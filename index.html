@@ -70,7 +70,6 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
 .btn-line{border:1px solid var(--line);color:var(--ink-soft)}
 .btn[disabled]{opacity:.45}
 #screen-start .btn{margin-top:14px}
-.start-foot{margin-top:auto;padding-top:48px;font-size:12px;color:var(--ink-soft);font-family:var(--sans);letter-spacing:.08em}
 
 /* ---------- 捏主控 ---------- */
 #screen-create{align-items:center;padding:calc(var(--sat) + 24px) 20px calc(var(--sab) + 24px)}
@@ -342,6 +341,7 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
 <body>
 
 <!-- ① 开局页：主菜单（继续 / 开新档 / 设置） -->
+<!-- 禁止在开局页底部添加版本号、build、字体、素材、署名等任何说明小字（用户要求，永久生效） -->
 <section id="screen-start" class="screen active">
   <div class="title-cal">红墙引</div>
   <div class="title-sub">带着系统去宫斗 · 旬回合养成</div>
@@ -351,7 +351,6 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
     <button class="btn btn-line" onclick="Game.askNewGame()">开新档</button>
     <button class="btn btn-ghost" onclick="Game.openSettings('API')">设置</button>
   </div>
-  <div class="start-foot" id="buildInfo">build 20261108-17 · 字体：朱雀仿宋 · 头像：深宫群像 · 性情/头像适配</div>
 </section>
 
 <!-- ①b 捏主控：本地随机生成主控档案（demo），确认后一键生成皇帝妃嫔等其余世界 -->
@@ -1447,9 +1446,9 @@ const PERSONA_ALIAS={
   '机灵':'机敏','伶俐':'机敏','聪慧':'机敏','聪敏':'机敏','灵敏':'机敏','颖悟':'机敏',
   '慎重':'谨慎','审慎':'谨慎','稳重':'谨慎','小心':'谨慎','周谨':'谨慎','持重':'谨慎',
   '忍让':'隐忍','含蓄':'隐忍','能忍':'隐忍','容忍':'隐忍',
-  '直率':'爽直','爽朗':'爽直','耿直':'爽直','直爽':'爽直','泼辣':'爽直','快人快语':'爽直',
-  '温柔':'温厚','温婉':'温厚','和善':'温厚','宽厚':'温厚','仁厚':'温厚','温和':'温厚','敦厚':'温厚','和煦':'温厚',
-  '高傲':'孤傲','孤高':'孤傲','孤僻':'孤傲','冷傲':'孤傲','落落寡合':'孤傲',
+  '直率':'爽直','爽朗':'爽直','耿直':'爽直','直爽':'爽直','泼辣':'爽直','快人快语':'爽直','爽利':'爽直','爽快':'爽直',
+  '温柔':'温厚','温婉':'温厚','和善':'温厚','宽厚':'温厚','仁厚':'温厚','温和':'温厚','敦厚':'温厚','和煦':'温厚','和气':'温厚','心软':'温厚',
+  '高傲':'孤傲','孤高':'孤傲','孤僻':'孤傲','冷傲':'孤傲','落落寡合':'孤傲','自傲':'孤傲','冷漠':'孤傲',
   '固执':'执拗','倔强':'执拗','倔':'执拗','认死理':'执拗',
   '柔顺':'柔婉','婉柔':'柔婉','温顺':'柔婉','娴静':'柔婉','柔静':'柔婉',
   '果断':'果决','决断':'果决','刚决':'果决','果敢':'果决','利落':'果决',
@@ -1458,12 +1457,12 @@ const PERSONA_ALIAS={
   '争强':'好胜','好强':'好胜','要强':'好胜','争胜':'好胜','不服输':'好胜',
   '细心':'细腻','心细':'细腻','细致':'细腻','敏感':'细腻','体贴':'细腻',
   '豁达':'大气','宽宏':'大气','开朗':'大气','大度':'大气','从容':'大气',
-  '胆小':'怯懦','懦弱':'怯懦','畏缩':'怯懦','胆怯':'怯懦','怕事':'怯懦',
+  '胆小':'怯懦','懦弱':'怯懦','畏缩':'怯懦','胆怯':'怯懦','怕事':'怯懦','怯弱':'怯懦',
   '幽默':'风趣','诙谐':'风趣','爱笑':'风趣',
   '坚韧':'坚忍','顽强':'坚忍','坚毅':'坚忍','能熬':'坚忍','百折不挠':'坚忍',
-  '清高':'清傲','高洁':'清傲','孤洁':'清傲',
+  '清高':'清傲','高洁':'清傲','孤洁':'清傲','清冷':'清傲',
   '世故':'圆滑','圆融':'圆滑','圆通':'圆滑','八面玲珑':'圆滑','玲珑':'圆滑',
-  '傲慢':'骄矜','自矜':'骄矜','矜贵':'骄矜','娇矜':'骄矜','骄纵':'骄矜','自视甚高':'骄矜'
+  '傲慢':'骄矜','自矜':'骄矜','矜贵':'骄矜','娇矜':'骄矜','骄纵':'骄矜','自视甚高':'骄矜','骄横':'骄矜'
 };
 const PERSONA_GROUPS=[['孤傲','清傲','骄矜'],['温厚','柔婉'],['隐忍','坚忍']];
 const PERSONA_CONFLICT=[
@@ -1634,10 +1633,15 @@ function avatarClassOf(name,rank){ // 按位份/称谓归类到身份池；认�
   if(npcKind(n)==='妃')return/皇后|皇贵妃|贵妃|贵嫔|嫔|妃|昭仪|昭容|昭媛|修仪|修容|修媛|充仪|充容|充媛/.test(n)?'consortHi':'consort'; // 只有称谓的旧档人物
   return libAvatarCat(n);
 }
-function avatarCatFor(s,who,rank){ // 位份/称谓之外，再看一眼存档里的皇帝本名，避免真名出场时配错
+function avatarCatFor(s,who,rank){ // 位份/称谓之外，再看一眼存档里的皇帝本名与皇嗣性别，避免真名出场时配错
   if(s&&s.world&&s.world.emperor){
     const en=String(s.world.emperor.name||'');
     if(en&&(who===en||who==='皇帝'))return'emperor';
+  }
+  if(s&&s.world){
+    const hs=String(s.world.heirs||'');
+    if(who&&hs.indexOf('皇子'+who+'（')>-1)return'prince';
+    if(who&&hs.indexOf('皇女'+who+'（')>-1)return'princess';
   }
   return avatarClassOf(who,rank);
 }
@@ -1726,7 +1730,7 @@ function enforceAvatarRules(s){ // 已分配头像的校正：停用图、性别
   if(pid&&!avatarIsAcceptable(pid,'consort',p.personality,p.age))p.avatar='';
   for(const id in s.npcs||{}){
     const n=s.npcs[id];if(!n||!n.avatar)continue;
-    const cat=avatarCatFor(s,id,n.rank)||'';
+    const cat=(n.avatarCat&&AVATAR_POOLS[n.avatarCat])?n.avatarCat:(avatarCatFor(s,id,n.rank)||'');
     const aid=avatarIdOf(n.avatar);
     if(!aid||!avatarIsAcceptable(aid,cat,npcTraits(n),n.age))n.avatar='';
   }
@@ -1746,7 +1750,9 @@ function backfillAvatars(s){ // 旧档/缺配人物补头像：主控 → npc �
   for(const id of Object.keys(s.npcs||{}).sort(byHash)){
     const n=s.npcs[id];if(!n)continue;
     if(!n.avatar&&s.avatarMap[id]){n.avatar=s.avatarMap[id];delete s.avatarMap[id]} // 同一人只留一张脸
-    if(!n.avatar)assign.push({who:id,cat:avatarCatFor(s,id,n.rank)||'',traits:npcTraits(n),age:n.age});
+    const cat=(n.avatarCat&&AVATAR_POOLS[n.avatarCat])?n.avatarCat:(avatarCatFor(s,id,n.rank)||'');
+    if(!n.avatarCat&&cat)n.avatarCat=cat;
+    if(!n.avatar)assign.push({who:id,cat,traits:npcTraits(n),age:n.age});
   }
   const names=[...new Set([...Object.keys(s.relationships||{}),...(Array.isArray(p.maids)?p.maids:[])])].sort(byHash);
   for(const name of names){
@@ -2292,7 +2298,10 @@ function applyDossier(list){
     if(d.realName)npc.realName=String(d.realName);
     if(d.age)npc.age=Number(d.age)||npc.age;
     if(!npc.avatar&&state.avatarMap&&state.avatarMap[id]){npc.avatar=state.avatarMap[id];delete state.avatarMap[id]} // 同一人只留一张脸
-    if(!npc.avatar)npc.avatar=giveAvatar(state,id,d.rank||'',d.traits,npc.age); // 新登场人物按身份与性情补一张剩余头像
+    const acat=npc.avatarCat||avatarCatFor(state,id,d.rank||npc.rank||'');
+    if(!npc.avatarCat)npc.avatarCat=acat;
+    if(npc.avatar&&!avatarIsAcceptable(avatarIdOf(npc.avatar),acat,npcTraits(npc),npc.age))npc.avatar=''; // 旧映射与身份不符则重配
+    if(!npc.avatar)npc.avatar=giveAvatar(state,id,d.rank||'',d.traits,npc.age,acat); // 新登场人物按身份与性情补一张剩余头像
     ensureNpcSkills(npc,id); // 新人物补才艺，供往后求师
     const prof=npc.profile=npc.profile||{traits:[],biography:[],impressions:{},recent:[],depth:'初识'};
     npc.known=true; // 模型在 dossier 里报到，说明主控已听说/见到，立即解锁
@@ -3177,7 +3186,11 @@ function buildOpeningWorld(proto){
   /* 开局头像：按身份、年龄与性情为每人（含主控）分配一张，全档不重复 */
   {const heirCat={};heirs.forEach(h=>heirCat[h.name]=(h.gender==='皇子'?'prince':'princess'));
    const assign=[{who:'__me__',cat:'consort',traits:protagonist.personality,age:protagonist.age}];
-   for(const id in npcs)assign.push({who:id,cat:heirCat[id]||avatarCatFor(state,id,npcs[id].rank)||'consort',traits:npcTraits(npcs[id]),age:npcs[id].age});
+   for(const id in npcs){
+     const cat=heirCat[id]||avatarCatFor(state,id,npcs[id].rank)||'consort';
+     npcs[id].avatarCat=cat; // 记下发放时的身份池：皇嗣等泛称旧档回读时仍按皇子/皇女校验
+     assign.push({who:id,cat,traits:npcTraits(npcs[id]),age:npcs[id].age});
+   }
    const dealt=dealAvatars(assign);
    protagonist.avatar=dealt['__me__'];
    for(const id in npcs)npcs[id].avatar=dealt[id];}
