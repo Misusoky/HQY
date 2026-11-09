@@ -2720,14 +2720,17 @@ function finalize(payload,meta){
     autoExpireStalePlots(meta&&meta.adj);
     try{applyDossier(payload.dossier)}catch(e){console.warn('[dossier] 人物档案回写失败',e)} // 单条人物档案出错不拖垮整旬结算
     const intelChanged=syncSkillIntel(state); // 交好到相熟：补记已知才艺
-    history.push({turn:state.turn,focus:meta.focus||'',choice:meta.choice||'',narrative:filterText(payload.narrative),log:String((payload.statePatch&&payload.statePatch.log)||'')});
+    const summary=String((payload.statePatch&&payload.statePatch.log)||'').trim();
+    state.lastNode=summary||`${fmtTime()} · ${meta.focus||meta.choice||'本旬行事'}`; // 自动档摘要用这句，不沿用开局的旧节点
+    history.push({turn:state.turn,focus:meta.focus||'',choice:meta.choice||'',narrative:filterText(payload.narrative),log:summary});
     if(history.length>HISTORY_CAP)history.splice(0,history.length-HISTORY_CAP);
     try{UI.renderTurnCard(payload,meta)}catch(e){console.warn('[card] 纪事卡渲染失败',e)}
     UI.updateStatusbar();
     if(intelChanged)toast('来往渐深，你已知道某人的才艺（人物谱可查）',3200);
-    if(majors.length||isMajorTurn(payload.statePatch,payload)){
-      saveToSlot(0,true);toast('已自动存档（'+fmtTime()+'）');
-    }
+    const major=!!(majors.length||isMajorTurn(payload.statePatch,payload));
+    const saved=saveToSlot(0,true); // 每旬结算都更新自动档：不再只在大事件与逢五旬时存
+    if(!saved)toast('自动存档失败：本机存储空间不足，请删除旧档或先导出备份',5200);
+    else if(major)toast('已自动存档（'+fmtTime()+'）');
     if(acquiredThisTurn.length){ // 新得之物：顺手标出能否使用、能否典当
       const list=acquiredThisTurn.slice(0,3).map(x=>`「${x.name}」${x.usable?'可使用':'不可使用'}·${x.pawnable?'可典当':'不可典当'}`).join('、');
       toast('获得 '+list+(acquiredThisTurn.length>3?' 等':''),4200);
@@ -3189,7 +3192,7 @@ const UI={
       <div class="sec"><div class="sec-cap">手动档</div>${[1,2,3].map(i=>slotHtml(SV.manual(i),'档位 '+i,false)).join('')}</div>
       <div class="setbtns"><button class="btn btn-ghost" onclick="Game.exportSave()">导出当前档</button><button class="btn btn-line" onclick="Game.importSave()">导入 JSON</button></div>
       <input type="file" id="importFile" accept=".json,application/json" style="display:none" onchange="Game.onImportFile(this)">
-      <div class="sheet-note">导入会直接覆盖当前进度，操作前请确认。</div>`;
+      <div class="sheet-note">自动档在每次本旬结算后更新；导入会直接覆盖当前进度，操作前请确认。</div>`;
   },
   sheetSettings(){
     return `<div class="setnav">
@@ -3864,7 +3867,6 @@ const Game={
     }
     resetXunBook(); // 新的一旬从零开始记账
     persistCurrent();UI.updateStatusbar();
-    if(state.turn%5===0){saveToSlot(0,true);toast('已自动存档（'+fmtTime()+'）')}
     phase='FOCUS_SELECT'; // 新的一旬从住处即可直接安排行事
     UI.goHome();
     this._xunStartPop(); // 旬首检查：已发酵事项直接弹出强制处理，不待命
