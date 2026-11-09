@@ -3816,8 +3816,7 @@ const Game={
       const gainNote=(walkNo>1)?'本旬康健收益已结算过，此次只演见闻、体质不再提升。'
         :(tb>0&&ti>=tb)?'气血已达根基，散步只作维持、不再提升。'
         :'体质正常且无疾病时，本次散步体质+1（恢复气血）——请写入 changes 与 statePatch。';
-      const msg=`第${xunNo()}旬第一轮：玩家往御花园散步闲逛（本旬第 ${walkNo} 次，耗精力 ${focusEnergyCost('散步')}）。演绎一路物候风景与园中见闻：可触发偶遇、宫人闲话、物候小事等轻量事件；偶遇与宠爱顺其自然，稀有资源随缘。${gainNote}（同一旬高强度活动与康健收益不兼得。）${leadHint}${pendHint}`;
-      msg+='散步只是本旬中的一段外出：scene.where 可写园中所在，但 statePatch.location 仍写本宫住处，不要把 location 改成御花园。';
+      const msg=`第${xunNo()}旬第一轮：玩家往御花园散步闲逛（本旬第 ${walkNo} 次，耗精力 ${focusEnergyCost('散步')}）。演绎一路物候风景与园中见闻：可触发偶遇、宫人闲话、物候小事等轻量事件；偶遇与宠爱顺其自然，稀有资源随缘。${gainNote}（同一旬高强度活动与康健收益不兼得。）${leadHint}${pendHint}散步只是本旬中的一段外出：scene.where 可写园中所在，但 statePatch.location 仍写本宫住处，不要把 location 改成御花园。`;
       this.round1(msg,'外出·御花园散步',focusEnergyCost('散步'),{leadIds:hits.map(p=>p.id),pendTexts:phits.map(pendText)}); // 宫城图不关：加载与结果都叠在图上，避免背景弹回房间
       return
     }
