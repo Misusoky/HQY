@@ -3479,11 +3479,49 @@ const Game={
     body.scrollTop=body.scrollHeight;
     return wrap;
   },
-  sayNarrative(text){ // 旁白回显：独立气泡，不配头像姓名
+  sayNarrative(text){ // 旁白回显：独立气泡，不配头像姓名；智能识别对话
     const parts=filterText(text||'').split(/\n+/).map(x=>x.trim()).filter(Boolean);
     for(const line of parts){
-      this.bubble('narr','',line);
-      if(sceneCtx)sceneCtx.lines.push({who:'narr',text:line});
+      // 检测是否包含对话引号（「」或""）
+      const hasDialog=/[「""]/.test(line);
+      if(hasDialog && sceneCtx){
+        // 智能拆分：旁白与对话交替
+        const segments=[];
+        let rest=line;
+        let isNarr=true;
+        // 用正则分割出旁白和对话部分
+        const regex=/([「""])(.*?)([」""])/g;
+        let lastIndex=0;
+        let match;
+        while((match=regex.exec(line))!==null){
+          // 对话前的旁白
+          if(match.index>lastIndex){
+            segments.push({type:'narr',text:line.slice(lastIndex,match.index).trim()});
+          }
+          // 对话内容
+          segments.push({type:'dialog',text:match[2].trim()});
+          lastIndex=regex.lastIndex;
+        }
+        // 最后剩余的旁白
+        if(lastIndex<line.length){
+          segments.push({type:'narr',text:line.slice(lastIndex).trim()});
+        }
+        // 渲染各部分
+        for(const seg of segments){
+          if(!seg.text)continue;
+          if(seg.type==='dialog'){
+            this.bubble('npc',sceneCtx.who||'',seg.text);
+            sceneCtx.lines.push({who:'npc',text:seg.text});
+          }else{
+            this.bubble('narr','',seg.text);
+            sceneCtx.lines.push({who:'narr',text:seg.text});
+          }
+        }
+      }else{
+        // 无对话：整句作为旁白
+        this.bubble('narr','',line);
+        if(sceneCtx)sceneCtx.lines.push({who:'narr',text:line});
+      }
     }
   },
   sayLine(text){ // 对方本轮话语：配其头像与姓名
