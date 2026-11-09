@@ -2142,11 +2142,19 @@ function guessUsable(name,note){ // 只有能实际消耗/生效的东西才可"
 function guessPawnable(name,note){ // 御赐/御前之物、有情感羁绊或违禁之物不可典卖
   return !/御赐|御前|太后|先皇后|自书|自抄|密信|七夕诗|地藏经|药|谱|抄本|避毒|藏锋|旧函|手串|当票|私藏|风险|不当|帕|纸|笺|帖/.test(String(name||'')+String(note||''));
 }
-function itemFlags(it){ // 补齐物品词条：可使用 / 可典当
+function applyShopCatalog(it){ // 商城词条落地：长期之物标记 durable（不耗件数、不可典卖、随身为用、入手即启用）
+  if(!it)return it;
+  const cat=SHOP_CATALOG[it.name];
+  if(!cat||cat.kind!=='durable')return it;
+  it.durable=true;it.usable=false;it.pawnable=false;
+  if(typeof it.equipped!=='boolean')it.equipped=true;
+  return it;
+}
+function itemFlags(it){ // 补齐物品词条：可使用 / 可典当；商城长期之物再落 durable
   if(!it)return it;
   if(typeof it.usable!=='boolean')it.usable=guessUsable(it.name,it.note);
   if(typeof it.pawnable!=='boolean')it.pawnable=guessPawnable(it.name,it.note);
-  return it;
+  return applyShopCatalog(it);
 }
 let acquiredThisTurn=[]; // 本旬新得之物：结算时提示"可使用/可典当"
 function addToInventory(list){ // 入库：按 名+备注 合并件数，件数归零即除名
@@ -3006,6 +3014,7 @@ const UI={
     else if(name==='传膳')B.innerHTML=this.sheetMeal();
     else if(name==='物品详情')B.innerHTML=this.sheetItemDetail(param);
     else if(name==='商城')B.innerHTML=this.sheetShop();
+    else if(name==='商品详情')B.innerHTML=this.sheetShopDetail(param);
     else if(name==='大事记')B.innerHTML=this.sheetChronicle();
     else if(name==='六宫')B.innerHTML=this.sheetVisit('妃');
     else if(name==='太医院')B.innerHTML=this.sheetVisit('医');
@@ -3069,14 +3078,16 @@ const UI={
   sheetItems(){
     let h='';
     const pend=((state.system&&state.system.shop)||[]).filter(it=>it.status==='待生效').map(it=>it.name);
-    if(pend.length)h+=`<div class="sec"><div class="sec-cap">待生效（商城购入）</div>${pend.map(n=>`<div class="itemrow"><span>${esc(n)}</span><span class="cnt">下轮结算</span></div>`).join('')}</div>`;
+    if(pend.length)h+=`<div class="sec"><div class="sec-cap">待生效（商城购入）</div>${pend.map(n=>`<div class="itemrow"><span>${esc(n)}</span><span class="cnt">下次行动结算时入手</span></div>`).join('')}</div>`;
     const inv=state.inventory||[];
     if(inv.length){
       h+=`<div class="sec"><div class="sec-cap">行囊（${inv.length} 种）</div>`+
         inv.map((it,i)=>{
           itemFlags(it);
-          const tags=`<span class="itag${it.usable?' on':''}">${it.usable?'可使用':'不可使用'}</span><span class="itag${it.pawnable?' on':''}">${it.pawnable?'可典当':'不可典当'}</span>`;
-          return `<button class="npcrow" onclick="UI.goSheet('物品详情',${i})"><span class="nr-name">${esc(it.name)}</span>${tags}<span class="nr-rel num">${it.count>0?'×'+esc(it.count):'已典出'}</span></button>`;
+          const tags=it.durable
+            ?`<span class="itag on">长期</span><span class="itag${it.equipped!==false?' on':''}">${it.equipped!==false?'佩戴中':'已收存'}</span>`
+            :`<span class="itag${it.usable?' on':''}">${it.usable?'可使用':'不可使用'}</span><span class="itag${it.pawnable?' on':''}">${it.pawnable?'可典当':'不可典当'}</span>`;
+          return `<button class="npcrow" onclick="UI.goSheet('物品详情',${i})"><span class="nr-name">${esc(it.name)}</span>${tags}<span class="nr-rel num">${it.durable?'':(it.count>0?'×'+esc(it.count):'已典出')}</span></button>`;
         }).join('')+`</div>`;
     }
     return h||'<div class="sheet-note">囊中空空。</div>';
@@ -3085,32 +3096,72 @@ const UI={
     const it=(state.inventory||[])[i];
     if(!it)return '<div class="sheet-note">此物已不在囊中。</div>';
     itemFlags(it);
+    const cat=SHOP_CATALOG[it.name]||{};
     const pawn=it.pawnable?`<button class="btn btn-primary" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.pawnItem(${i})">典卖 · 约得银 ${pawnPrice(it)} 两</button>`
       :`<button class="btn" disabled style="opacity:.45;letter-spacing:.1em;text-indent:.1em">不可典卖</button>`;
-    const usable=it.usable!==false;
+    const act=it.durable
+      ?`<button class="btn btn-primary" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.toggleEquip(${i})">${it.equipped!==false?'收存（停用效用）':'启用（随身佩戴）'}</button>`
+      :(it.usable!==false?`<button class="btn btn-primary" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.useItem(${i})">使用（耗精力 ${focusEnergyCost('使用道具')}）</button>`:`<button class="btn" disabled style="opacity:.45;letter-spacing:.1em;text-indent:.1em">不可使用</button>`);
+    const wide=(k,v)=>`<div class="rowline" style="align-items:flex-start"><span style="flex:none">${k}</span><span class="cnt" style="white-space:normal;text-align:right;max-width:70%">${esc(v)}</span></div>`;
     return `<div class="sec"><div class="sec-cap">${esc(it.name)}</div>
-      <div class="itemrow"><span>件数</span><span class="cnt num">×${esc(it.count)}</span></div>
+      ${cat.kind?`<div class="itemrow"><span>类别</span><span class="cnt">${cat.kind==='durable'?'长期之物 · 随身为用':'消耗品 · 用毕即无'}</span></div>`:''}
+      ${it.durable?'':`<div class="itemrow"><span>件数</span><span class="cnt num">×${esc(it.count)}</span></div>`}
       ${it.src?`<div class="itemrow"><span>来历</span><span class="cnt">${esc(it.src)}</span></div>`:''}
-      <div class="rowline" style="align-items:flex-start"><span style="flex:none">备注</span><span class="cnt" style="white-space:normal;text-align:right;max-width:70%">${esc(it.note||'—')}</span></div>
-      <div class="itemrow"><span>可否使用</span><span class="cnt">${it.usable?'可':'不可'}</span></div>
+      ${it.durable?`<div class="itemrow"><span>状态</span><span class="cnt">${it.equipped!==false?'佩戴中 · 效用生效':'已收存 · 效用暂停'}</span></div>`:''}
+      ${it.note?`<div class="rowline" style="align-items:flex-start"><span style="flex:none">备注</span><span class="cnt" style="white-space:normal;text-align:right;max-width:70%">${esc(it.note)}</span></div>`:''}
+      ${cat.usage?wide('用法',cat.usage):''}
+      ${cat.fx?wide('效用',cat.fx):''}
+      <div class="itemrow"><span>可否使用</span><span class="cnt">${it.durable?'无需使用 · 启用即生效':(it.usable?'可':'不可')}</span></div>
       <div class="itemrow"><span>可否典卖</span><span class="cnt">${it.pawnable?'可':'不可'}</span></div></div>
-      <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px">
-      ${usable?`<button class="btn btn-primary" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.useItem(${i})">使用（耗精力 ${focusEnergyCost('使用道具')}）</button>`:`<button class="btn" disabled style="opacity:.45;letter-spacing:.1em;text-indent:.1em">不可使用</button>`}
-      ${pawn}</div>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px">${act}${pawn}</div>
       <button class="backbtn" onclick="UI.sheetBack()">◀ 返回行囊</button>`;
   },
   sheetShop(){
     const p=state.protagonist||{};const shop=(state.system&&state.system.shop)||[];
-    const rows=shop.map((it,i)=>{
+    const ownOf=nm=>(state.inventory||[]).filter(x=>x.name===nm).reduce((a,x)=>a+(Number(x.count)||0),0);
+    const row=(it,i)=>{
+      const cat=SHOP_CATALOG[it.name]||{};
       const pending=it.status==='待生效';
       const sold=it.status==='已购'||it.status==='已用';
-      const lbl=pending?'待生效':(sold?it.status:'购买');
-      const own=it.name==='读心笺'?` · 持有 ×${(state.inventory||[]).filter(x=>x.name==='读心笺').reduce((a,x)=>a+(Number(x.count)||0),0)}`:'';
-      return `<div class="itemrow"><span>${esc(it.name)}</span><span class="cnt">积分 ${esc(it.cost)}${own}${it.status?` · ${esc(it.status)}`:''}</span>
-        <button style="flex:none;min-width:64px;min-height:34px;border-radius:8px;border:1px solid ${sold?'var(--line)':'var(--cinnabar)'};color:${sold?'var(--ink-soft)':'var(--cinnabar)'};font-size:13px" ${sold||pending?'disabled':''} onclick="Game.buyItem(${i})">${lbl}</button></div>`;
-    }).join('');
+      const tag=cat.kind==='durable'?'<span class="itag on">长期</span>':'<span class="itag">消耗</span>';
+      const right=sold?`<span class="nr-rel" style="color:var(--ink-soft)">${esc(it.status)}</span>`
+        :(pending?'<span class="nr-rel">待生效</span>'
+        :`<span class="nr-rel num">积分 ${esc(it.cost)}${ownOf(it.name)>0?` · 持有 ×${ownOf(it.name)}`:''}</span>`);
+      return `<button class="npcrow" onclick="UI.goSheet('商品详情',${i})"><span class="nr-name">${esc(it.name)}</span>${tag}${right}</button>`;
+    };
+    const idx=shop.map((it,i)=>[it,i]);
+    const dur=idx.filter(([it])=>(SHOP_CATALOG[it.name]||{}).kind==='durable');
+    const con=idx.filter(([it])=>(SHOP_CATALOG[it.name]||{}).kind!=='durable');
+    const sec=(cap,note,list)=>list.length?`<div class="sec"><div class="sec-cap">${cap}</div><div class="sheet-note" style="margin:0 0 6px">${note}</div>${list.map(([it,i])=>row(it,i)).join('')}</div>`:'';
     return `<div class="sec"><div class="sec-cap">宫斗系统 · 商城</div>
-      <div class="sheet-note" style="margin:0 0 6px">可用积分：<b class="num">${esc(p.points??0)}</b> · 购买即扣，下轮生效</div>${rows||'商城暂无物品'}</div>`;
+      <div class="sheet-note" style="margin:0">可用积分：<b class="num">${esc(p.points??0)}</b> · 点物品名看详情与用法 · 购买即扣，下次行动结算时入手</div></div>`
+      +sec('长期之物','购入随身为用，不耗件数；入手后在行囊详情页启停。',dur)
+      +sec('消耗品','用毕即无；读心笺购入即刻入囊，余者下次行动结算时入手。',con);
+  },
+  sheetShopDetail(i){
+    const it=((state.system&&state.system.shop)||[])[i];
+    if(!it)return '<div class="sheet-note">此物已不在商城。</div>';
+    const cat=SHOP_CATALOG[it.name]||{};
+    const durable=cat.kind==='durable';
+    const pending=it.status==='待生效';
+    const sold=it.status==='已购'||it.status==='已用';
+    const own=(state.inventory||[]).filter(x=>x.name===it.name).reduce((a,x)=>a+(Number(x.count)||0),0);
+    const wide=(k,v)=>`<div class="rowline" style="align-items:flex-start"><span style="flex:none">${k}</span><span class="cnt" style="white-space:normal;text-align:right;max-width:70%">${esc(v)}</span></div>`;
+    const buy=(sold||pending)
+      ?`<button class="btn" disabled style="opacity:.45;letter-spacing:.1em;text-indent:.1em">${pending?'待生效 · 下次行动结算时入手':esc(it.status)}</button>`
+      :`<button class="btn btn-primary" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.buyItem(${i})">购买 · 积分 ${esc(it.cost)}</button>`;
+    const after=durable?'购买后于下一次行动结算时入手，入手即启用；之后可在行囊详情页收存／启用。'
+      :(it.name==='读心笺'?'购买后即刻入囊；去「人物」中点开其人详情使用。'
+      :'购买后于下一次行动结算时入手，入行囊后在详情页点「使用」，一件即耗。');
+    return `<button class="backbtn" onclick="UI.sheetBack()">◀ 返回商城</button>
+      <div class="sec"><div class="sec-cap">${esc(it.name)}</div>
+      <div class="itemrow"><span>类别</span><span class="cnt">${cat.kind==='durable'?'长期之物 · 随身为用':(cat.kind==='consumable'?'消耗品 · 用毕即无':'—')}</span></div>
+      <div class="itemrow"><span>价格</span><span class="cnt num">积分 ${esc(it.cost)}</span></div>
+      ${own>0&&!sold?`<div class="itemrow"><span>持有</span><span class="cnt num">×${own}</span></div>`:''}
+      ${cat.desc?wide('详情',cat.desc):''}
+      ${cat.usage?wide('用法',cat.usage):''}
+      ${cat.fx?wide('效用',cat.fx):''}</div>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px">${buy}<div class="sheet-note">${after}</div></div>`;
   },
   relBadge(who){
     const r=(state.relationships||{})[who];
@@ -3343,6 +3394,55 @@ const WORLD_LIB = {
     {name:'免罪金牌（小）', cost:80}, {name:'驻颜膏', cost:60}, {name:'子嗣缘符', cost:100},
     {name:'藏锋匣', cost:90}
   ]
+};
+
+/* 商城词条：详情 / 用法 / 效用。kind 区分长期之物（随身为用、不耗件数）与消耗品（用毕即无），
+   商店列表只存 名/价/状态，词条以名为键在此静态维护 */
+const SHOP_CATALOG = {
+  '读心笺': {kind:'consumable',
+    desc:'素白小笺一张，无字无墨，入手微温。系统之物，只你可见可触。',
+    usage:'购入即刻入囊。在「人物」中点开其人详情，点「她心底如何看待你」即燃笺窥心：每张限用一次，不占回合、不耗精力；所见只此一瞬，不落档。',
+    fx:'即时窥见一人此刻对你的真实心意。'},
+  '玉容散': {kind:'consumable',
+    desc:'宫中养颜的细粉，调蜜敷面。据说是旧时贵妃们妆前的私藏，宫婢间千金难求。',
+    usage:'晚间洁面后调蜜匀敷，一次一盒。行囊详情页点「使用」即敷，耗些许精力。',
+    fx:'敷后肤色细润，外貌小幅进益（小档，渐进而非骤变）。'},
+  '益气丸': {kind:'consumable',
+    desc:'温补丸药，丸小力沉，与太医院益气固本的路数同源。',
+    usage:'温水送服，一次一丸。行囊详情页点「使用」即服，耗些许精力。',
+    fx:'补养气血：气血低于根基时助其回升；要拔高根基，仍须长期调理。'},
+  '静心香篆': {kind:'consumable',
+    desc:'篆香一盘，焚之烟细如线，气味清苦回甘，能定心神。',
+    usage:'于室内焚香静坐，一盘整燃。行囊详情页点「使用」即焚，耗些许精力。',
+    fx:'宁神定志：缓和惊悸与戾气，心绪宁定时不易生事、不易树敌。'},
+  '双鲤笺': {kind:'consumable',
+    desc:'双鱼纹样的名笺一对，一留一寄。信到即焚，不留纸迹。',
+    usage:'写毕封好，托可靠人手递出，或匿名送入指定宫中。行囊详情页点「使用」即写即递，耗些许精力。',
+    fx:'安全通一次书信：传情、报信、试探皆可，途经与风险由主持人裁定。'},
+  '传声鹤': {kind:'consumable',
+    desc:'折纸白鹤，吹气即成，翅振三声便到那人耳边，说完即散作光尘。',
+    usage:'对着鹤轻声嘱托一句紧要话，指明收话人。行囊详情页点「使用」即遣，耗些许精力。',
+    fx:'隔空传一句话：不经人手、不落字迹，隔墙有耳时最稳。'},
+  '驻颜膏': {kind:'consumable',
+    desc:'琥珀色小盒膏子，膏体细滑，带一缕冷香，据说是前朝方士所传。',
+    usage:'晨起妆前点敷眼角唇边，一次一盒。行囊详情页点「使用」即敷，耗些许精力。',
+    fx:'养颜驻容：外貌进益较玉容散更显著（仍为小档，非改头换面）。'},
+  '避毒珠': {kind:'durable',
+    desc:'乌沉珠子一颗，贴身戴着冬暖夏凉；百毒近身，则微微发烫示警。',
+    usage:'购入后随身佩戴（入手即启用），无需也不可「使用」。行囊详情页可「收存」摘下——效用即停，再「启用」戴回。',
+    fx:'长期之效：佩戴中可避寻常毒物与慢药暗算，毒近身时你会有所察觉。'},
+  '免罪金牌（小）': {kind:'durable',
+    desc:'小小一枚鎏金令牌，先朝式样，宫中旧档可验，能抵一次小过。',
+    usage:'长期收好即可，无需使用。闯下小祸（言语失当、礼仪有亏之类）时它自动替你挡下一次责罚，挡过即碎。',
+    fx:'遇事自动生效：抵一次小罪责罚；大逆不赦之罪不抵。'},
+  '子嗣缘符': {kind:'durable',
+    desc:'朱砂符纸折成的符令，贴身收着，微微发热。',
+    usage:'贴身佩戴（入手即启用），无需也不可「使用」。行囊详情页可「收存」停用，再「启用」戴回。',
+    fx:'长期之效：佩戴中增益子嗣缘，帷帐之事后更易有信；收存则无效。'},
+  '藏锋匣': {kind:'durable',
+    desc:'夹层小匣，外看是寻常妆匣，内里一格暗层，锁钥精巧。',
+    usage:'安置在住处夹墙或妆台暗处（入手即安置妥当），无需也不可「使用」。行囊详情页可「收存」停用。',
+    fx:'长期之效：启用中可匿藏密信、违禁样本等物，不列入明面清点，搜查时更难暴露。'}
 };
 
 const WL_HIGH_RANKS = {
@@ -3963,6 +4063,16 @@ const Game={
     sceneWhoHint=(opts&&opts.whoHint)||null; // 每次行动重置：只有拜访类行动才带兜底说话人
     phase='NARRATING';UI.showBusy('铺排中','正在铺排本旬剧情……',true);
     if(soldNotes.length){msg+=`\n另：主控已将 ${soldNotes.join('、')} 典卖换银（银两已自行囊前端结算，请在世界后台与传闻中承接，勿重复发银）。`}
+    if(pendingBuys.length){ // 商城待生效购买：积分已扣，本轮起必须入手并结算（此前只在「使用道具」时带入，购买后干别的行动会静默丢失）
+      const lines=pendingBuys.map(nm=>{
+        const c=SHOP_CATALOG[nm];
+        if(!c)return nm;
+        return c.kind==='durable'?`${nm}（长期之物，入手即随身启用：${c.fx}）`:`${nm}（消耗品，入行囊待主控择时用：${c.fx}）`;
+      }).join('；');
+      msg+=`\n本旬起生效的商城购买：${lines}。请把入手过程写入本旬正文，并经 statePatch["inventory.add"] 交给主控（来路注明「商城购入」）；效用并入本旬结算。`;
+    }
+    const gear=(state.inventory||[]).filter(x=>x&&x.durable&&x.equipped!==false); // 随身长期之物：每轮带效用进场，主持人承接
+    if(gear.length){msg+=`\n随身长期之物（佩戴／安置中）：${gear.map(x=>{const c=SHOP_CATALOG[x.name];return c?`${x.name}——${c.fx}`:x.name}).join('；')}。演绎与结算时承接其长期效用；若本旬因剧情被毁、被搜、被夺，写入 statePatch["inventory.add"] 以负件数扣减。`}
     const adj=adjudicatePlots(opts&&opts.skipDice); // 旬首剧情裁决：到期/超期剧情与冷却状态（主动触发时骰子让位）
     if(opts&&opts.meetWho)adj.gardenMeet=opts.meetWho; // 御花园偶遇命中：本轮必须触发与这个人的 scene 事件
     Game._lastAdj=adj;Game._lastFocus=focus; // 供剧情场景收尾与纪事摘要
@@ -3971,6 +4081,8 @@ const Game={
     const settle=p=>{
       $('#mapview').classList.remove('on'); // 目的地行动落定即收起宫城图（加载层 z-60 本就叠在图上）
       UI.hideBusy();
+      const shopArr=(state.system&&state.system.shop)||[];
+      for(const nm of pendingBuys){const e=shopArr.find(x=>x&&x.name===nm);if(e&&e.status==='待生效')e.status='已购'} // 待生效流转：本轮已演绎入手，商架记为已购
       pendingBuys=[];soldNotes=[];lastUseIdx=null;
       finalize(p,{focus,adj});
       logXunAction(focus);
@@ -4473,10 +4585,17 @@ const Game={
       toast('已购「读心笺」一张，即刻入囊');
     }else{
       it.status='待生效';pendingBuys.push(it.name);
-      toast(`已购「${it.name}」，效果下轮生效`);
+      toast(`已购「${it.name}」，下次行动结算时入手`);
     }
     logXunAction(`商城·${it.name}`);
-    persistCurrent();UI.renderSheet('商城');UI.updateStatusbar();
+    persistCurrent();UI.renderSheet('商品详情',i);UI.updateStatusbar();
+  },
+  toggleEquip(i){ // 长期之物：启用（随身佩戴）／收存（停用效用）；不耗件数、不占回合
+    const it=(state.inventory||[])[i];if(!it||!it.durable)return;
+    it.equipped=!(it.equipped!==false);
+    persistCurrent();
+    toast(it.equipped?`「${it.name}」已随身启用`:`「${it.name}」已收存，效用暂停`);
+    UI.renderSheet('物品详情',i);
   },
   /* 才艺修习面板 */
   openSkills(){selSkill=null;UI.openSheet('才艺修习')},
@@ -4576,13 +4695,16 @@ const Game={
   useItem(i){
     if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
     if((state.energy??0)<=0){this.collapse();return}
-    const it=(state.inventory||[])[i];if(!it||it.count<=0||it.usable===false)return;
+    const it=(state.inventory||[])[i];if(!it||it.count<=0)return;
+    if(it.durable){toast('长期之物无需使用：在详情页启用／收存即可');return}
+    if(it.usable===false){toast('此物不能使用');return}
     it.count-=1;const gone=it.count<=0;lastUseIdx=i;
     const label=`使用「${it.name}」`;
     const cost=focusEnergyCost('使用道具');
-    const buyNote=pendingBuys.length?`\n本旬起生效的商城购买：${pendingBuys.join('、')}（积分已扣，请将其效果并入本旬结算与 statePatch）。`:'';
+    const cat=SHOP_CATALOG[it.name];
+    const fxNote=cat?`此物效用：${cat.fx}`:'';
     UI.closeSheet();
-    this.round1(`第${xunNo()}旬第一轮：玩家消耗精力 ${cost} ${label}（${gone?'已用尽':'尚余 '+it.count+' 件'}${it.note?'；'+it.note:''}）。演绎使用此物的具体过程与其效果，然后决定是否触发剧情（hasEvent）。${buyNote}`,label,cost);
+    this.round1(`第${xunNo()}旬第一轮：玩家消耗精力 ${cost} ${label}（${gone?'已用尽':'尚余 '+it.count+' 件'}${it.note?'；'+it.note:''}）。${fxNote}演绎使用此物的具体过程与其效果，然后决定是否触发剧情（hasEvent）。`,label,cost);
   },
   pawnItem(i){
     const it=(state.inventory||[])[i];if(!it||!it.pawnable||it.count<=0)return;
