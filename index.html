@@ -1078,8 +1078,8 @@ const WORLD_BOOK_RUNTIME=(()=>{
     return !!(m&&keep.has(m[1]));
   }).join('\n\n').trim();
 })();
-const STYLE_GUIDE = "# 《带着系统去宫斗》叙事文风\n\n本文件只保存叙事与文风规则；玩法、数值、人物与世界规则以《世界书》为准。两份文件冲突时，固定事实与世界规则以《世界书》为准，表达方式以本文件为准。\n\n## 1. 叙事与文风\n\n- 视角与人称：第二人称限定视角，叙述一律以“你”称呼主控，写“你抬眼”“你听见”“你心里一沉”，不写“她抬眼”，也不以姓名或位份代指主控；全程贴主控所见所感，不出现主控不可知的信息。NPC 台词、书信与面板可照常称位份、名讳或“你”。既往摘要与旧档若为第三人称，只作事实参考，本旬正文仍须改用“你”。查询类指令以系统面板呈现，不属于叙事视角。\n- **可读性优先**：古典质感不等于晦涩。必须让读者清楚知道谁在哪里、做了什么、为何产生变化。不得把正常情节写成需要反复猜测的谜语，不要过度使用留白和暗示。\n- 基调与语感：架空盛唐感，自然、清楚、有温度。人物可以直说请求、拒绝、不悦与关心，不必句句藏锋；宫人言语保留尊卑分寸，禁用现代词汇、现代比喻与现代心理学术语。\n- 句子与节奏：以完整、顺畅的中长句承担叙事，短句只用于真正的停顿或冲突。避免连续单句成段、过度省略主语、频繁使用破折号，以及只写手、光、风、香而不推进事情的碎片化表达。\n- 对话与叙述：对话要有实际信息和来回反应，不能全是试探与弦外之音。叙述应明确说明主控能够理解的因果、身体感受与情绪变化，不强迫读者从一件器物猜测整段关系。\n- 核心手法：动作、对话、明确的感受说明和少量环境细节共同构成场景。情节发展必须清晰，人物关系与事件结果必须明确交代，不要让读者猜测基本事实。\n- 情绪可以适度直写，如“你听得有些难堪”“这句话让你松了口气”，但不得用夸张宣告替代具体反应，也不写大段心理独白。\n- 日常养成须具体可感，同时写出行动过程、遇到的小问题和结果，不用“努力后有所提升”替代正文，也不只堆指法、墨痕等意象。\n- 文风保持清楚、自然、具体：过度留白、晦涩暗示、通篇短句、机锋式对话、标签式人物介绍、四字成语堆砌、狗血反转、为凑戏份围着主控转、空环境铺陈、结尾感悟与面板复述，都从文中省去。\n- 篇幅与结构（一切场景的硬上限，无例外）：普通养成旬正文 250—400 字；主线、感情与重大抉择正文 400—600 字；单次正文一律不超过 650 字——开局、侍寝、生产、死亡、结局、番外、小剧场等所有场景同受此限。剧情对话每轮 line 不超过 120 字。每旬以 1—2 个完整场景为宜，正文不使用 emoji。\n- 简洁要求：每句须推进事件、关系或信息，删去不写也不损失任何信息的句子。环境描写至多两句且须与当下行动相关；同一情绪不反复渲染；寒暄客套只写必要的一来一回；宁可短而清楚，不长而铺陈。\n\n### 正反对照\n\n反例（晦涩、碎片化、过度留白，避免这样写）：\n\n> 廊下的光薄了。你没动。柳妃看你，笑了一声。“妹妹仍这样。”你垂眼，指尖冷。风穿过帘子。柳妃走了。你看玉佩。旧物。旧事。半晌，只道：“回吧。”\n\n正例（清楚、自然、明确表达，应当这样写）：\n\n> 柳妃在廊下叫住你，先问你病后可还服药，随后才提起去岁那匹云锦。“事情过去这些日子，我并非还要与你争一时长短。只是宫里人来人往，妹妹如今得太后青眼，说话行事也该替旁人留些余地。”这话听着像劝诫，也明明白白带着警告。你没有立刻答应，只道：“娘娘肯把话说开，是肯指点我。只是哪些余地该留，我还想请教娘娘。”柳妃看了你一会儿，命宫人把新做的护膝留下，转身离开。你回到殿中，才发觉方才一直攥着袖口。你让春韶将护膝收进箱里，没有佩戴；柳妃主动来谈和是事实，是否可信，还要看日后。";
-const PROMPT_TEMPLATE = "# 系统提示词模板（网页版每次请求拼接使用）\n\n> 使用方式：把下方「世界书」「叙事文风」「当前存档」三个占位块替换为对应文件全文（02、03、04），作为请求的 system 内容；用户消息再附上本旬指令（如「第 N 旬第一轮：玩家选择生活重心为 X」）。\n\n---\n\n你是文字游戏《带着系统去宫斗》的主持人。你严格遵守以下全部设定与纪律，只输出 JSON。\n\n## 一、世界书（固定事实与长期规则）\n\n{{世界书全文：02-世界书.md}}\n\n## 二、叙事文风（表达方式以此为准）\n\n{{叙事文风全文：03-叙事文风.md}}\n\n## 三、当前存档（动态进度的唯一依据，覆盖世界书默认值）\n\n{{当前存档 JSON：04-当前存档-v36.json 或玩家当前档}}\n\n## 四、主持人纪律（每次输出前静默自查）\n\n1. 每次只推进一个时间单位（一旬），由玩家决定何时继续；死亡先呈现局面。\n2. 每旬流程：先演绎本旬养成/重心过程，再检查剧情触发（30%—60%）；有剧情时给 2—4 个有实质差异的选项并停下等玩家抉择，后果在应对之后结算。\n3. 每旬至多一条需应对的主要剧情；较大影响事件后间隔至少 3 旬再出大事件；到期引线优先兑现但合进已有轮次。\n4. 数值结算：普通事件单次 ±1—5，重大 ±5—15 且须有前置或代价；属性钳制 0—100；体质（气血）永不高于根基（存档 protagonist.constitutionBase）：恢复气血只在气血低于根基时结算，拔高根基单次至多+1、上限90，且必须同写 protagonist.constitutionBase 与 protagonist.attributes.体质；只结算真实发生的事，不因同一事件重复加减；不影响不知情或无关角色。\n5. 银两对账：逐笔记收支，下旬末统一结算月俸（每月 6 两）。\n6. 知情边界：NPC 只依据亲历、目睹、听说或合理推断知情；私密互动不外溢；针对主控的阴谋在主控视角中突然发生，不提前剧透；不写主控不可知的上帝视角内容。\n7. NPC 言行持续符合身份、性格、关系阶段与情绪；到期引线（裴贵妃正月内须有可见动作等）到点即兑现。\n8. 宠爱须转化为实际相处：宠爱 83 的皇帝应有召见、共膳、书信、记住细节等实际接触，不只用赏赐糊数字。\n9. 选项设计：围绕不同目标、手段或代价拉开；允许稳妥回避、直接应对、借助他人、主动担险；每个选项写当下可见的机会或代价，也保留可能带来明确负面结果的方向。\n10. 正文严格遵守叙事文风：第二人称限定视角，叙述一律以“你”称呼主控，写“你抬眼”“你听见”，以“你”指代主控；全程贴主控所见所感，既往摘要与旧档中的第三人称只作事实参考。narrative 与 haremNews 中凡涉及主控，一律称“你”；清楚顺畅可读优先；对话有实际信息与来回反应；普通旬 250—400 字，剧情/感情/重大应对 400—600 字，单次正文一律不超过 650 字，开局、侍寝、生产、死亡、结局、番外等一切场景同受此限；scene 对话每轮 line 不超过 120 字；每句须推进事件或信息，细节服务于事件，环境铺陈、结尾感悟与面板复述从略；正文不用 emoji。\n11. 内容边界：现代概念与术语留在戏外，亲密与伤害场面点到为止；超现实元素仅宫斗系统，且只对主控可见。\n12. 自定义行动符合世界规则即认真承接，不合理行动以世界内逻辑、风险或失败结果回应。\n\n## 五、输出格式（只输出 JSON 本身，不加 markdown 代码块与额外文字）\n\n```json\n{\n  \"narrative\": \"本旬剧情正文\",\n  \"haremNews\": \"后宫动态（主控可感知的公开消息与传闻，传闻须可标注失真；无则空字符串）\",\n  \"changes\": [\"本旬变化条目，只列变化项\"],\n  \"hasEvent\": false,\n  \"options\": [],\n  \"todo\": [\"待续事项，只列临期约定、剧情引线、持续事件\"],\n  \"statePatch\": {\n    \"location\": \"地点\",\n    \"protagonist.attributes.体质\": 62,\n    \"protagonist.constitutionBase\": 70,\n    \"protagonist.skills.琴艺\": 33,\n    \"protagonist.silver\": 66,\n    \"protagonist.points\": 90,\n    \"relationships.韦昭仪.value\": 86,\n    \"inventory.add\": [{\"name\": \"泥金团扇\", \"count\": 1, \"note\": \"郑贵人赠\", \"usable\": true, \"pawnable\": true}],\n    \"pending\": [\"更新后的待兑现事项\"],\n    \"log\": \"本旬一句话摘要\"\n  }\n}\n```\n\n规则：\n- `hasEvent: true` 时 `options` 给 2—4 项（每项含 id 与 text），正文与选项给出后停止，不结算应对后果；`hasEvent: false` 时 `options` 必须为空数组，同时完整结算本旬。\n- `statePatch` 只放本次实际变化的键；未变化的不写。键用点号路径对应存档 JSON 结构。\n- 体质（气血）≤根基（protagonist.constitutionBase）：恢复性提升（散步、药膳、静养）只在气血低于根基时每旬至多+1；拔高根基（锻炼、调理、系统道具）单次至多+1、上限90，须同写 constitutionBase 与体质。\n- 获得、用尽、送出、损毁物品一律写 `statePatch[\"inventory.add\"]`：`name` 物品名（短，不带件数与括号备注）、`count` 件数（消耗/送出/损毁用负数）、`note` 备注（如「已完工」「某人所赠」，持久显示）、`usable` 可否使用——药物、香露、吃食、符物、系统道具等能实际消耗或生效的为 true；信物、文书、手迹、衣饰、摆件等只能收藏或转赠的为 false。`pawnable` 可否典卖——御赐与御前之物、太后所赐、有情感羁绊之物（信物、手迹、旧函）、违禁或涉密之物为 false，寻常财物为 true。物品统一走 `inventory.add`。行囊清单见存档 `inventory`，前端按名合并件数，归零除名。\n- 第二轮（玩家已作应对）请求到达时：演绎行动、他人反应与直接后果，统一结算本旬养成与剧情，`hasEvent` 恒为 false。\n- 旬首请求到达时：先推进世界后台（核心 NPC 目标卡见存档 npcGoalCards），再演绎主控所选重心的具体养成过程，然后决定是否触发剧情。\n- 显示顺序遵循世界书第 12 节：当前状态→本旬安排→剧情正文→后宫动态→本旬变化→（道具/商城提示按需）→待续事项→下一步。界面会按此渲染，无需在 JSON 里重复状态栏。\n- 正文用简体中文书面语，不用 emoji。\n";
+const STYLE_GUIDE = "# 《带着系统去宫斗》叙事文风\n\n本文件只保存叙事与文风规则；玩法、数值、人物与世界规则以《世界书》为准。两份文件冲突时，固定事实与世界规则以《世界书》为准，表达方式以本文件为准。\n\n## 1. 叙事与文风\n\n- 视角与人称：第二人称限定视角，叙述一律以“你”称呼主控，写“你抬眼”“你听见”“你心里一沉”，不写“她抬眼”，也不以姓名或位份代指主控；全程贴主控所见所感，不出现主控不可知的信息。NPC 台词、书信与面板可照常称位份、名讳或“你”。既往摘要与旧档若为第三人称，只作事实参考，本旬正文仍须改用“你”。查询类指令以系统面板呈现，不属于叙事视角。\n- **可读性优先**：古典质感不等于晦涩。必须让读者清楚知道谁在哪里、做了什么、为何产生变化。不得把正常情节写成需要反复猜测的谜语，不要过度使用留白和暗示。\n- 基调与语感：架空盛唐感，自然、清楚、有温度。人物可以直说请求、拒绝、不悦与关心，不必句句藏锋；宫人言语保留尊卑分寸，禁用现代词汇、现代比喻与现代心理学术语。\n- 句子与节奏：以完整、顺畅的中长句承担叙事，短句只用于真正的停顿或冲突。避免连续单句成段、过度省略主语、频繁使用破折号，以及只写手、光、风、香而不推进事情的碎片化表达。\n- 对话与叙述：对话要有实际信息和来回反应，不能全是试探与弦外之音。叙述应明确说明主控能够理解的因果、身体感受与情绪变化，不强迫读者从一件器物猜测整段关系。\n- 核心手法：动作、对话、明确的感受说明和少量环境细节共同构成场景。情节发展必须清晰，人物关系与事件结果必须明确交代，不要让读者猜测基本事实。\n- 情绪可以适度直写，如“你听得有些难堪”“这句话让你松了口气”，但不得用夸张宣告替代具体反应，也不写大段心理独白。\n- 日常养成须具体可感，同时写出行动过程、遇到的小问题和结果，不用“努力后有所提升”替代正文，也不只堆指法、墨痕等意象。\n- 文风保持清楚、自然、具体：过度留白、晦涩暗示、通篇短句、机锋式对话、标签式人物介绍、四字成语堆砌、狗血反转、为凑戏份围着主控转、空环境铺陈、结尾感悟与面板复述，都从文中省去。\n- 篇幅与结构（一切场景的硬上限，无例外）：普通养成旬正文 250—400 字；主线、感情与重大抉择正文 400—600 字；单次正文一律不超过 650 字——开局、侍寝、生产、死亡、结局、番外、小剧场等所有场景同受此限。剧情对话 scene.parts 总长每轮不超过 120 字。每旬以 1—2 个完整场景为宜，正文不使用 emoji。\n- 简洁要求：每句须推进事件、关系或信息，删去不写也不损失任何信息的句子。环境描写至多两句且须与当下行动相关；同一情绪不反复渲染；寒暄客套只写必要的一来一回；宁可短而清楚，不长而铺陈。\n\n### 正反对照\n\n反例（晦涩、碎片化、过度留白，避免这样写）：\n\n> 廊下的光薄了。你没动。柳妃看你，笑了一声。“妹妹仍这样。”你垂眼，指尖冷。风穿过帘子。柳妃走了。你看玉佩。旧物。旧事。半晌，只道：“回吧。”\n\n正例（清楚、自然、明确表达，应当这样写）：\n\n> 柳妃在廊下叫住你，先问你病后可还服药，随后才提起去岁那匹云锦。“事情过去这些日子，我并非还要与你争一时长短。只是宫里人来人往，妹妹如今得太后青眼，说话行事也该替旁人留些余地。”这话听着像劝诫，也明明白白带着警告。你没有立刻答应，只道：“娘娘肯把话说开，是肯指点我。只是哪些余地该留，我还想请教娘娘。”柳妃看了你一会儿，命宫人把新做的护膝留下，转身离开。你回到殿中，才发觉方才一直攥着袖口。你让春韶将护膝收进箱里，没有佩戴；柳妃主动来谈和是事实，是否可信，还要看日后。";
+const PROMPT_TEMPLATE = "# 系统提示词模板（网页版每次请求拼接使用）\n\n> 使用方式：把下方「世界书」「叙事文风」「当前存档」三个占位块替换为对应文件全文（02、03、04），作为请求的 system 内容；用户消息再附上本旬指令（如「第 N 旬第一轮：玩家选择生活重心为 X」）。\n\n---\n\n你是文字游戏《带着系统去宫斗》的主持人。你严格遵守以下全部设定与纪律，只输出 JSON。\n\n## 一、世界书（固定事实与长期规则）\n\n{{世界书全文：02-世界书.md}}\n\n## 二、叙事文风（表达方式以此为准）\n\n{{叙事文风全文：03-叙事文风.md}}\n\n## 三、当前存档（动态进度的唯一依据，覆盖世界书默认值）\n\n{{当前存档 JSON：04-当前存档-v36.json 或玩家当前档}}\n\n## 四、主持人纪律（每次输出前静默自查）\n\n1. 每次只推进一个时间单位（一旬），由玩家决定何时继续；死亡先呈现局面。\n2. 每旬流程：先演绎本旬养成/重心过程，再检查剧情触发（30%—60%）；有剧情时给 2—4 个有实质差异的选项并停下等玩家抉择，后果在应对之后结算。\n3. 每旬至多一条需应对的主要剧情；较大影响事件后间隔至少 3 旬再出大事件；到期引线优先兑现但合进已有轮次。\n4. 数值结算：普通事件单次 ±1—5，重大 ±5—15 且须有前置或代价；属性钳制 0—100；体质（气血）永不高于根基（存档 protagonist.constitutionBase）：恢复气血只在气血低于根基时结算，拔高根基单次至多+1、上限90，且必须同写 protagonist.constitutionBase 与 protagonist.attributes.体质；只结算真实发生的事，不因同一事件重复加减；不影响不知情或无关角色。\n5. 银两对账：逐笔记收支，下旬末统一结算月俸（每月 6 两）。\n6. 知情边界：NPC 只依据亲历、目睹、听说或合理推断知情；私密互动不外溢；针对主控的阴谋在主控视角中突然发生，不提前剧透；不写主控不可知的上帝视角内容。\n7. NPC 言行持续符合身份、性格、关系阶段与情绪；到期引线（裴贵妃正月内须有可见动作等）到点即兑现。\n8. 宠爱须转化为实际相处：宠爱 83 的皇帝应有召见、共膳、书信、记住细节等实际接触，不只用赏赐糊数字。\n9. 选项设计：围绕不同目标、手段或代价拉开；允许稳妥回避、直接应对、借助他人、主动担险；每个选项写当下可见的机会或代价，也保留可能带来明确负面结果的方向。\n10. 正文严格遵守叙事文风：第二人称限定视角，叙述一律以“你”称呼主控，写“你抬眼”“你听见”，以“你”指代主控；全程贴主控所见所感，既往摘要与旧档中的第三人称只作事实参考。narrative 与 haremNews 中凡涉及主控，一律称“你”；清楚顺畅可读优先；对话有实际信息与来回反应；普通旬 250—400 字，剧情/感情/重大应对 400—600 字，单次正文一律不超过 650 字，开局、侍寝、生产、死亡、结局、番外等一切场景同受此限；scene.parts 总长每轮不超过 120 字；每句须推进事件或信息，细节服务于事件，环境铺陈、结尾感悟与面板复述从略；正文不用 emoji。\n11. 内容边界：现代概念与术语留在戏外，亲密与伤害场面点到为止；超现实元素仅宫斗系统，且只对主控可见。\n12. 自定义行动符合世界规则即认真承接，不合理行动以世界内逻辑、风险或失败结果回应。\n\n## 五、输出格式（只输出 JSON 本身，不加 markdown 代码块与额外文字）\n\n```json\n{\n  \"narrative\": \"本旬剧情正文\",\n  \"haremNews\": \"后宫动态（主控可感知的公开消息与传闻，传闻须可标注失真；无则空字符串）\",\n  \"changes\": [\"本旬变化条目，只列变化项\"],\n  \"hasEvent\": false,\n  \"options\": [],\n  \"todo\": [\"待续事项，只列临期约定、剧情引线、持续事件\"],\n  \"statePatch\": {\n    \"location\": \"地点\",\n    \"protagonist.attributes.体质\": 62,\n    \"protagonist.constitutionBase\": 70,\n    \"protagonist.skills.琴艺\": 33,\n    \"protagonist.silver\": 66,\n    \"protagonist.points\": 90,\n    \"relationships.韦昭仪.value\": 86,\n    \"inventory.add\": [{\"name\": \"泥金团扇\", \"count\": 1, \"note\": \"郑贵人赠\", \"usable\": true, \"pawnable\": true}],\n    \"pending\": [\"更新后的待兑现事项\"],\n    \"log\": \"本旬一句话摘要\"\n  }\n}\n```\n\n规则：\n- `hasEvent: true` 时 `options` 给 2—4 项（每项含 id 与 text），正文与选项给出后停止，不结算应对后果；`hasEvent: false` 时 `options` 必须为空数组，同时完整结算本旬。\n- `statePatch` 只放本次实际变化的键；未变化的不写。键用点号路径对应存档 JSON 结构。\n- 体质（气血）≤根基（protagonist.constitutionBase）：恢复性提升（散步、药膳、静养）只在气血低于根基时每旬至多+1；拔高根基（锻炼、调理、系统道具）单次至多+1、上限90，须同写 constitutionBase 与体质。\n- 获得、用尽、送出、损毁物品一律写 `statePatch[\"inventory.add\"]`：`name` 物品名（短，不带件数与括号备注）、`count` 件数（消耗/送出/损毁用负数）、`note` 备注（如「已完工」「某人所赠」，持久显示）、`usable` 可否使用——药物、香露、吃食、符物、系统道具等能实际消耗或生效的为 true；信物、文书、手迹、衣饰、摆件等只能收藏或转赠的为 false。`pawnable` 可否典卖——御赐与御前之物、太后所赐、有情感羁绊之物（信物、手迹、旧函）、违禁或涉密之物为 false，寻常财物为 true。物品统一走 `inventory.add`。行囊清单见存档 `inventory`，前端按名合并件数，归零除名。\n- 第二轮（玩家已作应对）请求到达时：演绎行动、他人反应与直接后果，统一结算本旬养成与剧情，`hasEvent` 恒为 false。\n- 旬首请求到达时：先推进世界后台（核心 NPC 目标卡见存档 npcGoalCards），再演绎主控所选重心的具体养成过程，然后决定是否触发剧情。\n- 显示顺序遵循世界书第 12 节：当前状态→本旬安排→剧情正文→后宫动态→本旬变化→（道具/商城提示按需）→待续事项→下一步。界面会按此渲染，无需在 JSON 里重复状态栏。\n- 正文用简体中文书面语，不用 emoji。\n";
 const CHRONICLE_MD = "---\nname: chronicle\ntype: project\ndescription: 《带着系统去宫斗》剧情大事记，仅保留仍影响后续的重要历史。\n---\n\n# 剧情大事记 · 带着系统去宫斗\n\n## 元朔元年：入宫与慢药案\n- 你以云麾将军崔家嫡女身份入宫，初册正七品常在，居披香殿侧殿，主位韦昭仪；系统激活。\n- 初入宫时得皇帝点名，柳妃由此记恨。诗会夺魁后入御前。\n- 与皇帝逐渐亲近；元年五月首次侍寝，获御赐安息香。\n- 与韦昭仪建立假冷淡掩护与实际信任；开始抄经，与太后结缘。\n- 郑贵人元年六月小产，太后暗查，旧案至今未结。\n- 柳妃实施慢药与云锦逾制双线构陷。你装病查链、取证设局反杀，九月圣裁：柳妃降从四品嫔、禁足半年、罚俸一年。柳氏成为长期死敌。\n- 大案后闭门谢客半月稳住声望；十月菊宴复出。\n\n## 元朔二年：经营根基\n- 逐步经营太后、皇后、韦昭仪与林守拙关系，完成主线四至六。\n- 林守拙收为半师，教授医术药理；获准赴太医院抄书。\n- 你从慈宁宫抄经升为校经，得太后信任与澄心堂旧墨。\n- 韦昭仪授藏证之道、开蒙琴艺，双方成稳定盟谊。\n- 二年腊月晋正六品美人，三年晋从五品才人。\n\n## 元朔四年：柳氏案终局与当前格局\n- 柳嫔密信案由皇后查办，其兄长外放江南道，处境转危。\n- 八月初二你奉皇后口谕探病，坐实柳嫔假病，脉案呈中宫。\n- 九月中旬：柳氏降美人、幽禁听雨轩（无诏不得出）；被幽禁前递密信给你——求递话＋附\"郑贵人案有两份脉案底档、经手人原稿藏江南\"的消息。你焚帕、密信藏于藏锋匣，按下查证，真伪未证。\n- 皇帝九月上旬夜访披香殿，赐先皇后旧绣样一匣，宠爱82。\n- 十一月初三赏菊宴：你以\"残雪缺月\"答皇后问缺角菊，中宫称善，你的\"雪点妆\"被挪至菊山正面；裴贵妃侧目记怨。\n- 当前未结事项以最新存档为准。";
 const DEFAULT_SAVE = {"game": "带着系统去宫斗", "saveVersion": "v36", "turn": 127, "time": {"era": "元朔", "year": 4, "month": 12, "xun": "下旬", "note": "四年十二月下旬，年度结算毕；入腊月尽，即将进入元朔五年正月"}, "location": "披香殿侧殿", "lastNode": "腊月下旬闭门练琴收官；《平沙》小成", "world": {"dynasty": "晟朝", "emperor": {"name": "李衍", "age": 22, "traits": "念旧而寡情，重视旧物与\"不取\"", "recent": "冬至宴亲赞崔\"字比诗好\"；曾在御苑菊山\"雪点妆\"前驻足，说\"缺一角才有意思\"（高德全转述）"}, "factions": ["含凉殿", "流霞阁", "听雨轩"], "heirs": "无皇嗣", "keyServants": ["高德全", "秦狰", "沈姑姑", "林守拙（半师）"]}, "protagonist": {"name": "崔明蘅", "age": 16, "rank": "从五品才人", "family": "云麾将军崔家嫡女", "personality": ["机敏", "谨慎", "隐忍"], "attributes": {"外貌": 71, "才华": 73, "交际": 58, "忌惮": 60, "手段": 55, "威望": 95, "体质": 81, "孕率": 63}, "skills": {"书法": 77, "琴艺": 31, "医术·药理": 60, "棋艺": 21, "女红": 20, "莳花": 12}, "skillNotes": "《平沙》渐入佳境；能闻味辨药、认脉", "silver": 68, "points": 90, "health": "康健", "salary": "每月6两，下旬末统一结算", "special": "子嗣缘符已启用，贴身香囊暗格；温补方照用，数月无信", "maids": ["春韶", "晚晴"], "security": "入口四道手，药可闻不可尝", "settleRule": "并行多事时主收益打折＋一项附带收益"}, "items": {"systemItems": ["避毒珠×1（贴身，已购）", "藏锋匣（夹墙暗格，钥匙贴身）：先皇后旧式鲤鱼灯、慢药样本、柳美人密信一封（私藏中，风险自担；鲤鱼帕已焚毁）"], "medical": ["清暑香露一瓶", "《各宫平安脉脉案抄本》（查无先皇后病中脉案，中宫脉案单独立档）", "皇后赏药材匣"], "empressDowager": ["青年自抄《地藏经》旧函（每旬初一读一页）", "澄心堂旧墨", "旧檀木手串", "菊饼余量将尽"], "emperor": ["御赐安息香", "白玉镇纸", "金错刀", "先皇后旧绣样一匣十二幅（滚针、抢针已至山茶第三层色，一幅将收尾）", "松香一小包"], "others": ["《兰亭序》唐摹本", "泥金团扇", "《棋经》", "兔子宫灯", "赤金缠枝红宝石簪（封存）", "云锦四匹（御赐，不当不送不裁）", "宫扇", "东珠一匣", "自书字与七夕诗二首", "冬衣、素珍珠簪、吉服", "素缎兰草帕", "杏子红海棠帕（已完工）"], "pawned": "安神香两盒，已逾期，赎当须加价", "misc": ["手膏\"甘菊冷香\"版", "三元羹", "自抄《菊谱》《花镜》条目册一册"], "plants": "\"雪点妆\"盆菊两株：一株根未冻实明春可期，一株仍在暖阁休养（十二月中旬自御苑起回侧殿）"}, "relationships": {"皇帝": {"type": "宠爱", "value": 83}, "皇后萧氏": {"type": "好感", "value": 55}, "太后": {"type": "好感", "value": 52}, "韦昭仪": {"type": "好感", "value": 85}, "郑贵人": {"type": "好感", "value": 19}, "裴贵妃": {"type": "好感", "value": 1, "note": "记怨未发"}, "柳美人": {"type": "仇恨", "value": "长期死敌，幽禁听雨轩；密信求情未答，玩家按下查证"}, "林守拙": {"type": "半师", "note": "棋约已清"}, "杜选侍": "畏惧", "高德全": "态度偏软", "薛女史": "可靠补台"}, "system": {"mainQuests": "主线一至十已完成；隐藏成就\"引蛇出洞\"", "activeQuest": "当前无在途主线任务（子嗣线开启，等待中）", "points": 90, "shop": [{"name": "读心笺", "cost": 15}, {"name": "玉容散", "cost": 45}, {"name": "益气丸", "cost": 50}, {"name": "静心香篆", "cost": 50}, {"name": "双鲤笺", "cost": 40}, {"name": "传声鹤", "cost": 55}, {"name": "避毒珠", "cost": 70, "status": "已购"}, {"name": "免罪金牌（小）", "cost": 80}, {"name": "驻颜膏", "cost": 60}, {"name": "子嗣缘符", "cost": 100, "status": "已用"}, {"name": "藏锋匣", "cost": 90, "status": "已购"}]}, "recentConfirmedFacts": ["十一月上旬：太后请脉赠菊饼；赏菊宴\"残雪缺月\"答皇后，菊挪菊山正面，裴贵妃记怨", "十一月中旬：练绣样；拜访韦昭仪问先皇后，获线索——先皇后信佛病中少传太医、中宫脉案单独立档、太医院秦院判在其走后半年致仕回乡；抄本无载", "十一月下旬：闭门练琴《平沙》小成；冬至宴（腊月初）即兴作诗，帝赞\"字比诗好\"；探望韦昭仪咳疾送温方受赏", "十二月中旬：休养闲逛；御苑收菊回殿；传闻裴贵妃宫里寻了崔冬至诗字拓样（存疑）", "十二月下旬：潜心练琴收官；《平沙》渐入佳境，琴艺29→31"], "pending": ["裴贵妃：记怨未发；拓字传闻存疑，留意", "先皇后旧档线索：秦院判（致仕回乡）＋中宫脉案单独立档＋柳氏密信\"两份底档\"——三线方向相近，宜慢查", "柳氏密信：藏于藏锋匣；求情之请未答", "郑贵人小产旧案：真伪未证", "安神香当票已逾期", "子嗣线：缘符随身，等待中", "正月里节令（元旦、人日）将至，可预备露脸或礼数"], "npcGoalCards": {"裴贵妃": "目标不明，对崔记怨未动；冬至宴全程冷淡。期限：不可再无限观望，正月内须有一次可见动作", "柳美人": "幽禁听雨轩，无诏不得出；递信求援未得回音", "韦昭仪": "维持与崔的盟谊；咳疾渐愈", "林守拙": "任太医院职务如常；与崔有随时手谈之约"}, "nextStep": "元朔五年正月上旬，由玩家安排生活重心；正月节令可留意"};
 
@@ -1112,7 +1112,7 @@ const PERSONA_MODULE = [
 const LENGTH_MODULE = [
 '## 十三、篇幅与输出预算（硬性覆盖世界书、叙事文风与模板中的篇幅数字）',
 '1. 普通养成旬正文 150—250 字；剧情、感情、重大应对 250—380 字；单次正文一律不超过 420 字。开局、侍寝、生产、死亡、结局、番外等所有场景同受此限。',
-'2. scene.line 每轮不超过 70 字；options 2—3 项即可，确有四个不同方向时才给 4 项。',
+'2. scene.parts 总长每轮不超过 70 字，按语义分 2—5 段；options 2—3 项即可，确有四个不同方向时才给 4 项。',
 '3. changes 不超过 5 条，每条不超过 20 字；dossier 每轮至多 1 人，只写本轮新增信息。',
 '4. 环境铺陈、心理独白、结尾总结与面板复述从略；每句须推进事件、关系或信息，删去不损失信息的句子。',
 '5. 剧情对话的 ongoing 轮次（非 resolve）只输出 scene 与 options：narrative 留空字符串，changes 与 statePatch 留空对象/空数组。'
@@ -1337,15 +1337,20 @@ const SCENE_MODULE = [
 '触发剧情（hasEvent=true）时优先输出 scene 结构，进入对话式剧情：',
 '```json',
 '{"hasEvent":true,',
-' "eventSource":"太后",',
-' "scene":{"state":"ongoing","who":"太后","line":"对方本轮的话或动作","when":"腊月廿三 申时","where":"御花园梅林"},',
+' "eventSource":"素心",',
+' "narrative":"你把话在心里过了一遍：……只让人回了句",',
+' "scene":{"state":"ongoing","who":"素心",',
+'  "parts":[{"type":"narr","text":"她把茶盏搁下，声音放轻"},{"type":"say","text":"知道了"}],',
+'  "when":"腊月廿三 申时","where":"御花园梅林"},',
 ' "options":[{"id":"a","text":"接话选项，可带姿态标签如【敛衽福身】"},{"id":"b","text":"另一方向，机会或代价可见"}],',
 ' "statePatch":{}}',
 '```',
 '- scene.who 必填，写清对方是谁：用存档中的人物称谓或姓名（如"太后""韦昭仪""春韶"），顶层 eventSource 写同一人；界面据此显示姓名与头像。',
-'- 触发剧情的当旬，narrative 必须先交代主控正在何处做什么、此人如何出现（迎面、传唤、偶遇、遣人请去），再进第一句台词；界面会先显示这段叙述，再接 scene.line。',
-'- 每轮只演绎对方当即反应与场面变化：scene.state="ongoing"，给 scene.line（一段不超过 70 字，只写对方这一轮的话与关键动作，不写主控的动作心理、不铺环境）、scene.where/when（有变化才写）与 2—3 个接话选项（放顶层 options）；此阶段 narrative 必须为空字符串，changes 与 statePatch 为空，不结算数值。',
-'- 事已说尽、应对已足或局面已变时：scene.state="resolve"，并一并输出完整结算——narrative（收尾演绎）、changes、statePatch（含 statePatch.plots 的变动条目），规则同第二轮。',
+'- scene.parts 必填：按语义把这一轮拆成 2—5 段，而不是按标点硬切。type="narr" 写旁白、动作、神态；type="say" 写对方这一轮的原话（不带引号）；同场换人说话时在该段加 "who"。不要输出空段或纯标点段，台词后的句号、引号不要单独成段。',
+'- 触发剧情的当旬，narrative 必须先交代主控正在何处做什么、此人如何出现（迎面、传唤、偶遇、遣人请去），只写旁白，到"只让人回了句"这类引出语为止；第一句台词放进 scene.parts 的 say 段。界面会先显示 narrative，再按 parts 顺序渲染。',
+'- narrative 只写旁白与动作，人物台词一律放进 scene.parts；不要在 narrative 里写引号对白。scene.line 可省略，仅作旧界面兜底。',
+'- 每轮只演绎对方当即反应与场面变化：scene.state="ongoing"，scene.parts 总长不超过 70 字（只写对方这一轮的话与关键动作，不写主控的动作心理、不铺环境）、scene.where/when（有变化才写）与 2—3 个接话选项（放顶层 options）；此阶段 narrative 必须为空字符串，changes 与 statePatch 为空，不结算数值。',
+'- 事已说尽、应对已足或局面已变时：scene.state="resolve"，并一并输出完整结算——narrative（收尾旁白，不写台词）、changes、statePatch（含 statePatch.plots 的变动条目），规则同第二轮。',
 '- 收尾只收束本场对话中已发生的事；须呼应既往前情时，只写存档剧情账与待续事项里已有记载的内容。',
 '- 召宫人问话、临时差遣等旬中插话不是本旬养成：收尾只结算这场对话本身（关系、情报、交办差事、行囊），主角才艺与基础属性留到旬末小结。',
 '- 对话以 2—3 轮自然收束：事情说尽、该告退时让人物主动收话（如"还有什么要交代的""奴婢省得，这便去办"），随后 scene.state="resolve"。玩家随时可选"结束对话"，你应声简短收尾（narrative 一两句即可）。',
@@ -2276,7 +2281,8 @@ function buildMessages(userMsg,noHistory){
 const SCENE_RULES=[
 '你是文字游戏《带着系统去宫斗》的主持人，现在只推进一段剧情对话里「对方这一句」。时间与数值留到收尾结算。只输出 JSON。',
 '【文风】架空盛唐，人物言语符合身份、性情与当下情绪；用古代语汇；只写对方的话与关键动作。',
-'【输出】{"narrative":"","changes":[],"hasEvent":true,"scene":{"state":"ongoing","who":"对方称谓","line":"≤70字","where":"有变化才写","when":"有变化才写"},"options":[{"id":"a","text":"≤70字"},{"id":"b","text":"≤70字"}]}',
+'【输出】{"narrative":"","changes":[],"hasEvent":true,"scene":{"state":"ongoing","who":"对方称谓","parts":[{"type":"narr","text":"旁白/动作"},{"type":"say","text":"对方原话，不带引号"}],"where":"有变化才写","when":"有变化才写"},"options":[{"id":"a","text":"≤70字"},{"id":"b","text":"≤70字"}]}',
+'【分段】scene.parts 按语义分 2—5 段：narr 写旁白、动作、神态；say 写对方台词，不带引号。不要按标点硬切，不要空段或纯标点段；同场换人说话时 say 段可带 who。narrative 只写旁白，不写引号对白。',
 '【约束】本轮 scene.state 必须是 "ongoing"；narrative 必须为空字符串，changes=[]，statePatch={}；options 给 2—3 个方向不同的接话，只写当下可见的机会或代价。即使话已说尽，也只写对方收束性的一句，由玩家选择「结束对话」，本轮保持 ongoing。',
 '【承接】严格承接用户消息里的本场对话记录，把话题往前推；对方只依据自己的性情、目标、与主控的关系及已知信息回应。'
 ].join('\n');
@@ -2307,7 +2313,7 @@ function buildSceneSystem(who){
 
 /* ============================================================ API */
 function appendBudgetNote(msgs){ // 截断后原样重发必然再截断：附一段精简要求，把结算压回预算内
-  const note='【上一次输出超出长度上限被截断】请重新输出完整 JSON，并压缩篇幅：narrative 不超过 350 字；scene.line 不超过 80 字；changes 不超过 5 条；statePatch 只写本旬确有变化的键；dossier 至多 1 人。务必保证 JSON 完整闭合。';
+  const note='【上一次输出超出长度上限被截断】请重新输出完整 JSON，并压缩篇幅：narrative 不超过 350 字；scene.parts 总长不超过 80 字；changes 不超过 5 条；statePatch 只写本旬确有变化的键；dossier 至多 1 人。务必保证 JSON 完整闭合。';
   const out=msgs.map(m=>Object.assign({},m));
   const last=out[out.length-1];
   if(last&&last.role==='user')last.content=String(last.content)+'\n'+note;
@@ -3646,10 +3652,14 @@ function unlockNpc(name,depth='听说'){ // 渐进解锁：听说过/打过交�
   }
 }
 
-function sceneSpeaker(p,sc){ // 定对话对方：模型漏写 who 时，从台词里唯一能对上的人物取名，别一律显示"宫中来人"
+function sceneSpeaker(p,sc){ // 定对话对方：模型漏写 who 时，先认 parts 里的 say.who／拜访对象，再从台词里找唯一人名
   const raw=String((sc&&sc.who)||(p&&p.eventSource)||'').trim();
   if(raw&&!/^(宫中来人|来人|某人|众人|宫人|宫女|太监|不详|事发)$/.test(raw))return raw;
-  const line=String((sc&&sc.line)||''); // 只认台词里点名的人：翻叙述猜人容易把传话太监错认成太后
+  const parts=Array.isArray(sc&&sc.parts)?sc.parts:[];
+  const partWho=[...new Set(parts.map(x=>x&&x.who).filter(Boolean).map(x=>String(x).trim()))].filter(Boolean);
+  if(partWho.length===1)return partWho[0];
+  if(sceneWhoHint)return sceneWhoHint; // 主动拜访：拜访对象比叙述里被提及的人更可靠
+  const line=[String((sc&&sc.line)||''),...parts.map(x=>String((x&&x.text)||x||''))].join(' ');
   const npcs=(state&&state.npcs)||{};
   const hits=Object.keys(npcs).filter(id=>id&&id.length>=2&&line.includes(id));
   if(hits.length===1)return hits[0];
@@ -3796,7 +3806,7 @@ const Game={
     const phits=matchPending([who,npc]);
     const leadHint=hits.length?`\n【呼应引线】此人与在途引线相关：${hits.map(p=>`「${p.title}」（${p.line}）`).join('；')}。请借此次会面推进或了结它：能兑现的当旬兑现并回写台账；暂不能了结的，也要让会面与之产生实质关联（新信息、态度变化、埋下下一步），并更新 note。`:'';
     const pendHint=phits.length?`\n【呼应待续】此次行动与待续琐事相关：${phits.map(x=>pendText(x)).join('；')}。请在本旬演绎中顺手办理或问起此事，办妥的从 statePatch.pending 移除；未办妥的更新一句现状（回写即重置挂账计旬）。`:'';
-    const msg=`第${xunNo()}旬第一轮：玩家主动出门拜访「${npc}」。依双方关系、位份、情理与时机如实演接待结果——接见、婉拒、不在宫中都可能，吃闭门羹也是有效结果，见面与否顺其自然。若接见，用剧情对话 scene 结构呈现此次会面（scene.who 填「${npc}」；对方说话、玩家接话，多轮后 resolve 收尾结算）；若未见到，安静结算本旬。${leadHint}${pendHint}`;
+    const msg=`第${xunNo()}旬第一轮：玩家主动出门拜访「${npc}」。依双方关系、位份、情理与时机如实演接待结果——接见、婉拒、不在宫中都可能，吃闭门羹也是有效结果，见面与否顺其自然。若接见，用剧情对话 scene 结构呈现此次会面（scene.who 填「${npc}」；scene.parts 按语义分段，narr 写旁白动作、say 写台词，不带引号；对方说话、玩家接话，多轮后 resolve 收尾结算）；若未见到，安静结算本旬。${leadHint}${pendHint}`;
     this.round1(msg,'拜访·'+npc,focusEnergyCost('社交拜访'),{skipDice:true,leadIds:hits.map(p=>p.id),pendTexts:phits.map(pendText),whoHint:npc});
   },
   maidTalk(name){ // 日常宫务：不预调 API、不弹"事发"，本地开场白直入对话；开口说话才扣精力（每次5）
@@ -3937,7 +3947,7 @@ const Game={
       const p0=parsePayload(raw);
       const noEvent=(this._eventMandated(adj)||(opts&&opts._xunPop))&&!p0.hasEvent; // 裁决要求触发而模型没触发：仍纠正一次（旬首发酵弹出为硬强制）
       if(noEvent){
-        const fixMsg=msg+`\n【纠正】前端剧情裁决已裁定本旬必须触发剧情（${this._mandateText(adj)}），你却输出 hasEvent=false。请重新输出完整 JSON：hasEvent=true，用剧情对话 scene 结构呈现本轮剧情（scene.state="ongoing"、scene.line 为对方的话或动作、顶层 options 给 2—4 个接话选项），停下等待玩家应对、不结算后果；本旬养成过程简要并入 narrative。`;
+        const fixMsg=msg+`\n【纠正】前端剧情裁决已裁定本旬必须触发剧情（${this._mandateText(adj)}），你却输出 hasEvent=false。请重新输出完整 JSON：hasEvent=true，用剧情对话 scene 结构呈现本轮剧情（scene.state="ongoing"、scene.parts 按语义分段：narr 写旁白/动作，say 写对方台词、不带引号、不按标点硬切；顶层 options 给 2—4 个接话选项），停下等待玩家应对、不结算后果；本旬养成过程简要并入 narrative。`;
         lastRequest={type:'r1',msg:fixMsg,focus,cost,opts};
         UI.showBusy('铺排中','正在重新生成剧情……',true);
         return callModel(fixMsg).then(raw2=>settle(parsePayload(raw2)));
@@ -3980,7 +3990,8 @@ const Game={
     if(!sc.who||/^(宫中来人|来人|某人|众人|宫人|宫女|太监|不详|事发)$/.test(sc.who))sc.who=who; // 回写兜底说话人，进入对话时不再丢
     const title=plot?plot.title:(who==='宫中来人'?'事发':who);
     const meta=[sc.when,sc.where].filter(Boolean).join('｜');
-    const lead=sc.line?filterText(sc.line):this.chatLead(p);
+    const parts=this.sceneParts(sc);
+    const lead=sc.line?filterText(sc.line):(parts?parts.map(x=>x.type==='say'?`“${x.text}”`:x.text).join(''):this.chatLead(p));
     const setup=filterText(p.narrative||'');
     const setupTail=setup?setup.split(/(?<=[。！？])/).filter(Boolean).slice(-2).join('').slice(-180):''; // 先交代在何处遇上谁，避免剧情凭空开始
     $('#incTitle').textContent=title==='事发'?'事发':'事发 · '+title;
@@ -4052,10 +4063,42 @@ const Game={
     }
     const tail=text.slice(last).trim();
     if(tail)out.push({type:last===0?'plain':'narr',text:tail});
-    return out;
+    return out.filter(s=>s.text&&!/^[\s。，、；：！？…—·'"“”‘’「」『』()（）]+$/.test(s.text)); // 纯标点不成段
   },
-  sayNarrative(text){ // 旁白回显：引号内配对方头像，引号外走无头像旁白
+  sceneParts(sc){ // API 语义分段：scene.parts=[{type:"narr"|"say",text,who?}]
+    let arr=sc&&sc.parts;
+    if(typeof arr==='string'){try{arr=JSON.parse(arr)}catch(e){arr=null}}
+    if(!Array.isArray(arr))return null;
+    const out=[];
+    for(const p of arr){
+      if(p==null)continue;
+      const text=filterText(typeof p==='string'?p:(p.text??p.content??'')).trim();
+      if(!text||/^[\s。，、；：！？…—·'"“”‘’「」『』()（）]+$/.test(text))continue;
+      const raw=String(p.type||p.t||p.role||'').trim().toLowerCase();
+      const isSay=['say','dialog','dialogue','npc','speech','character','char','台词','对白'].includes(raw);
+      out.push({type:isSay?'say':'narr',text,who:p.who?String(p.who).trim():''});
+    }
+    return out.length?out:null;
+  },
+  sayParts(parts,who){ // 按 API 给的语义段渲染：say 带头像，narr 走旁白
+    const fallback=who||(sceneCtx?sceneCtx.who:'');
+    for(const p of parts){
+      if(p.type==='say'){
+        this.bubble('npc',p.who||fallback,p.text);
+        if(sceneCtx)sceneCtx.lines.push({who:'npc',text:p.text});
+      }else{
+        this.bubble('narr','',p.text);
+        if(sceneCtx)sceneCtx.lines.push({who:'narr',text:p.text});
+      }
+    }
+  },
+  sayNarrative(text,whole){ // 旁白回显：whole=true 时整段当旁白（API 已语义分段，不再猜引号）
     const parts=filterText(text||'').split(/\n+/).map(x=>x.trim()).filter(Boolean);
+    if(whole){
+      const t=parts.join('\n');
+      if(t){this.bubble('narr','',t);if(sceneCtx)sceneCtx.lines.push({who:'narr',text:t})}
+      return;
+    }
     for(const line of parts){
       for(const seg of this.splitSpeech(line)){
         if(seg.type==='dialog'){
@@ -4150,9 +4193,10 @@ const Game={
     $('#chatClock').textContent=fmtTime();
     const body=$('#chatBody');body.innerHTML='';
     if(sc.when||sc.where)this.bubble('sys','',`${sc.when||''}${sc.when&&sc.where?'｜':''}${sc.where||''}`);
-    if(p.narrative){this.sayNarrative(p.narrative);p._narrShown=true} // 触发剧情的当旬正文：先铺出在何处、如何遇上此人，再进第一句台词
-    const opening=sc.line?filterText(sc.line):this.chatLead(p);
-    this.sayLine(opening); // 引号内进对方气泡，引号外的动作/神态走旁白
+    const parts=this.sceneParts(sc);
+    if(p.narrative){this.sayNarrative(p.narrative,!!parts);p._narrShown=true} // 有 parts 时 narrative 整段当旁白，不再按引号猜
+    if(parts){this.sayParts(parts);p._narrShown=true} // 新协议：API 已按语义分好旁白与台词，直接渲染
+    else{const opening=sc.line?filterText(sc.line):this.chatLead(p);this.sayLine(opening)} // 旧输出兜底：按引号拆
     $('#chatview').classList.add('on');
     if(sc.state==='resolve'){ // 一轮即收尾：直接结算，不给接话选项
       this._sceneResolve(p);
@@ -4196,20 +4240,22 @@ const Game={
       const p=parsePayload(raw);
       const sc=p.scene||{};
       const sopts=(Array.isArray(p.options)&&p.options.length)?p.options:(Array.isArray(sc.options)?sc.options:[]);
+      const parts=this.sceneParts(sc);
       if(compact){ // 精简轮只演对方这一句，不 resolve、不结算；收尾留给「结束对话」或轮数上限
         phase='EVENT_CHOICE';
         if(sc.when||sc.where)this.bubble('sys','',`${sc.when||''}${sc.when&&sc.where?'｜':''}${sc.where||''}`);
-        const line=sc.line?filterText(sc.line):(p.narrative?this.chatLead(p):'');
-        if(line)this.sayLine(line);
+        if(parts)this.sayParts(parts);
+        else{const line=sc.line?filterText(sc.line):(p.narrative?this.chatLead(p):'');if(line)this.sayLine(line)}
         this.renderSceneOpts(sopts);
         $('#chatBody').scrollTop=$('#chatBody').scrollHeight;
         return;
       }
-      // 模型没给 resolve、也没给台词和选项：按收尾处理，避免卡在只有"结束对话"的死循环
-      if(sc.state==='resolve'||(!sc.line&&!sopts.length)){this._sceneResolve(p);return}
+      // 模型没给 resolve、也没给语义分段/台词和选项：按收尾处理，避免卡在只有"结束对话"的死循环
+      if(sc.state==='resolve'||(!sc.line&&!parts&&!sopts.length)){this._sceneResolve(p);return}
       phase='EVENT_CHOICE';
       if(sc.when||sc.where)this.bubble('sys','',`${sc.when||''}${sc.when&&sc.where?'｜':''}${sc.where||''}`);
-      if(sc.line)this.sayLine(sc.line);
+      if(parts)this.sayParts(parts);
+      else if(sc.line)this.sayLine(sc.line);
       this.renderSceneOpts(sopts);
       $('#chatBody').scrollTop=$('#chatBody').scrollHeight;
     }).catch(e=>{
@@ -4230,7 +4276,7 @@ const Game={
     const settlement=sceneCtx.standalone
       ?'并收束这场问话：只结算它实际带来的关系、情报、差事与行囊变化；主角才艺与属性成长留到旬末小结，修习、散步等与问话无关的收益也留到那时。没有变化就不写 changes。'
       :'并一并完整结算本旬养成与剧情（narrative 收尾、changes、statePatch，含 statePatch.plots 的变动条目）。';
-    const msg=`第${xunNo()}旬剧情对话第${r}轮：玩家应对「${choice}」。只演绎${sceneCtx.who}的当即反应与场面变化：输出 scene.line（≤70 字，对方本轮的话或动作）、scene.where/when（有变化才写）、scene.state 与 2—3 个接话选项；此阶段不结算数值。${cap?`本场对话已达上限，本轮 scene.state 必须为"resolve"，${settlement}`:'本轮只演 ongoing：narrative 留空字符串，changes=[]，statePatch={}，只写 scene 与 options；即使话已说尽，也只写对方收束性的一句，由玩家选择「结束对话」。'}`+this.sceneContextBlock();
+    const msg=`第${xunNo()}旬剧情对话第${r}轮：玩家应对「${choice}」。只演绎${sceneCtx.who}的当即反应与场面变化：输出 scene.parts（2—5 段，narr 写旁白/动作/神态，say 写对方台词、不带引号，按语义分段而非按标点硬切；总长 ≤70 字）、scene.where/when（有变化才写）、scene.state 与 2—3 个接话选项；此阶段不结算数值。${cap?`本场对话已达上限，本轮 scene.state 必须为"resolve"，${settlement}`:'本轮只演 ongoing：narrative 留空字符串，changes=[]，statePatch={}，只写 scene 与 options；即使话已说尽，也只写对方收束性的一句，由玩家选择「结束对话」。'}`+this.sceneContextBlock();
     this.requestScene(msg,choice,MAX_OUTPUT_TOKENS,!cap,!cap); // 未到上限：精简提示词 + 不带历史；到上限：完整提示词收尾结算
   },
   sceneEnd(){ // 玩家主动结束：对方应声简短收尾，统一结算（不耗精力）；本地开场且一言未发则不调 API、不结算
@@ -4248,14 +4294,18 @@ const Game={
     const settle=sceneCtx.standalone
       ?'这只是一位宫中人在旬中回话，并非本旬养成重心：只结算这场问话实际带来的关系、情报、交办差事与行囊变化；主角才艺与属性成长留到旬末小结，修习、散步等无关收益也留到那时。没有变化就不写 changes。'
       :'并完整结算本旬养成与剧情（changes、statePatch，含 statePatch.plots 的变动条目）。';
-    const msg=`第${xunNo()}旬剧情对话：玩家示意话已说完，结束与${sceneCtx.who}的对话。请收尾：scene.state="resolve"，补一段简短的收场演绎（narrative 一两句即可，如各自散去、欠身告退），${settle}收场只写本场已发生的事。`+this.sceneContextBlock();
+    const msg=`第${xunNo()}旬剧情对话：玩家示意话已说完，结束与${sceneCtx.who}的对话。请收尾：scene.state="resolve"，补一段简短的收场演绎（narrative 一两句旁白即可，如各自散去、欠身告退；不写引号对白），${settle}收场只写本场已发生的事。`+this.sceneContextBlock();
     this.requestScene(msg,'（结束对话）');
   },
   _sceneResolve(p){
     phase='RESOLVING';
     const body=$('#chatBody');
     if(sceneCtx&&sceneCtx.standalone)p=stripStandaloneGrowth(p); // 旬中问话不结算本旬养成，兜底剔除模型硬塞的才艺/属性成长
-    if(!p._narrShown)this.sayNarrative(p.narrative);
+    if(!p._narrShown){
+      const parts=this.sceneParts(p.scene);
+      if(parts)this.sayParts(parts); // 收尾前若有最后一句对白，先按语义段渲染
+      if(p.narrative)this.sayNarrative(p.narrative,!!parts); // 有 parts 时收尾 narrative 整段当旁白
+    }
     finalize(p,{focus:Game._lastFocus||'剧情',choice:'剧情应对',adj:Game._lastAdj});
     body.scrollTop=body.scrollHeight;
     $('#chatOpts').innerHTML='<button class="btn btn-primary" style="letter-spacing:.2em;text-indent:.2em" onclick="Game.sceneDone()">继续</button>';
