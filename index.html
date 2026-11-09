@@ -3855,7 +3855,7 @@ const Game={
       {id:'c',text:'问话：之前交代的事办得如何'},
       {id:'d',text:'闲聊几句，看看她的心思'}
     ],scene:{state:'ongoing',line:greet,when:fmtTime(),where:home}});
-    if(sceneCtx){sceneCtx.local=true;sceneCtx.standalone=true} // 本地开场：一言未发即结束时不结算；整场都不算“本旬养成”，只结算问话本身
+    if(sceneCtx){sceneCtx.local=true;sceneCtx.standalone=true;sceneCtx.maid=true} // 本地开场：一言未发即结束不结算；maid：问话不设自动收尾，只能由主控点「结束对话」
   },
   nextTurn(){ // 休息，进入下一旬：旬数+1，精力回满，日历按两旬制推进
     state.turn=(state.turn||0)+1;state.energy=ENERGY_MAX;state.energyWarned=false;state.mealCount=0;state.walkCount=0;state.time=advanceTime(state.time);
@@ -4321,7 +4321,7 @@ const Game={
         return;
       }
       // 模型没给 resolve、也没给语义分段/台词和选项：按收尾处理，避免卡在只有"结束对话"的死循环
-      if(sc.state==='resolve'||(!sc.line&&!parts&&!sopts.length)){this._sceneResolve(p);return}
+      if(!(sceneCtx&&sceneCtx.maid)&&(sc.state==='resolve'||(!sc.line&&!parts&&!sopts.length))){this._sceneResolve(p);return} // 宫女问话只由主控点「结束对话」收场
       phase='EVENT_CHOICE';
       this.sceneMeta(sc);
       if(parts)this.sayParts(parts);
@@ -4342,11 +4342,12 @@ const Game={
     state.energy=Math.max(0,Math.round(state.energy-SCENE_EXTRA_COST));UI.updateStatusbar();checkRestWarn(); // 多接一句的代价
     this.recordLine('me',choice);
     sceneCtx.round++;
-    const r=sceneCtx.round,cap=r>=SCENE_MAX_ROUNDS;
+    const r=sceneCtx.round,cap=!sceneCtx.maid&&r>=SCENE_MAX_ROUNDS; // 宫女问话不设自动收尾上限
     const settlement=sceneCtx.standalone
       ?'并收束这场问话：只结算它实际带来的关系、情报、差事与行囊变化；主角才艺与属性成长留到旬末小结，修习、散步等与问话无关的收益也留到那时。没有变化就不写 changes。'
       :'并一并完整结算本旬养成与剧情（narrative 收尾、changes、statePatch，含 statePatch.plots 的变动条目）。';
-    const msg=`第${xunNo()}旬剧情对话第${r}轮：玩家应对「${choice}」。只演绎${sceneCtx.who}的当即反应与场面变化：输出 scene.parts（2—5 段，narr 写旁白/动作/神态，say 写对方台词，quote 写转述他人原话，台词都不带引号，按语义分段而非按标点硬切；总长 ≤70 字）、scene.where/when（有变化才写）、scene.state 与 2—3 个接话选项；此阶段不结算数值。${cap?`本场对话已达上限，本轮 scene.state 必须为"resolve"，${settlement}`:'本轮只演 ongoing：narrative 留空字符串，changes=[]，statePatch={}，只写 scene 与 options；即使话已说尽，也只写对方收束性的一句，由玩家选择「结束对话」。'}`+this.sceneContextBlock();
+    const maidNote=sceneCtx.maid?'本场是主控在住处吩咐宫女：scene.state 必须始终为 "ongoing"，不得自行 resolve、收场、告退或写她离开；话已说尽也只写她应声待命（如"奴婢记下了，这便去办"）。何时收场只由主控点「结束对话」决定。':'';
+    const msg=`第${xunNo()}旬剧情对话第${r}轮：玩家应对「${choice}」。只演绎${sceneCtx.who}的当即反应与场面变化：输出 scene.parts（2—5 段，narr 写旁白/动作/神态，say 写对方台词，quote 写转述他人原话，台词都不带引号，按语义分段而非按标点硬切；总长 ≤70 字）、scene.where/when（有变化才写）、scene.state 与 2—3 个接话选项；此阶段不结算数值。${cap?`本场对话已达上限，本轮 scene.state 必须为"resolve"，${settlement}`:'本轮只演 ongoing：narrative 留空字符串，changes=[]，statePatch={}，只写 scene 与 options；即使话已说尽，也只写对方收束性的一句，由玩家选择「结束对话」。'}${maidNote}`+this.sceneContextBlock();
     this.requestScene(msg,choice,MAX_OUTPUT_TOKENS,!cap,!cap); // 未到上限：精简提示词 + 不带历史；到上限：完整提示词收尾结算
   },
   sceneEnd(){ // 玩家主动结束：对方应声简短收尾，统一结算（不耗精力）；本地开场且一言未发则不调 API、不结算
