@@ -241,6 +241,8 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
    ============================================================ */
 #screen-main{position:fixed;inset:0;overflow:hidden;background:#d8cdb8}
 /* 房间图占满全屏，锚定底部（顶部可裁），热区按同一裁剪框换算坐标 */
+.livetext{position:fixed;left:50%;bottom:calc(104px + var(--sab));transform:translateX(-50%) translateY(8px);z-index:70;max-width:min(92vw,560px);max-height:30vh;overflow:hidden;background:rgba(30,25,18,.86);color:#f5efe3;font-size:13px;line-height:1.8;padding:10px 16px;border-radius:12px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;white-space:pre-wrap;word-break:break-word;font-family:var(--serif);box-shadow:0 6px 24px rgba(0,0,0,.18)}
+.livetext.on{opacity:1;transform:translateX(-50%) translateY(0)}
 .homebg{position:absolute;inset:0;z-index:0;background:url(assets/room.jpg) center bottom/cover no-repeat #d8cdb8}
 .homebg::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(30,25,18,.10),rgba(30,25,18,0) 18%,rgba(30,25,18,0) 72%,rgba(30,25,18,.22))}
 /* 顶栏：时间盒 + 位份/银两/积分 */
@@ -417,6 +419,7 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
   <div class="sheet-body" id="sheetBody"></div>
 </div>
 <div class="toast" id="toast"></div>
+<div class="livetext" id="liveText"></div>
 <!-- 剧情对话：全屏聊天气泡 -->
 <div class="chatview" id="chatview">
   <div class="chat-head num"><button onclick="Game.closeChat()">◀ 返回</button><span class="ch-ava" id="chatAva"></span><span class="ch-title" id="chatTitle">剧情对话</span><span class="fh-time" id="chatClock"></span></div>
@@ -1945,7 +1948,7 @@ function toast(msg,ms=2200){const el=$('#toast');el.textContent=msg;el.classList
 
 /* ============================================================ 设置 */
 const SET_KEY='sgd_settings';
-const DEFAULT_SETTINGS={apiKey:'',baseUrl:'https://api.deepseek.com/v1',model:'deepseek-chat',theme:'auto'};
+const DEFAULT_SETTINGS={apiKey:'',baseUrl:'https://api.deepseek.com/v1',model:'deepseek-chat',theme:'auto',stream:true};
 function loadSettings(){
   try{return Object.assign({},DEFAULT_SETTINGS,JSON.parse(localStorage.getItem(SET_KEY)||'{}'))}
   catch(e){return Object.assign({},DEFAULT_SETTINGS)}
@@ -2260,6 +2263,39 @@ function buildMessages(userMsg,noHistory){
   msgs.push({role:'user',content:String(userMsg)+'\n【格式】只输出一个完整 JSON 对象，不要输出任何 JSON 以外的文字。'});
   return msgs;
 }
+/* 剧情对话 ongoing 轮次专用精简提示词：只带本场对方、主控与相关引线，不带整本世界书与全部存档。
+   这些轮次不结算、不推进时间，模型只需要写好对方这一句话与接话选项。 */
+const SCENE_RULES=[
+'你是文字游戏《带着系统去宫斗》的主持人，现在只推进一段剧情对话里「对方这一句」。不结算、不推进时间、不新增场外人物。只输出 JSON。',
+'【文风】架空盛唐，人物言语符合身份、性情与当下情绪；不用现代词汇、现代比喻与心理学术语；不写主控的动作与心理，只写对方的话与关键动作；不铺环境，不写结尾感悟。',
+'【输出】{"narrative":"","changes":[],"hasEvent":true,"scene":{"state":"ongoing","who":"对方称谓","line":"≤70字","where":"有变化才写","when":"有变化才写"},"options":[{"id":"a","text":"≤70字"},{"id":"b","text":"≤70字"}]}',
+'【约束】本轮 scene.state 必须是 "ongoing"；narrative 必须为空字符串，changes=[]，statePatch={}；options 给 2—3 个方向不同的接话，不得泄露未发生的收益或幕后真相。即使话已说尽，也只写对方收束性的一句，由玩家选择「结束对话」；不得输出 resolve，不得结算。',
+'【承接】严格承接用户消息里的本场对话记录，不重复已说过的话；对方只依据自己的性情、目标、与主控的关系及已知信息回应。'
+].join('\n');
+function buildSceneSystem(who){
+  let n=(state.npcs||{})[who];
+  if(!n)for(const id in (state.npcs||{})){const x=state.npcs[id];if(x&&(x.name===who||x.realName===who)){n=x;break}} // 真名/称谓两种写法都能对上
+  n=n||{};
+  const prof=n.profile||{};
+  const hidden={};
+  if(n.hidden&&typeof n.hidden==='object')for(const k in n.hidden){const v=n.hidden[k];hidden[k]=typeof v==='string'?v.slice(0,180):v}
+  const p=state.protagonist||{};
+  const w=state.world||{};
+  const rels=state.relationships||{};
+  const relationship=rels[who]!=null?rels[who]:(n.name&&rels[n.name]!=null?rels[n.name]:null);
+  const payload={
+    time:fmtTime(),location:state.location,
+    protagonist:{name:p.name,rank:p.rank,age:p.age,personality:normalizePersona(p.personality),look:p.look},
+    npc:{name:who,realName:n.realName,rank:n.rank,age:n.age,faction:n.faction,
+      traits:normalizePersona(prof.traits),hidden,relationship,
+      biography:Array.isArray(prof.biography)?prof.biography.slice(-5).map(b=>String((b&&b.text)||b||'').slice(0,100)):[],
+      recent:Array.isArray(prof.recent)?prof.recent.slice(-2):[]},
+    world:{dynasty:w.dynasty,emperor:w.emperor?{name:w.emperor.name,age:w.emperor.age,traits:w.emperor.traits}:null,factions:w.factions},
+    activePlots:(state.plots||[]).filter(x=>x.stage==='进行中').slice(0,6).map(x=>({title:x.title,line:x.line,note:String(x.note||'').slice(0,100)})),
+    recentFacts:(state.recentConfirmedFacts||[]).slice(-3)
+  };
+  return SCENE_RULES+'\n\n【本场信息】\n'+JSON.stringify(payload);
+}
 
 /* ============================================================ API */
 function appendBudgetNote(msgs){ // 截断后原样重发必然再截断：附一段精简要求，把结算压回预算内
@@ -2287,12 +2323,41 @@ function modelText(message){ // content 可能是字符串、分段数组（部�
   if(c&&typeof c==='object')return typeof c.text==='string'?c.text:(typeof c.content==='string'?c.content:JSON.stringify(c));
   return '';
 }
+function liveField(raw,key){ // 从尚未闭合的 JSON 里取出正在生成的字符串，用于流式预览
+  const t=String(raw||''),k='"'+key+'"';
+  const idx=t.lastIndexOf(k);if(idx<0)return '';
+  let i=t.indexOf(':',idx+k.length);if(i<0)return '';i++;
+  while(i<t.length&&/\s/.test(t[i]))i++;
+  if(t[i]!=='"')return '';
+  i++;let out='';
+  for(;i<t.length;i++){
+    const c=t[i];
+    if(c==='\\'){
+      const n=t[i+1];if(n===undefined)break;
+      if(n==='n'){out+='\n';i++}
+      else if(n==='t'){out+='\t';i++}
+      else if(n==='r'){i++}
+      else if(n==='u'){
+        const hex=t.slice(i+2,i+6);if(hex.length<4)break;
+        const code=parseInt(hex,16);if(Number.isFinite(code))out+=String.fromCharCode(code);
+        i+=5;
+      }else{out+=n;i++}
+    }else if(c==='"')break;
+    else out+=c;
+  }
+  return out;
+}
+function liveExcerpt(raw){ // 取正文或对方台词中较长的一段作预览，只保留末尾
+  const narr=liveField(raw,'narrative'),line=liveField(raw,'line');
+  return (line.length>=narr.length?line:narr).trim().slice(-180);
+}
 async function callModel(userMsg,opts){
   const s=loadSettings();
   if(!s.apiKey){const err=new Error('尚未填写 API Key');err.noKey=true;throw err}
   const baseMsgs=(opts&&opts.messages)||buildMessages(userMsg,opts&&opts.noHistory);
   const maxTokens=(opts&&opts.maxTokens)||MAX_OUTPUT_TOKENS;
   const timeoutMs=(opts&&opts.timeoutMs)||REQUEST_TIMEOUT;
+  const allowStream=s.stream!==false&&!(opts&&opts.noStream); // 设置里可关闭，兼容不支持 SSE 的网关
   const expect=(opts&&opts.expect)||'payload';
   const validate=raw=>{ // 只校验，不改写；解析后的字段洗净由调用方再做一次
     if(expect==='payload'){parsePayload(raw);return}
@@ -2305,24 +2370,69 @@ async function callModel(userMsg,opts){
       if(!ok){const err=new Error('返回不是 JSON');err.raw=String(raw==null?'':raw).trim();err.invalidJson=true;throw err}
     }
   };
-  const send=async messages=>{
+  const partial=(opts&&opts.onPartial)||(typeof UI!=='undefined'?UI.live:null); // 流式落笔预览
+  const send=async(messages,useStream=true)=>{
     const ctrl=new AbortController();abortCtrl=ctrl;
     let timedOut=false;
     const timer=setTimeout(()=>{timedOut=true;ctrl.abort()},timeoutMs);
     const started=Date.now();
     try{
+      const body={model:s.model||'deepseek-chat',messages,temperature:0.75,max_tokens:maxTokens,response_format:{type:'json_object'}};
+      if(useStream)body.stream=true;
       const res=await fetch(s.baseUrl.replace(/\/+$/,'')+'/chat/completions',{
         method:'POST',signal:ctrl.signal,
         headers:{'Content-Type':'application/json','Authorization':'Bearer '+s.apiKey},
-        body:JSON.stringify({model:s.model||'deepseek-chat',messages,temperature:0.75,max_tokens:maxTokens,response_format:{type:'json_object'}})
+        body:JSON.stringify(body)
       });
-      if(!res.ok)throw new Error('HTTP '+res.status+'：'+(await res.text()).slice(0,300));
-      const data=await res.json();
-      const choice=data.choices&&data.choices[0];
-      const content=modelText(choice&&choice.message);
-      const finish=String((choice&&choice.finish_reason)||'');
-      if(data.usage){ // 耗时与 token 用量：用于判断慢在输入还是输出
-        const u=data.usage;
+      if(!res.ok){
+        const text=(await res.text()).slice(0,300);
+        if(useStream&&(res.status===400||res.status===422)&&/stream|event-stream/i.test(text))return await send(messages,false); // 网关不支持流式：退回整包
+        throw new Error('HTTP '+res.status+'：'+text);
+      }
+      const ctype=String(res.headers.get('content-type')||'');
+      let content='',finish='',usage=null,respModel='';
+      if(useStream&&/text\/event-stream/i.test(ctype)&&res.body&&typeof res.body.getReader==='function'){
+        const reader=res.body.getReader(),dec=new TextDecoder();
+        let buf='',lastEmit=0;
+        const emit=()=>{
+          if(!partial)return;
+          const now=Date.now();if(now-lastEmit<80)return; // 节流：别让每个 token 都碰 DOM
+          lastEmit=now;
+          try{partial(liveExcerpt(content))}catch(e){}
+        };
+        const onLine=line=>{
+          const str=line.replace(/\r$/,'').replace(/^\uFEFF/,'').trimStart();
+          if(!str||str.startsWith(':')||!str.startsWith('data:'))return;
+          const payload=str.slice(5).trim();
+          if(!payload||payload==='[DONE]')return;
+          let obj;try{obj=JSON.parse(payload)}catch(e){return}
+          if(obj.error){const em=obj.error.message||obj.error.code||JSON.stringify(obj.error);throw new Error('接口返回错误：'+em)}
+          if(obj.usage)usage=obj.usage;
+          if(obj.model)respModel=obj.model;
+          const choice=obj.choices&&obj.choices[0];if(!choice)return;
+          const piece=modelText({content:choice.delta&&choice.delta.content});
+          if(piece)content+=piece;
+          if(choice.finish_reason)finish=String(choice.finish_reason);
+          emit();
+        };
+        for(;;){
+          const {done,value}=await reader.read();
+          if(done)break;
+          buf+=dec.decode(value,{stream:true});
+          let i;
+          while((i=buf.indexOf('\n'))>=0){const line=buf.slice(0,i);buf=buf.slice(i+1);onLine(line)}
+        }
+        buf+=dec.decode();
+        if(buf.trim())onLine(buf);
+      }else{
+        const data=await res.json();
+        usage=data.usage||null;respModel=data.model||'';
+        const choice=data.choices&&data.choices[0];
+        content=modelText(choice&&choice.message);
+        finish=String((choice&&choice.finish_reason)||'');
+      }
+      if(usage){ // 耗时与 token 用量：用于判断慢在输入还是输出
+        const u=usage;
         console.info(`[API] ${((Date.now()-started)/1000).toFixed(1)}s  prompt ${u.prompt_tokens??'?'} / completion ${u.completion_tokens??'?'} tokens`
           +(u.prompt_cache_hit_tokens!=null?` / cache hit ${u.prompt_cache_hit_tokens}`:''));
       }
@@ -2331,7 +2441,7 @@ async function callModel(userMsg,opts){
       }
       if(!String(content).trim()){ // JSON 模式会把无法识别的输出替换成空格：这是接口已知问题，自动重试
         const err=new Error('模型返回了空内容（接口 JSON 模式偶发）');
-        err.empty=true;err.raw='';err.detail=`模型：${data.model||s.model||'—'}${finish?`｜finish_reason：${finish}`:''}`;
+        err.empty=true;err.raw='';err.detail=`模型：${respModel||s.model||'—'}${finish?`｜finish_reason：${finish}`:''}`;
         throw err;
       }
       return content;
@@ -2341,13 +2451,14 @@ async function callModel(userMsg,opts){
     }finally{
       clearTimeout(timer);
       if(abortCtrl===ctrl)abortCtrl=null;
+      if(partial){try{partial('')}catch(e){}}
     }
   };
   let messages=baseMsgs,truncatedTried=false;
   for(let emptyTried=0,parseTried=0;;){
     let raw;
     try{
-      raw=await send(messages);
+      raw=await send(messages,allowStream);
     }catch(e){
       if(e.truncated&&!truncatedTried&&!(opts&&opts.noRetry)){ // 截断：压缩篇幅后重试
         truncatedTried=true;
@@ -2620,6 +2731,12 @@ const UI={
     $('#errTitle').textContent='出了岔子';
     $('#errBody').innerHTML=`<div style="color:var(--cinnabar);font-size:14px;margin-bottom:6px">${esc(msg)}</div>${raw?`<div style="font-size:12px;color:var(--ink-soft);white-space:pre-wrap;word-break:break-all;background:var(--paper);border-radius:8px;padding:8px;max-height:120px;overflow:auto">${esc(String(raw).slice(0,1200))}</div>`:''}`;
     $('#errModal').classList.add('on');
+  },
+  live(text){ // 流式落笔预览：只显示正在生成的正文/台词，完成后隐藏
+    const el=$('#liveText');if(!el)return;
+    const t=String(text||'').trim();
+    if(!t){el.classList.remove('on');el.textContent='';return}
+    el.textContent=t;el.classList.add('on');
   },
   /* 旬首安排 */
   sheetFocus(){ // 吩咐：自拟本旬要做的事（新开局时改为首旬选项）
@@ -2970,6 +3087,7 @@ const UI={
       <div class="setrow"><span class="sk">API Key</span><input id="setKey" type="password" placeholder="sk-…" value="${esc(s.apiKey)}"></div>
       <div class="setrow"><span class="sk">接口地址</span><input id="setBase" placeholder="https://api.deepseek.com/v1" value="${esc(s.baseUrl)}"></div>
       <div class="setrow"><span class="sk">模型</span><input id="setModel" placeholder="deepseek-chat" value="${esc(s.model)}"></div>
+      <div class="setrow"><span class="sk">流式输出</span><select id="setStream"><option value="1" ${s.stream!==false?'selected':''}>开启（边写边看，推荐）</option><option value="0" ${s.stream===false?'selected':''}>关闭（接口不支持流式时）</option></select></div>
       <div class="setrow"><span class="sk">外观</span><select id="setTheme"><option value="auto" ${s.theme==='auto'?'selected':''}>跟随系统</option><option value="light" ${s.theme==='light'?'selected':''}>宣纸（浅色）</option><option value="dark" ${s.theme==='dark'?'selected':''}>墨底（深色）</option></select></div>
       <div class="setbtns"><button class="btn btn-primary" onclick="Game.saveSettingsFromUI()">保存设置</button><button class="btn btn-line" id="btnTestApi" onclick="Game.testApi()">测试连通</button></div>
       <div id="apiTestRes" style="display:none;margin-top:10px;font-size:13px;line-height:1.7;border-radius:8px;padding:8px 10px"></div></div>
@@ -3911,20 +4029,31 @@ const Game={
     const lines=sceneCtx.lines.slice(-10).map(l=>`${l.who==='me'?'玩家':l.who==='npc'?sceneCtx.who:'旁白'}：${String(l.text||'').slice(0,80)}`).join('\n');
     return `\n【本场对话记录】\n${lines}\n请承接以上对话，不要重复已说过的话。`;
   },
-  requestScene(msg,choice,maxTokens,noHistory){ // 场景请求统一出口：失败可重试，重试不重复扣精力
+  requestScene(msg,choice,maxTokens,noHistory,compact){ // 场景请求统一出口：失败可重试，重试不重复扣精力
     phase='RESOLVING';this.chatBusy(true);
-    lastRequest={type:'sc',msg,choice,maxTokens,noHistory};
-    const opts={};if(maxTokens)opts.maxTokens=maxTokens;if(noHistory)opts.noHistory=true; // ongoing 轮次不带历史正文，场景记录已在 msg 里
-    callModel(msg,opts).then(raw=>{
+    lastRequest={type:'sc',msg,choice,maxTokens,noHistory,compact};
+    const req={};if(maxTokens)req.maxTokens=maxTokens;
+    if(compact)req.messages=[{role:'system',content:buildSceneSystem(sceneCtx?sceneCtx.who:'')},{role:'user',content:msg}]; // ongoing：精简提示词，不结算
+    else if(noHistory)req.noHistory=true; // 收尾轮保留完整提示词，只省历史正文
+    callModel(msg,req).then(raw=>{
       const p=parsePayload(raw);
       const sc=p.scene||{};
-      const opts=(Array.isArray(p.options)&&p.options.length)?p.options:(Array.isArray(sc.options)?sc.options:[]);
+      const sopts=(Array.isArray(p.options)&&p.options.length)?p.options:(Array.isArray(sc.options)?sc.options:[]);
+      if(compact){ // 精简轮只演对方这一句，不 resolve、不结算；收尾留给「结束对话」或轮数上限
+        phase='EVENT_CHOICE';
+        if(sc.when||sc.where)this.bubble('sys','',`${sc.when||''}${sc.when&&sc.where?'｜':''}${sc.where||''}`);
+        const line=sc.line?filterText(sc.line):(p.narrative?this.chatLead(p):'');
+        if(line)this.sayLine(line);
+        this.renderSceneOpts(sopts);
+        $('#chatBody').scrollTop=$('#chatBody').scrollHeight;
+        return;
+      }
       // 模型没给 resolve、也没给台词和选项：按收尾处理，避免卡在只有"结束对话"的死循环
-      if(sc.state==='resolve'||(!sc.line&&!opts.length)){this._sceneResolve(p);return}
+      if(sc.state==='resolve'||(!sc.line&&!sopts.length)){this._sceneResolve(p);return}
       phase='EVENT_CHOICE';
       if(sc.when||sc.where)this.bubble('sys','',`${sc.when||''}${sc.when&&sc.where?'｜':''}${sc.where||''}`);
       if(sc.line)this.sayLine(sc.line);
-      this.renderSceneOpts(opts);
+      this.renderSceneOpts(sopts);
       $('#chatBody').scrollTop=$('#chatBody').scrollHeight;
     }).catch(e=>{
       this.chatBusy(false);phase='EVENT_CHOICE';
@@ -3940,8 +4069,8 @@ const Game={
     this.recordLine('me',choice);
     sceneCtx.round++;
     const r=sceneCtx.round,cap=r>=SCENE_MAX_ROUNDS;
-    const msg=`第${xunNo()}旬剧情对话第${r}轮：玩家应对「${choice}」。只演绎${sceneCtx.who}的当即反应与场面变化：输出 scene.line（≤70 字，对方本轮的话或动作）、scene.where/when（有变化才写）、scene.state 与 2—3 个接话选项；此阶段不结算数值。${cap?'本场对话已达上限，本轮 scene.state 必须为"resolve"，并一并完整结算本旬养成与剧情（narrative 收尾、changes、statePatch，含 statePatch.plots 的变动条目）。':'若判定 ongoing：narrative 必须为空字符串，changes 为空数组，statePatch 为空对象，只写 scene 与 options；若事已说尽或局面已变，才可 scene.state="resolve" 并完整结算本旬。'}`+this.sceneContextBlock();
-    this.requestScene(msg,choice,MAX_OUTPUT_TOKENS,!cap); // 未到上限的 ongoing 轮次不带历史正文；到上限的收尾轮按完整结算给预算
+    const msg=`第${xunNo()}旬剧情对话第${r}轮：玩家应对「${choice}」。只演绎${sceneCtx.who}的当即反应与场面变化：输出 scene.line（≤70 字，对方本轮的话或动作）、scene.where/when（有变化才写）、scene.state 与 2—3 个接话选项；此阶段不结算数值。${cap?'本场对话已达上限，本轮 scene.state 必须为"resolve"，并一并完整结算本旬养成与剧情（narrative 收尾、changes、statePatch，含 statePatch.plots 的变动条目）。':'本轮只演 ongoing：narrative 必须为空字符串，changes=[]，statePatch={}，只写 scene 与 options；不得输出 resolve，不得结算。即使话已说尽，也只写对方收束性的一句，由玩家选择「结束对话」。'}`+this.sceneContextBlock();
+    this.requestScene(msg,choice,MAX_OUTPUT_TOKENS,!cap,!cap); // 未到上限：精简提示词 + 不带历史；到上限：完整提示词收尾结算
   },
   sceneEnd(){ // 玩家主动结束：对方应声简短收尾，统一结算（不耗精力）；本地开场且一言未发则不调 API、不结算
     if(phase!=='EVENT_CHOICE'||!sceneCtx)return;
@@ -3995,7 +4124,7 @@ const Game={
     if(!lastRequest)return;
     const r=lastRequest;
     if(r.type==='r1')this.round1(r.msg,r.focus,r.cost,r.opts);
-    else if(r.type==='sc')this.requestScene(r.msg,r.choice,r.maxTokens,r.noHistory);
+    else if(r.type==='sc')this.requestScene(r.msg,r.choice,r.maxTokens,r.noHistory,r.compact);
     else if(r.type==='r2'){UI.skeleton(true,true);phase='RESOLVING';
       callModel(r.msg).then(raw=>{UI.clearSkeleton();const p=parsePayload(raw);const last=history[history.length-1];finalize(p,{focus:last?last.focus:'',choice:r.choice,adj:Game._lastAdj});UI.actResult(last?last.focus:'本旬行事',filterText(p.narrative),p.changes||[])}).catch(e=>{UI.clearSkeleton();this.handleCallErr(e)})}
     else if(r.type==='newgame'){if(this._createdProtagonist)this.startWorldGen();else this.askNewGame()}
@@ -4203,7 +4332,7 @@ const Game={
   switchSetPane(p){setPane=p;UI.renderSheet('设置')},
   openSettings(p){if(p)setPane=p;UI.openSheet('设置')},
   saveSettingsFromUI(){
-    saveSettings({apiKey:$('#setKey').value.trim(),baseUrl:$('#setBase').value.trim()||'https://api.deepseek.com/v1',model:$('#setModel').value.trim()||'deepseek-chat',theme:$('#setTheme').value});
+    saveSettings({apiKey:$('#setKey').value.trim(),baseUrl:$('#setBase').value.trim()||'https://api.deepseek.com/v1',model:$('#setModel').value.trim()||'deepseek-chat',theme:$('#setTheme').value,stream:$('#setStream').value!=='0'});
     toast('设置已保存');
   },
   testApi(){
