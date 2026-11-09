@@ -5514,9 +5514,6 @@ const Game={
     UI.closeSheet();
     this.round1(`第${xunNo()}旬第一轮：玩家消耗精力 ${focusEnergyCost(t)} 选定上旬生活重心「${t}」。按第一轮流程演绎本旬。`,t,focusEnergyCost(t));
   },
-  cancelCall(){if(abortCtrl)abortCtrl.abort();UI.hideBusy();toast('已取消');
-    if(lastRequest&&lastRequest.type==='sc'&&sceneCtx){phase='EVENT_CHOICE';this.renderSceneOpts(sceneCtx.lastOptions||[]);return}
-    if(lastRequest&&lastRequest.type==='r2'){phase='EVENT_CHOICE';this.renderChatOpts(currentEvent.options)}else if(state){phase='FOCUS_SELECT';UI.goHome()}},
   handleCallErr(e){
     if(e.name==='AbortError')return;
     if(lastUseIdx!=null){const it=(state.inventory||[])[lastUseIdx];if(it){it.count=(Number(it.count)||0)+1;persistCurrent()}lastUseIdx=null} // 使用失败，件数回滚
