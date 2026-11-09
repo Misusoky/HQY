@@ -299,7 +299,11 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
 .restmodal{background:rgba(36,31,24,.8)}
 .rm-card{border-radius:14px;box-shadow:0 10px 30px rgba(46,36,21,.4)}
 .rm-ops .btn{border-radius:22px;letter-spacing:.1em}
-
+/* 生成中动画省略号 */
+.busy-dots i{display:inline-block;animation:bdot 1.2s infinite}
+.busy-dots i:nth-child(2){animation-delay:.2s}
+.busy-dots i:nth-child(3){animation-delay:.4s}
+@keyframes bdot{0%,60%,100%{opacity:.15}30%{opacity:1}}
 
 /* 剧情对话：全屏聊天气泡界面 */
 .chatview{position:fixed;inset:0;z-index:30;display:none;flex-direction:column;background:var(--paper)}
@@ -474,6 +478,14 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
   </div>
 </div>
 
+<!-- 生成中弹窗：任何发起处原地 loading，覆盖全屏（含对话界面） -->
+<div class="restmodal" id="busyModal">
+  <div class="rm-card" style="text-align:center">
+    <div class="rm-title" id="busyTitle">铺排中<span class="busy-dots"><i>·</i><i>·</i><i>·</i></span></div>
+    <div class="rm-body" id="busyBody" style="text-align:center">正在铺排……</div>
+    <div id="busyElapsed" style="margin-top:10px;font-size:12px;color:var(--ink-soft);font-family:var(--sans)">已等候 0 秒</div>
+  </div>
+</div>
 <!-- 错误弹窗 -->
 <div class="restmodal" id="errModal">
   <div class="rm-card">
@@ -2258,8 +2270,14 @@ const UI={
     tick();this._skTimer=setInterval(tick,1000);
   },
   clearSkeleton(){const s=$('#skel');if(s)s.remove();if(this._skTimer){clearInterval(this._skTimer);this._skTimer=null}},
-  showBusy(title,body,elapsed=true){}, // 已禁用：不再显示加载弹窗
-  hideBusy(){}, // 已禁用：不再显示加载弹窗
+  showBusy(title,body,elapsed=true){ // 全屏加载：文案与是否显示等候秒数由调用方决定
+    const t=$('#busyTitle'),b=$('#busyBody'),e=$('#busyElapsed');
+    if(t)t.innerHTML=title+'<span class="busy-dots"><i>·</i><i>·</i><i>·</i></span>';
+    if(b)b.innerHTML=body;
+    if(e)e.style.display=elapsed?'':'none';
+    $('#busyModal').classList.add('on');
+  },
+  hideBusy(){$('#busyModal').classList.remove('on')},
   errCard(msg,raw){ // 错误弹窗（原地呈现，可重试/去设置）
     $('#errTitle').textContent='出了岔子';
     $('#errBody').innerHTML=`<div style="color:var(--cinnabar);font-size:14px;margin-bottom:6px">${esc(msg)}</div>${raw?`<div style="font-size:12px;color:var(--ink-soft);white-space:pre-wrap;word-break:break-all;background:var(--paper);border-radius:8px;padding:8px;max-height:120px;overflow:auto">${esc(String(raw).slice(0,1200))}</div>`:''}`;
