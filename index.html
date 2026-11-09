@@ -1462,7 +1462,7 @@ const PLOT_NEW_LEAD_CHANCE=0.3; // 骰中后开全新引子的概率（其余为
 const STALE_PLOT_XUN=4;      // 无期限在途线悬置 N 旬未推进即"发酵"：旬首强制处理（兑现/改写/作废），不许干挂
 const STALE_AUTO_EXPIRE=3;   // 发酵后连续 N 旬被裁决列出仍无回写：前端自动作废（机会流失）
 const ECHO_MISS_MAX=2;       // 同一引线连续被散步/拜访呼应 N 次却无台账回写：此后不再借行动硬凑交集，留待旬首发酵处置
-const GARDEN_MEET_CHANCE=0.7; // 御花园散步偶遇熟人概率：前端代码掷骰硬约束，不交给提示词"随缘"；皇帝太后走正式觐见不入偶遇池
+const GARDEN_MEET_CHANCE=0.7; // 御花园散步偶遇概率：前端代码掷骰硬约束，不交给提示词"随缘"；皇帝、太后也在偶遇池（撞见即初识的入口）
 function focusEnergyCost(focus){ // 各类行动精力消耗
   const f=String(focus||'');
   if(/使用道具|使用物品/.test(f))return 5; // 用物最轻
@@ -3811,9 +3811,11 @@ const Game={
   openFocus(){if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}UI.openSheet('吩咐')}, // 吩咐：自拟本旬要做的事
   hsGoOut(){if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}$('#mapClock').textContent=fmtTime();$('#mapview').classList.add('on')}, // 出门＝宫城图选目的地
   mapBack(){$('#mapview').classList.remove('on')},
-  _gardenMeetPick(){ // 御花园偶遇人选：主控已认识的宫中人物随机一位；皇帝、太后走正式觐见，不入偶遇池
+  _gardenMeetPick(){ // 御花园偶遇人选：已认识的宫中人物随机一位；皇帝、太后不受结识限制——游园撞见正是初识途径，相熟之后再走正式觐见
     const npcs=(state&&state.npcs)||{};
-    const pool=Object.keys(npcs).filter(id=>{const n=npcs[id];return n&&n.known&&!/皇帝|皇上|陛下|太后/.test(id+(n.rank||''))});
+    const pool=Object.keys(npcs).filter(id=>{const n=npcs[id];if(!n)return false;
+      if(/皇帝|皇上|陛下|太后/.test(id+(n.rank||'')))return true;
+      return !!n.known});
     return pool.length?pool[Math.floor(Math.random()*pool.length)]:null;
   },
   mapGo(place){ // 宫城图目的地：养心殿见驾、六宫访妃嫔、太医院问医、藏书阁寻书、御花园散步闲逛；出宫暂留空
@@ -3837,7 +3839,7 @@ const Game={
       const meetWho=this._gardenMeetPick();
       const meetHit=!!meetWho&&Math.random()<GARDEN_MEET_CHANCE; // 偶遇由前端代码掷骰硬约束，不交给提示词"随缘"
       const meetNote=meetHit
-        ?`本轮偶遇骰已命中（概率 ${Math.round(GARDEN_MEET_CHANCE*100)}%）：玩家须在园中偶遇「${meetWho}」，用剧情对话 scene 结构呈现（scene.who 填「${meetWho}」，地点写园中所在）；偶遇内容须与在途引线、双方关系或主控当前处境自然相关，给 2—4 个接话选项后停止，不结算应对后果；本轮 hasEvent 必须为 true。`
+        ?`本轮偶遇骰已命中（概率 ${Math.round(GARDEN_MEET_CHANCE*100)}%）：玩家须在园中偶遇「${meetWho}」，用剧情对话 scene 结构呈现（scene.who 填「${meetWho}」，地点写园中所在）；偶遇内容须与在途引线、双方关系或主控当前处境自然相关，给 2—4 个接话选项后停止，不结算应对后果；本轮 hasEvent 必须为 true。若主控与此人尚未照面（如皇帝、太后），按初见演绎：问安避让、自报家门、留下第一印象，事后经 dossier 建档。`
         :`本轮偶遇骰未命中（概率 ${Math.round(GARDEN_MEET_CHANCE*100)}%）：只演物候风景、宫人闲话等轻量见闻，不安排与具体人物的撞见剧情。`;
       const msg=`第${xunNo()}旬第一轮：玩家往御花园散步闲逛（本旬第 ${walkNo} 次，耗精力 ${focusEnergyCost('散步')}）。演绎一路物候风景与园中见闻。${meetNote}${gainNote}（同一旬高强度活动与康健收益不兼得。）${leadHint}${pendHint}散步只是本旬中的一段外出：scene.where 可写园中所在，但 statePatch.location 仍写本宫住处，不要把 location 改成御花园。`;
       this.round1(msg,'外出·御花园散步',focusEnergyCost('散步'),{skipDice:meetHit,meetWho:meetHit?meetWho:null,leadIds:hits.map(p=>p.id),pendTexts:phits.map(pendText),whoHint:meetHit?meetWho:undefined}); // 偶遇命中即本轮剧情额度；宫城图不关：加载与结果都叠在图上，避免背景弹回房间
