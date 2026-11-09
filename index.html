@@ -587,10 +587,6 @@ function sanitizePlot(p){ // 单条台账归一；字段缺失时给默认值（
     touch:numOrNull(p.touch),staleMiss:numOrNull(p.staleMiss)||0 // touch=最近推进旬号；staleMiss=发酵后连续被无视次数
   };
 }
-function sanitizePlots(arr){ // 整组归一（读档、新档时用）
-  if(!Array.isArray(arr))return state.plots||[];
-  return arr.map(sanitizePlot).filter(p=>p&&p.title);
-}
 function mergePlots(base,incoming,nowTurn){ // 增量回写：模型只给变化条目，未提及的保持不变；凡回写即记 touch=本旬
   const list=Array.isArray(base)?base.slice():[];
   const byId=new Map(list.map(p=>[p.id,p]));
@@ -1804,7 +1800,6 @@ const CR_FAMILIES=[ // 家世六档：决定初始位份与体己银
   {k:'勋贵',d:'祖上有军功，门第煊赫',rank:'常在（正七品）',silver:220},
   {k:'宗室',d:'远支宗女，血统尊贵而势孤',rank:'常在（正七品）',silver:160}];
 const CR_ORIGINS=['家道中落的嫡女','被继母迫害的嫡女','想为生母一搏的庶女','被嫡母迫害的庶女','家庭幸福、野心勃勃想上位的嫡女','父母双亡、寄居亲戚家被侵吞财产的孤女','被未婚夫退婚的女子'];
-const CR_PERSONA=PERSONA_ALL;
 const CR_LOOK={ // 容貌描述部件池：各抽一二，拼成一段话
   eyes:['一双丹凤眼眼尾微挑','杏眼澄澈，看人时先垂三分','凤眼含威，不笑时略显清冷','眸色偏浅，顾盼间波光流转','一双瑞凤眼，眼尾一粒朱砂小痣'],
   brows:['眉如远山含黛','眉似新月','眉峰微挑，自带英气','眉心一点花钿似的红痕'],
@@ -1907,7 +1902,23 @@ function setPath(obj,path,val){
   for(let i=0;i<ks.length-1;i++){if(o[ks[i]]==null||typeof o[ks[i]]!=='object')o[ks[i]]={};o=o[ks[i]]}
   o[ks[ks.length-1]]=val;
 }
+function getPath(obj,path){
+  const ks=path.split('.');let o=obj;
+  for(const k of ks){if(o==null||typeof o!=='object')return undefined;o=o[k]}
+  return o;
+}
+function mergeDeep(target,src){ // 模型偶尔把嵌套对象整块写进 statePatch：合并而非替换，避免丢掉未提及的字段
+  for(const k in src){
+    if(k==='__proto__'||k==='constructor'||k==='prototype')continue;
+    const v=src[k],cur=target[k];
+    if(v&&typeof v==='object'&&!Array.isArray(v)&&cur&&typeof cur==='object'&&!Array.isArray(cur))mergeDeep(cur,v);
+    else if(v!==undefined)target[k]=v;
+  }
+  return target;
+}
 function toCN(n){n=Number(n)||0;if(n<10)return'一二三四五六七八九'[n-1]||String(n);if(n<20)return'十'+(n%10?'一二三四五六七八九'[n%10-1]:'');return Math.floor(n/10)+'十'+(n%10?'一二三四五六七八九'[n%10-1]:'')}
+function xunNoOf(turn){return (Number(turn)||0)+1} // 存档 turn=已完成旬数（从 0 起），展示给玩家/模型时统一 +1
+function xunNo(){return xunNoOf(state&&state.turn)}
 function fmtTime(t){t=t||state.time;return `${t.era}${toCN(t.year)}年·${MONTHS[t.month]||t.month+'月'}${t.xun||''}`}
 function toast(msg,ms=2200){const el=$('#toast');el.textContent=msg;el.classList.add('on');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('on'),ms)}
 
@@ -1977,8 +1988,12 @@ function ensureNpcRealNames(s){ // 幂等：已有本名不动，缺的按名讳
   }
 }
 function normalizeState(s){
-  s.npcs=s.npcs||{};s.items=s.items||{};s.relationships=s.relationships||{};
-  s.system=s.system||{shop:[]};s.pending=normalizePending(s.pending,s.turn);s.time=s.time||{era:'元朔',year:1,month:3,xun:'上旬'};
+  s.npcs=(s.npcs&&typeof s.npcs==='object'&&!Array.isArray(s.npcs))?s.npcs:{};
+  s.items=(s.items&&typeof s.items==='object')?s.items:{};
+  s.relationships=(s.relationships&&typeof s.relationships==='object'&&!Array.isArray(s.relationships))?s.relationships:{};
+  s.system=(s.system&&typeof s.system==='object')?s.system:{shop:[]};
+  if(!Array.isArray(s.system.shop))s.system.shop=[];
+  s.pending=normalizePending(s.pending,s.turn);s.time=s.time||{era:'元朔',year:1,month:3,xun:'上旬'};
   if(s.time.xun==='中旬')s.time.xun='下旬'; // 旧三旬制存档归入两旬制
   if(typeof s.energy!=='number'||!(s.energy>=0)){ // 旧档（无精力字段）：turn 由「已完成旬数」转为「当前旬号」
     s.energy=ENERGY_MAX;
@@ -1994,11 +2009,14 @@ function normalizeState(s){
     pr.traits=normalizePersona(Array.isArray(pr.traits)?pr.traits:[]);
     pr.biography=Array.isArray(pr.biography)?pr.biography:[];
     pr.impressions=pr.impressions&&typeof pr.impressions==='object'?pr.impressions:{};
+    for(const who in pr.impressions)if(typeof pr.impressions[who]==='string')pr.impressions[who]={note:pr.impressions[who]};
     pr.recent=Array.isArray(pr.recent)?pr.recent:[];
     pr.depth=pr.depth||'初识';
   }
   ensureNpcRealNames(s); // 旧档人物补本名；已有本名不覆盖
   s.protagonist=s.protagonist||{};s.protagonist.attributes=s.protagonist.attributes||{};s.protagonist.skills=s.protagonist.skills||{};
+  if(typeof s.protagonist.maids==='string')s.protagonist.maids=s.protagonist.maids.split(/[、,，\s]+/).filter(Boolean);
+  if(!Array.isArray(s.protagonist.maids))s.protagonist.maids=[];
   s.protagonist.personality=normalizePersona(s.protagonist.personality); // 旧档性情去重、归并近义、剔除相斥
   const at=s.protagonist.attributes,sk=s.protagonist.skills;
   if(sk['医术·药理']&&!sk['医术']){sk['医术']=sk['医术·药理'];delete sk['医术·药理']} // 旧档才艺名归一
@@ -2026,7 +2044,8 @@ function normalizeState(s){
   if(!s.itemFlagV1){for(const it of s.inventory)it.usable=guessUsable(it.name,it.note);s.itemFlagV1=true} // 旧档一次性重算可否使用
   for(const it of s.inventory)itemFlags(it); // 补齐缺失词条
   if(!s.plotLedgerV1){migratePlotLedger(s);s.plotLedgerV1=true} // 一次性迁移剧情台账
-  if(!s.readMindV1){const sys=s.system=s.system||{};const shop=sys.shop=sys.shop||[];if(!shop.some(it=>it&&it.name==='读心笺'))shop.push({name:'读心笺',cost:15});s.readMindV1=true} // 旧档商城补读心笺
+  if(!Array.isArray(s.plots))s.plots=[];
+  if(!s.readMindV1){const sys=s.system=s.system||{};const shop=sys.shop=Array.isArray(sys.shop)?sys.shop:[];if(!shop.some(it=>it&&it.name==='读心笺'))shop.push({name:'读心笺',cost:15});s.readMindV1=true} // 旧档商城补读心笺
   s.pending=(s.pending||[]).filter(x=>!/当票|赎当|已逾期/.test(pendText(x))); // 典当银货两讫、当场结清：不留逾期话口
   s.inventory=(s.inventory||[]).filter(it=>!/当票/.test(String(it.name||''))); // 旧档当票条目一并清除
   backfillAvatars(s); // 头像：旧档主控/人物补配（新档在开局生成时已分配）
@@ -2068,18 +2087,16 @@ function addToInventory(list){ // 入库：按 名+备注 合并件数，件数�
     if(!raw||!raw.name)continue;
     const it=itemFlags(Object.assign({count:1,note:''},raw));
     const n=Number(it.count);it.count=Number.isFinite(n)?n:1;
-    const key=state.inventory.findIndex(o=>o.name===it.name&&o.note===it.note);
-    if(it.count<=0){
-      if(key>=0)state.inventory.splice(key,1);
-      continue;
-    }
+    let key=state.inventory.findIndex(o=>o.name===it.name&&o.note===it.note);
+    if(key<0&&it.count<0)key=state.inventory.findIndex(o=>o.name===it.name); // 消耗/送出：备注可能不同，按名扣减
     if(key>=0){
       const ex=state.inventory[key];
       ex.count=(Number(ex.count)||0)+it.count;
-      if(it.note)ex.note=it.note;
+      if(it.count>0&&it.note)ex.note=it.note;
       if(typeof raw.usable==='boolean')ex.usable=raw.usable;
       if(typeof raw.pawnable==='boolean')ex.pawnable=raw.pawnable;
-    }else{
+      if(ex.count<=0)state.inventory.splice(key,1); // 归零除名
+    }else if(it.count>0){
       state.inventory.push(it);
     }
     if(it.count>0)acquiredThisTurn.push({name:it.name,usable:it.usable,pawnable:it.pawnable});
@@ -2108,6 +2125,8 @@ let lastUseIdx=null;          // 使用道具的件数回滚索引（调用失�
 let sceneCtx=null;            // 剧情场景状态：{who,round,lastOptions,lines}
 const CARD_CAP=20;let cardCount=0;
 const MAX_OUTPUT_TOKENS=4096;   // 单次输出上限：正文 + JSON 结算；取主流模型的通用上限，留足余量避免 JSON 被截断
+const JSON_RETRY_EMPTY=2;       // JSON 模式偶发返回空白（DeepSeek 等接口会吞掉非 JSON 内容）：自动重试次数
+const JSON_RETRY_PARSE=1;       // 返回了文本却解析不出 JSON：追加纠正后重试次数
 const REQUEST_TIMEOUT=120000;   // 单次请求超时（毫秒），超时立即报错而不是一直转圈
 const HISTORY_FULL_TURNS=4;     // 送入上下文的完整近旬数，更早的只送一句摘要
 const HISTORY_CAP=80;           // 本地最多保留的旬数
@@ -2116,6 +2135,7 @@ const HISTORY_CAP=80;           // 本地最多保留的旬数
 function compactState(s){ // 只压缩送入模型的那一份，localStorage 里仍是完整存档
   if(!s)return s;
   const out=Object.assign({},s);
+  out.turn=xunNoOf(s.turn); // 对外统一 1 起旬号，与指令里的「第N旬」一致
   // 剧情台账：进行中的全留，已结的只留最近 8 条
   if(Array.isArray(s.plots)){
     const done=s.plots.filter(p=>p.stage!=='进行中').slice(-8);
@@ -2169,13 +2189,13 @@ function buildMessages(userMsg){
   const msgs=[{role:'system',content:buildSystem()}];
   const recent=history.slice(-HISTORY_FULL_TURNS),old=history.slice(0,-HISTORY_FULL_TURNS);
   if(old.length){ // 更早的旬合并成一段摘要，避免几十条 messages 反复携带
-    msgs.push({role:'user',content:'既往旬摘要（供承接，不必复述）：\n'+old.map(h=>`第${h.turn}旬：${h.log||'(平静的一旬)'}`).join('\n')});
+    msgs.push({role:'user',content:'既往旬摘要（供承接，不必复述）：\n'+old.map(h=>`第${xunNoOf(h.turn)}旬：${String(h.log||'(平静的一旬)')}`).join('\n')});
   }
   for(const h of recent){
-    msgs.push({role:'user',content:`第${h.turn}旬：玩家生活重心「${h.focus}」${h.choice?`；突发事件应对「${h.choice}」`:''}`});
-    msgs.push({role:'assistant',content:h.narrative});
+    msgs.push({role:'user',content:`第${xunNoOf(h.turn)}旬：玩家生活重心「${h.focus}」${h.choice?`；突发事件应对「${h.choice}」`:''}`});
+    msgs.push({role:'assistant',content:String(h.narrative||'')});
   }
-  msgs.push({role:'user',content:userMsg});
+  msgs.push({role:'user',content:String(userMsg)+'\n【格式】只输出一个完整 JSON 对象，不要输出任何 JSON 以外的文字。'});
   return msgs;
 }
 
@@ -2188,12 +2208,41 @@ function appendBudgetNote(msgs){ // 截断后原样重发必然再截断：附�
   else out.push({role:'user',content:note});
   return out;
 }
+function appendJsonHint(msgs,empty,err){ // 空/坏 JSON 重发：连同原请求再要一次，不改变剧情内容
+  const note=empty
+    ?'【系统】上一次回复为空（接口 JSON 模式偶发，不是你的错）。请重新完整输出本旬 JSON：只输出一个 JSON 对象，不要任何解释或 markdown 代码块。'
+    :`【系统】上一次回复无法解析为 JSON（${(err&&err.message)||'格式错误'}）。请重新完整输出本旬 JSON：只输出一个 JSON 对象，不要任何解释或 markdown 代码块${err&&err.raw?`；上次回复开头是：${String(err.raw).slice(0,80)}`:''}。`;
+  const out=msgs.map(m=>Object.assign({},m));
+  const last=out[out.length-1];
+  if(last&&last.role==='user')last.content=String(last.content)+'\n'+note;
+  else out.push({role:'user',content:note});
+  return out;
+}
+function modelText(message){ // content 可能是字符串、分段数组（部分网关）或对象，统一取出文本
+  const c=message&&message.content;
+  if(typeof c==='string')return c;
+  if(Array.isArray(c))return c.map(x=>typeof x==='string'?x:(x&&typeof x==='object'?(typeof x.text==='string'?x.text:(typeof x.content==='string'?x.content:'')):'')).join('');
+  if(c&&typeof c==='object')return typeof c.text==='string'?c.text:(typeof c.content==='string'?c.content:JSON.stringify(c));
+  return '';
+}
 async function callModel(userMsg,opts){
   const s=loadSettings();
   if(!s.apiKey){const err=new Error('尚未填写 API Key');err.noKey=true;throw err}
   const baseMsgs=(opts&&opts.messages)||buildMessages(userMsg);
   const maxTokens=(opts&&opts.maxTokens)||MAX_OUTPUT_TOKENS;
   const timeoutMs=(opts&&opts.timeoutMs)||REQUEST_TIMEOUT;
+  const expect=(opts&&opts.expect)||'payload';
+  const validate=raw=>{ // 只校验，不改写；解析后的字段洗净由调用方再做一次
+    if(expect==='payload'){parsePayload(raw);return}
+    if(expect==='impression'){
+      let ok=false;
+      try{
+        const t=String(raw==null?'':raw),a=t.indexOf('{'),b=t.lastIndexOf('}');
+        if(b>a)ok=typeof (JSON.parse(t.slice(a,b+1))||{}).impression==='string';
+      }catch(e){}
+      if(!ok){const err=new Error('返回不是 JSON');err.raw=String(raw==null?'':raw).trim();err.invalidJson=true;throw err}
+    }
+  };
   const send=async messages=>{
     const ctrl=new AbortController();abortCtrl=ctrl;
     let timedOut=false;
@@ -2208,15 +2257,20 @@ async function callModel(userMsg,opts){
       if(!res.ok)throw new Error('HTTP '+res.status+'：'+(await res.text()).slice(0,300));
       const data=await res.json();
       const choice=data.choices&&data.choices[0];
-      const content=choice&&choice.message&&choice.message.content;
-      if(!content)throw new Error('模型返回为空');
+      const content=modelText(choice&&choice.message);
+      const finish=String((choice&&choice.finish_reason)||'');
       if(data.usage){ // 耗时与 token 用量：用于判断慢在输入还是输出
         const u=data.usage;
         console.info(`[API] ${((Date.now()-started)/1000).toFixed(1)}s  prompt ${u.prompt_tokens??'?'} / completion ${u.completion_tokens??'?'} tokens`
           +(u.prompt_cache_hit_tokens!=null?` / cache hit ${u.prompt_cache_hit_tokens}`:''));
       }
-      if(choice.finish_reason==='length'||choice.finish_reason==='max_tokens'){ // 截断的 JSON 必然解析失败，标记后由外层精简重试
+      if(finish==='length'||finish==='max_tokens'){ // 截断的 JSON 必然解析失败，标记后由外层精简重试
         const err=new Error('输出达到长度上限被截断，JSON 未闭合');err.raw=content;err.truncated=true;throw err;
+      }
+      if(!String(content).trim()){ // JSON 模式会把无法识别的输出替换成空格：这是接口已知问题，自动重试
+        const err=new Error('模型返回了空内容（接口 JSON 模式偶发）');
+        err.empty=true;err.raw='';err.detail=`模型：${data.model||s.model||'—'}${finish?`｜finish_reason：${finish}`:''}`;
+        throw err;
       }
       return content;
     }catch(e){
@@ -2227,18 +2281,46 @@ async function callModel(userMsg,opts){
       if(abortCtrl===ctrl)abortCtrl=null;
     }
   };
-  try{
-    return await send(baseMsgs);
-  }catch(e){
-    if(!e.truncated||(opts&&opts.noRetry))throw e;
-    console.info('[API] 输出被截断，追加精简要求后重试一次');
-    return await send(appendBudgetNote(baseMsgs));
+  let messages=baseMsgs,truncatedTried=false;
+  for(let emptyTried=0,parseTried=0;;){
+    let raw;
+    try{
+      raw=await send(messages);
+    }catch(e){
+      if(e.truncated&&!truncatedTried&&!(opts&&opts.noRetry)){ // 截断：压缩篇幅后重试
+        truncatedTried=true;
+        console.info('[API] 输出被截断，追加精简要求后重试一次');
+        messages=appendBudgetNote(messages);
+        continue;
+      }
+      if(e.empty&&emptyTried<JSON_RETRY_EMPTY&&!(opts&&opts.noRetry)){ // 空内容：DeepSeek 等 JSON 模式偶发，重试通常即可
+        emptyTried++;
+        console.info(`[API] 返回空内容，自动重试（${emptyTried}/${JSON_RETRY_EMPTY}）`);
+        messages=appendJsonHint(messages,true);
+        continue;
+      }
+      throw e;
+    }
+    try{
+      validate(raw);
+      return raw;
+    }catch(e){
+      if(e.invalidJson&&parseTried<JSON_RETRY_PARSE&&!(opts&&opts.noRetry)){
+        parseTried++;
+        console.info('[API] 返回不是有效 JSON，追加纠正后重试：'+e.message);
+        messages=appendJsonHint(messages,false,e);
+        continue;
+      }
+      throw e;
+    }
   }
 }
 function parsePayload(raw){
-  let t=String(raw).trim().replace(/^```(json)?/i,'').replace(/```$/,'').trim();
+  const src=raw==null?'':String(raw);
+  let t=src.trim().replace(/^```(?:json)?\s*/i,'').replace(/```\s*$/,'').trim();
+  const fail=m=>{const e=new Error(m);e.raw=src.trim();e.invalidJson=true;throw e};
+  if(!t)fail('模型返回了空内容');
   const a=t.indexOf('{'),b=t.lastIndexOf('}');
-  const fail=m=>{const e=new Error(m);e.raw=t;throw e};
   if(a<0)fail('返回不是 JSON');
   if(b<=a)fail('输出在 JSON 闭合前被截断（可重试）');
   let p;try{p=JSON.parse(t.slice(a,b+1))}catch(e){
@@ -2249,11 +2331,19 @@ function parsePayload(raw){
   // 字段洗净：模型偶发把数组写成字符串、把 scene 写成字符串，后续 .map/.join 会直接抛错并让界面无响应
   const asList=v=>Array.isArray(v)?v:(v==null||v===''?[]:[v]);
   const asText=v=>typeof v==='string'?v:String(v==null?'':JSON.stringify(v));
+  const asOption=o=>typeof o==='string'?{text:o}:(o&&typeof o==='object'?o:{text:asText(o)});
   p.changes=asList(p.changes).map(asText).filter(Boolean);
   p.todo=asList(p.todo).map(asText).filter(Boolean);
-  p.options=asList(p.options).map(o=>typeof o==='string'?{text:o}:(o&&typeof o==='object'?o:{text:asText(o)}));
+  p.options=asList(p.options).map(asOption);
+  if(p.eventSource!=null&&typeof p.eventSource!=='string')p.eventSource=asText(p.eventSource);
   if(p.scene!=null&&(typeof p.scene!=='object'||Array.isArray(p.scene)))p.scene={line:asText(p.scene)};
-  if(p.scene&&Array.isArray(p.scene.options))p.scene.options=asList(p.scene.options).map(o=>typeof o==='string'?{text:o}:(o&&typeof o==='object'?o:{text:asText(o)}));
+  if(p.scene){
+    if(p.scene.line!=null&&typeof p.scene.line!=='string')p.scene.line=asText(p.scene.line);
+    if(p.scene.who!=null&&typeof p.scene.who!=='string')p.scene.who=asText(p.scene.who);
+    if(p.scene.where!=null&&typeof p.scene.where!=='string')p.scene.where=asText(p.scene.where);
+    if(p.scene.when!=null&&typeof p.scene.when!=='string')p.scene.when=asText(p.scene.when);
+    if(p.scene.options!=null)p.scene.options=asList(p.scene.options).map(asOption); // 字符串/单对象也不能留到 .map
+  }
   if(p.dossier!=null&&!Array.isArray(p.dossier))p.dossier=[];
   if(p.statePatch!=null&&(typeof p.statePatch!=='object'||Array.isArray(p.statePatch)))p.statePatch={};
   return p;
@@ -2283,8 +2373,16 @@ function applyPatch(patch){
       for(const x of arr){const it=parseLegacyItem(x,label);if(it)addToInventory([it])}
       continue;
     }
+    if(k==='inventory')continue; // 行囊只走 inventory.add，整表覆盖会把已合并的件数冲掉
+    if(k==='statePatch')continue;
+    if(/(^|\.)(__proto__|constructor|prototype)(\.|$)/.test(k))continue;
     let v=patch[k];
+    if(v===undefined||v===null)continue; // 空值不参与结算，避免整块字段被 null 冲掉
     if(/protagonist\.(attributes|skills)\./.test(k)&&typeof v==='number')v=clamp01_100(v);
+    if(v&&typeof v==='object'&&!Array.isArray(v)){ // 模型把 {"protagonist":{"attributes":{...}}} 整块写进来时按字段合并
+      const cur=getPath(state,k);
+      if(cur&&typeof cur==='object'&&!Array.isArray(cur)){mergeDeep(cur,v);continue}
+    }
     setPath(state,k,v);
     if(k==='protagonist.rank')majors.push('位份变动');
     if(/死亡|薨|病逝|暴毙/.test(k))majors.push('死亡');
@@ -2304,7 +2402,7 @@ function applyDossier(list){
     if(d.rank)npc.rank=String(d.rank); // 位份会升降：以最新档案为准
     if(d.faction)npc.faction=String(d.faction);
     if(d.realName)npc.realName=String(d.realName);
-    if(d.age)npc.age=Number(d.age)||npc.age;
+    if(d.age!=null)npc.age=Number(d.age)||npc.age;
     if(!npc.avatar&&state.avatarMap&&state.avatarMap[id]){npc.avatar=state.avatarMap[id];delete state.avatarMap[id]} // 同一人只留一张脸
     const acat=npc.avatarCat||avatarCatFor(state,id,d.rank||npc.rank||'');
     if(!npc.avatarCat)npc.avatarCat=acat;
@@ -2343,7 +2441,7 @@ function finalize(payload,meta){
     autoExpireStalePlots(meta&&meta.adj);
     try{applyDossier(payload.dossier)}catch(e){console.warn('[dossier] 人物档案回写失败',e)} // 单条人物档案出错不拖垮整旬结算
     const intelChanged=syncSkillIntel(state); // 交好到相熟：补记已知才艺
-    history.push({turn:state.turn,focus:meta.focus||'',choice:meta.choice||'',narrative:filterText(payload.narrative),log:(payload.statePatch&&payload.statePatch.log)||''});
+    history.push({turn:state.turn,focus:meta.focus||'',choice:meta.choice||'',narrative:filterText(payload.narrative),log:String((payload.statePatch&&payload.statePatch.log)||'')});
     if(history.length>HISTORY_CAP)history.splice(0,history.length-HISTORY_CAP);
     try{UI.renderTurnCard(payload,meta)}catch(e){console.warn('[card] 纪事卡渲染失败',e)}
     UI.updateStatusbar();
@@ -2426,7 +2524,7 @@ const UI={
     }).join('')+'</div>';
   },
   renderTurnCard(payload,meta){
-    const news=filterText(payload.hareemNews||payload.haremNews||'');
+    const news=filterText(payload.haremNews||'');
     const todo=(payload.todo&&payload.todo.length)?`<div class="todo"><b>待续</b>　${esc(payload.todo.join('；'))}</div>`:'';
     const title=meta.choice?`<div class="card-title">应对</div>`:'';
     this.pushCard(`<article class="turncard">
@@ -2726,7 +2824,7 @@ const UI={
   },
   mindSection(id){ // 她对你：默认不可知；印象位即按钮，点击即耗读心笺一张即时生成，不落档
     const v=impView[id];
-    if(v&&typeof v==='object')return `<div class="rel"><span class="rel-v" style="width:auto">${esc(v.text)}</span></div><div class="sheet-note">——读心所见，止于第 ${v.turn} 旬；要知如今，再点一次。</div>`;
+    if(v&&typeof v==='object')return `<div class="rel"><span class="rel-v" style="width:auto">${esc(v.text)}</span></div><div class="sheet-note">——读心所见，止于第 ${xunNoOf(v.turn)} 旬；要知如今，再点一次。</div>`;
     if(v==='…')return '<div class="sheet-note">笺上火光一闪，她的影子正在笺上聚拢……</div>';
     const own=(state.inventory||[]).filter(x=>x.name==='读心笺').reduce((a,x)=>a+(Number(x.count)||0),0);
     if(own)return `<button class="npcrow" style="width:100%" onclick="Game.readMind('${esc(id)}')"><span class="nr-name">她心底如何看待你——不可知</span><span class="nr-depth">读心笺 ×1 · 点击窥心</span></button><div class="sheet-note">囊中尚有 ${own} 张；点击即消耗一张，即时窥见此刻心意。</div>`;
@@ -2781,14 +2879,14 @@ const UI={
       ${recent?`<div class="sec"><div class="sec-cap">最近动向</div>${recent}</div>`:''}`;
   },
   paneSaves(){
-    const cur=state?`<div class="sheet-note">当前：第 ${state.turn} 旬 · ${esc(fmtTime())}</div>`:'';
+    const cur=state?`<div class="sheet-note">当前：第 ${xunNo()} 旬 · ${esc(fmtTime())}</div>`:'';
     const slotHtml=(key,label,auto)=>{
       let p=null;try{p=JSON.parse(localStorage.getItem(key))}catch(e){}
       const t=p?new Date(p.savedAt).toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'';
       if(!p)return auto?`<div class="slot empty"><div class="sl-head">${label}</div><div class="sl-log">空档位</div></div>`
         :`<div class="slot empty"><div class="sl-head">${label}</div><div class="sl-log">空档位</div>
         <div class="sl-ops"><button onclick="Game.overwriteSlot('${key}')">存入当前进度</button></div></div>`;
-      return `<div class="slot"><div class="sl-head">${label}<span class="sl-time num">${t} · 第${p.turn||'?'}旬</span></div>
+      return `<div class="slot"><div class="sl-head">${label}<span class="sl-time num">${t} · 第${p.turn==null?'?':xunNoOf(p.turn)}旬</span></div>
         <div class="sl-log">${esc(p.log||'（无摘要）')}</div>
         <div class="sl-ops"><button onclick="Game.loadSlot('${key}',${auto?1:0})">读取</button>${auto?'':`<button onclick="Game.overwriteSlot('${key}')">覆盖</button>`}<button class="danger" onclick="Game.deleteSlot('${key}')">删除</button></div></div>`;
     };
@@ -3235,7 +3333,7 @@ function buildOpeningWorld(proto){
       text:paras[2]+'\n\n'+`掌事姑姑说，几处派系各有领头的人：${state.world.factionLeaders.map(f=>`${f.name}以${f.leader}为首`).join('；')}。这些名字先记下，往后遇上了，才知谁该敬、谁该避。`,
       unlock:[main.name,...state.world.factionLeaders.map(f=>f.leader),...heirs.map(h=>h.name)]},
     {title:'住处与身边人',depth:'初识',
-      text:paras[3]+'\n\n'+`往后每一旬，你有精力一百。修习才艺耗二十五，出门拜访或料理宫务耗二十，往御花园等处散步闲逛耗十，用一件东西耗五；精力见底会当场昏厥。乏了不必硬撑，就此歇下、进入下一旬，精力自然回满。日子怎么排，要你自己拿主意。`,
+      text:paras[3]+'\n\n'+`往后每一旬，你有精力一百。修习才艺耗二十，出门拜访或料理宫务耗二十，往御花园等处散步闲逛耗十，用一件东西耗五；精力见底会当场昏厥。乏了不必硬撑，就此歇下、进入下一旬，精力自然回满。日子怎么排，要你自己拿主意。`,
       unlock:[headMaid.name,...maids.map(m=>m.name)]},
     {title:'宫斗系统',depth:'',
       text:paras[4]+'\n\n'+`系统只对你一人可见。完成任务得积分，积分可在商城换道具；道具能改属性、改关系，也能在要紧时救你一命。便宜的读心笺还能窥见一人此刻对你的真实心意。当前积分 100，点顶栏「积分」即可打开商城；商城道具每三旬刷新。`,
@@ -3293,8 +3391,9 @@ const Game={
   /* 开局 */
   continueGame(){
     const cur=loadCurrent();
-    if(cur){state=normalizeState(cur.state);history=cur.history||[];toast('已恢复本机进度（第'+(state.turn||0)+'旬）')}
+    if(cur){state=normalizeState(cur.state);history=cur.history||[];toast('已恢复本机进度（第'+xunNo()+'旬）')}
     else{state=normalizeState(JSON.parse(JSON.stringify(DEFAULT_SAVE)));history=[];toast('已载入 v36 存档：'+fmtTime())}
+    persistCurrent(); // 旧档迁移（补精力、行囊、台账等）立即落盘，避免每次读档重复迁移
     pendingBuys=[];this.enterMain();
   },
   askNewGame(){ // 开新档入口（主界面）：有旧进度先确认覆盖
@@ -3405,7 +3504,7 @@ const Game={
       const phits=matchPending(['御花园','花园','散步']);
       const leadHint=hits.length?`\n【呼应引线】园中散步与在途引线相关：${hits.map(p=>`「${p.title}」（${p.line}）`).join('；')}。请让此番闲逛与之产生实质交集（撞见、听闻、想起要办的事），能推进的推进并回写台账，暂不能的也在 note 留一笔现状。`:'';
       const pendHint=phits.length?`\n【呼应待续】园中散步与待续琐事相关：${phits.map(x=>pendText(x)).join('；')}。请顺势办理或想起此事，办妥的从 statePatch.pending 移除，未办妥的更新现状。`:'';
-      const msg=`第${state.turn}旬第一轮：玩家往御花园散步闲逛（耗精力 ${focusEnergyCost('散步')}）。演绎一路物候风景与园中见闻：可触发偶遇、宫人闲话、物候小事等轻量事件，不保证遇到皇帝或获得宠爱，也不提供稳定稀有资源。体质正常且无疾病时，本旬体质+1——散步的康健收益即在此，请写入 changes 与 statePatch（同一旬高强度活动不得兼取此收益）。${leadHint}${pendHint}`;
+      const msg=`第${xunNo()}旬第一轮：玩家往御花园散步闲逛（耗精力 ${focusEnergyCost('散步')}）。演绎一路物候风景与园中见闻：可触发偶遇、宫人闲话、物候小事等轻量事件，不保证遇到皇帝或获得宠爱，也不提供稳定稀有资源。体质正常且无疾病时，本旬体质+1——散步的康健收益即在此，请写入 changes 与 statePatch（同一旬高强度活动不得兼取此收益）。${leadHint}${pendHint}`;
       this.round1(msg,'外出·御花园散步',focusEnergyCost('散步'),{leadIds:hits.map(p=>p.id),pendTexts:phits.map(pendText)}); // 宫城图不关：加载与结果都叠在图上，避免背景弹回房间
       return
     }
@@ -3420,7 +3519,7 @@ const Game={
     const phits=matchPending([who,npc]);
     const leadHint=hits.length?`\n【呼应引线】此人与在途引线相关：${hits.map(p=>`「${p.title}」（${p.line}）`).join('；')}。请借此次会面推进或了结它：能兑现的当旬兑现并回写台账；暂不能了结的，也要让会面与之产生实质关联（新信息、态度变化、埋下下一步），并更新 note。`:'';
     const pendHint=phits.length?`\n【呼应待续】此次行动与待续琐事相关：${phits.map(x=>pendText(x)).join('；')}。请在本旬演绎中顺手办理或问起此事，办妥的从 statePatch.pending 移除；未办妥的更新一句现状（回写即重置挂账计旬）。`:'';
-    const msg=`第${state.turn}旬第一轮：玩家主动出门拜访「${npc}」。依双方关系、位份、情理与时机如实演接待结果——接见、婉拒、不在宫中都可能，吃闭门羹也是有效结果，不得保证见到。若接见，用剧情对话 scene 结构呈现此次会面（对方说话、玩家接话，多轮后 resolve 收尾结算）；若未见到，安静结算本旬。${leadHint}${pendHint}`;
+    const msg=`第${xunNo()}旬第一轮：玩家主动出门拜访「${npc}」。依双方关系、位份、情理与时机如实演接待结果——接见、婉拒、不在宫中都可能，吃闭门羹也是有效结果，不得保证见到。若接见，用剧情对话 scene 结构呈现此次会面（对方说话、玩家接话，多轮后 resolve 收尾结算）；若未见到，安静结算本旬。${leadHint}${pendHint}`;
     this.round1(msg,'拜访·'+npc,focusEnergyCost('社交拜访'),{skipDice:true,leadIds:hits.map(p=>p.id),pendTexts:phits.map(pendText)});
   },
   maidTalk(name){ // 日常宫务：不预调 API、不弹"事发"，本地开场白直入对话；开口说话才扣精力（每次5）
@@ -3455,7 +3554,7 @@ const Game={
     const adj=adjudicatePlots(true); // skipDice：本旬剧情额度即此，不再另掷
     if(!adj.stale.length&&!adj.pendStale.length)return;
     const items=[...adj.stale.map(p=>`「${p.title}」`),...adj.pendStale.map(x=>pendText(x))].join('；');
-    const msg=`第${state.turn}旬旬首：以下事项已搁置发酵，须立即处置，不得再拖：${items}。本旬首个剧情额度即用于此事——请用剧情对话 scene 结构开场（state="ongoing"，对方的话或动作开场，嵌入主控当前处境自然发生：来人传话、事发、旧事被翻上门等皆可），给 2—4 个应对选项后停止，不结算应对后果；应对后 resolve 时统一结算并回写台账/待续（兑现者 stage 改"已兑现"；琐事办掉即从 pending 移除）。`;
+    const msg=`第${xunNo()}旬旬首：以下事项已搁置发酵，须立即处置，不得再拖：${items}。本旬首个剧情额度即用于此事——请用剧情对话 scene 结构开场（state="ongoing"，对方的话或动作开场，嵌入主控当前处境自然发生：来人传话、事发、旧事被翻上门等皆可），给 2—4 个应对选项后停止，不结算应对后果；应对后 resolve 时统一结算并回写台账/待续（兑现者 stage 改"已兑现"；琐事办掉即从 pending 移除）。`;
     this.round1(msg,'旬首·发酵处置',0,{skipDice:true,_xunPop:true}); // 强制处置不占精力
   },
   collapse(){ // 精力归零：当场昏迷，扣体质，弹窗确认后强制进入下一旬
@@ -3677,7 +3776,7 @@ const Game={
   },
   chatRound2(choice){ // 旧两轮制聊天的第二轮：演绎 + 分句回显为气泡
     phase='RESOLVING';this.chatBusy(true);
-    const msg=`第${state.turn}旬第二轮：玩家应对「${choice}」。请演绎行动、他人反应与直接后果，统一结算本旬养成与剧情变化；hasEvent 必须为 false；若本旬应对使剧情线推进或了结，只经 statePatch.plots 回写发生变化的条目。`;
+    const msg=`第${xunNo()}旬第二轮：玩家应对「${choice}」。请演绎行动、他人反应与直接后果，统一结算本旬养成与剧情变化；hasEvent 必须为 false；若本旬应对使剧情线推进或了结，只经 statePatch.plots 回写发生变化的条目。`;
     lastRequest={type:'r2',msg,choice};
     callModel(msg).then(raw=>{
       UI.clearSkeleton();
@@ -3756,7 +3855,7 @@ const Game={
     callModel(msg,maxTokens?{maxTokens}:undefined).then(raw=>{
       const p=parsePayload(raw);
       const sc=p.scene||{};
-      const opts=p.options&&p.options.length?p.options:(sc.options||[]);
+      const opts=(Array.isArray(p.options)&&p.options.length)?p.options:(Array.isArray(sc.options)?sc.options:[]);
       // 模型没给 resolve、也没给台词和选项：按收尾处理，避免卡在只有"结束对话"的死循环
       if(sc.state==='resolve'||(!sc.line&&!opts.length)){this._sceneResolve(p);return}
       phase='EVENT_CHOICE';
@@ -3778,7 +3877,7 @@ const Game={
     this.recordLine('me',choice);
     sceneCtx.round++;
     const r=sceneCtx.round,cap=r>=SCENE_MAX_ROUNDS;
-    const msg=`第${state.turn}旬剧情对话第${r}轮：玩家应对「${choice}」。只演绎${sceneCtx.who}的当即反应与场面变化：输出 scene.line（对方本轮话或动作）、scene.where/when（有变化才写）、scene.state 与 2—4 个接话选项；此阶段不结算数值。${cap?'本场对话已达上限，本轮 scene.state 必须为"resolve"，并一并完整结算本旬养成与剧情（narrative 收尾、changes、statePatch，含 statePatch.plots 的变动条目）。':'若事已说尽、应对已足或局面已变，可 scene.state="resolve" 并一并完整结算本旬（narrative、changes、statePatch、statePatch.plots 变动条目）；否则 ongoing。'}`+this.sceneContextBlock();
+    const msg=`第${xunNo()}旬剧情对话第${r}轮：玩家应对「${choice}」。只演绎${sceneCtx.who}的当即反应与场面变化：输出 scene.line（对方本轮话或动作）、scene.where/when（有变化才写）、scene.state 与 2—4 个接话选项；此阶段不结算数值。${cap?'本场对话已达上限，本轮 scene.state 必须为"resolve"，并一并完整结算本旬养成与剧情（narrative 收尾、changes、statePatch，含 statePatch.plots 的变动条目）。':'若事已说尽、应对已足或局面已变，可 scene.state="resolve" 并一并完整结算本旬（narrative、changes、statePatch、statePatch.plots 变动条目）；否则 ongoing。'}`+this.sceneContextBlock();
     this.requestScene(msg,choice,MAX_OUTPUT_TOKENS); // 非收尾轮也可能被判定 resolve 并整旬结算，预算须按完整结算给
   },
   sceneEnd(){ // 玩家主动结束：对方应声简短收尾，统一结算（不耗精力）；本地开场且一言未发则不调 API、不结算
@@ -3793,7 +3892,7 @@ const Game={
       $('#chatOpts').innerHTML='<button class="btn btn-primary" style="letter-spacing:.2em;text-indent:.2em" onclick="Game.sceneDone()">继续</button>';
       return;
     }
-    const msg=`第${state.turn}旬剧情对话：玩家示意话已说完，结束与${sceneCtx.who}的对话。请收尾：scene.state="resolve"，补一段简短的收场演绎（narrative 一两句即可，如各自散去、欠身告退），并完整结算本旬养成与剧情（changes、statePatch，含 statePatch.plots 的变动条目）。收场只写本场已发生的事，不得虚构主控未亲历的往事或警告。`+this.sceneContextBlock();
+    const msg=`第${xunNo()}旬剧情对话：玩家示意话已说完，结束与${sceneCtx.who}的对话。请收尾：scene.state="resolve"，补一段简短的收场演绎（narrative 一两句即可，如各自散去、欠身告退），并完整结算本旬养成与剧情（changes、statePatch，含 statePatch.plots 的变动条目）。收场只写本场已发生的事，不得虚构主控未亲历的往事或警告。`+this.sceneContextBlock();
     this.requestScene(msg,'（结束对话）');
   },
   _sceneResolve(p){
@@ -3817,7 +3916,7 @@ const Game={
     const t=list[i];if(t==null)return;
     Game._openingOptions=null; // 首旬四选一只出现一次，之后"吩咐"回到自拟面板
     UI.closeSheet();
-    this.round1(`第${(state.turn||0)+1}旬第一轮：玩家消耗精力 ${focusEnergyCost(t)} 选定上旬生活重心「${t}」。按第一轮流程演绎本旬。`,t,focusEnergyCost(t));
+    this.round1(`第${xunNo()}旬第一轮：玩家消耗精力 ${focusEnergyCost(t)} 选定上旬生活重心「${t}」。按第一轮流程演绎本旬。`,t,focusEnergyCost(t));
   },
   cancelCall(){if(abortCtrl)abortCtrl.abort();UI.clearSkeleton();UI.hideBusy();toast('已取消');
     if(lastRequest&&lastRequest.type==='sc'&&sceneCtx){phase='EVENT_CHOICE';this.renderSceneOpts(sceneCtx.lastOptions||[]);return}
@@ -3826,7 +3925,8 @@ const Game={
     if(e.name==='AbortError')return;
     if(lastUseIdx!=null){const it=(state.inventory||[])[lastUseIdx];if(it){it.count=(Number(it.count)||0)+1;persistCurrent()}lastUseIdx=null} // 使用失败，件数回滚
     if(e.noKey){UI.errCard('尚未填写 API Key',null);return}
-    UI.errCard('生成失败：'+e.message,e.raw||'');
+    if(e.empty){UI.errCard('生成失败：模型连续返回空内容（接口 JSON 模式偶发，已自动重试）',e.detail||'');return}
+    UI.errCard('生成失败：'+e.message,[e.detail,e.raw].filter(Boolean).join('\n'));
   },
   retry(){
     if(!lastRequest)return;
@@ -3951,7 +4051,7 @@ const Game={
     const phits=matchPending([who,npc]);
     const leadHint=hits.length?`\n【呼应引线】此人与在途引线相关：${hits.map(p=>`「${p.title}」（${p.line}）`).join('；')}。请借此次求师自然推进或了结它，能兑现的当旬兑现并回写台账。`:'';
     const pendHint=phits.length?`\n【呼应待续】此次求师与待续琐事相关：${phits.map(x=>pendText(x)).join('；')}。请在本旬演绎中顺手办理或问起此事，办妥的从 statePatch.pending 移除；未办妥的更新一句现状。`:'';
-    const msg=`第${state.turn}旬第一轮：玩家登门拜访「${npc}」，寒暄之后当面提起想学「${skillName}」。双方好感 ${relVal}（已过 ${SKILL_TEACH_BOND}），她于此艺精熟（${skillName} ${tv}，${SKILL_LEVEL(tv)}，高于 ${SKILL_TEACH_MIN}）。依她的性情，可以应允，也可先考较、提一个小条件或要一份人情，但不得无端回绝。应允后本旬为拜师入门：在 statePatch 写入 protagonist.skills.${skillName} 为 5—10（刚入门的起点），changes 写明「习得${skillName}（入门）」，并把往后随她学艺的约定写入 pending。若她提出条件而玩家未应，可留作后续，不得直接判定学成。${leadHint}${pendHint}`;
+    const msg=`第${xunNo()}旬第一轮：玩家登门拜访「${npc}」，寒暄之后当面提起想学「${skillName}」。双方好感 ${relVal}（已过 ${SKILL_TEACH_BOND}），她于此艺精熟（${skillName} ${tv}，${SKILL_LEVEL(tv)}，高于 ${SKILL_TEACH_MIN}）。依她的性情，可以应允，也可先考较、提一个小条件或要一份人情，但不得无端回绝。应允后本旬为拜师入门：在 statePatch 写入 protagonist.skills.${skillName} 为 5—10（刚入门的起点），changes 写明「习得${skillName}（入门）」，并把往后随她学艺的约定写入 pending。若她提出条件而玩家未应，可留作后续，不得直接判定学成。${leadHint}${pendHint}`;
     this.round1(msg,'求师·'+npc+'·'+skillName,focusEnergyCost('求师'),{skipDice:true,leadIds:hits.map(p=>p.id),pendTexts:phits.map(pendText)});
   },
   /* 行囊 */
@@ -3964,7 +4064,7 @@ const Game={
     const cost=focusEnergyCost('使用道具');
     const buyNote=pendingBuys.length?`\n本旬起生效的商城购买：${pendingBuys.join('、')}（积分已扣，请将其效果并入本旬结算与 statePatch）。`:'';
     UI.closeSheet();
-    this.round1(`第${state.turn}旬第一轮：玩家消耗精力 ${cost} ${label}（${gone?'已用尽':'尚余 '+it.count+' 件'}${it.note?'；'+it.note:''}）。演绎使用此物的具体过程与其效果，然后决定是否触发剧情（hasEvent）。${buyNote}`,label,cost);
+    this.round1(`第${xunNo()}旬第一轮：玩家消耗精力 ${cost} ${label}（${gone?'已用尽':'尚余 '+it.count+' 件'}${it.note?'；'+it.note:''}）。演绎使用此物的具体过程与其效果，然后决定是否触发剧情（hasEvent）。${buyNote}`,label,cost);
   },
   pawnItem(i){
     const it=(state.inventory||[])[i];if(!it||!it.pawnable||it.count<=0)return;
@@ -3995,7 +4095,7 @@ const Game={
     const sys='你是文字游戏《带着系统去宫斗》的主持人。这是一次【读心笺】系统道具查询，不是回合推进：不演绎剧情、不推进时间、不结算、不写 statePatch。依据所附该人物的完整真相（hidden）与她同主控的近期往来，写出此人此刻对主控的真实内心印象。只输出 JSON：{"impression":"…"}；impression 用第二人称称呼主控（行文中写“你”）、一两句、80字以内，可含她未曾表露的算计、戒备、轻蔑或柔情，但只写对你（主控）的印象，不写他人，不用 emoji。';
     const payload={who:name,hidden:npc.hidden||{},known:{traits:normalizePersona(prof.traits),recent:(prof.recent||[]).slice(-6),biography:(prof.biography||[]).slice(-8)},relationship:rel==null?null:rel,recentWithMe:hist,me:state.protagonist&&state.protagonist.name};
     const msg='请写出「她此刻对主控（行文中称“你”）的印象」，人物资料如下：\n'+JSON.stringify(payload);
-    callModel(msg,{messages:[{role:'system',content:sys},{role:'user',content:msg}],maxTokens:220})
+    callModel(msg,{messages:[{role:'system',content:sys},{role:'user',content:msg}],maxTokens:220,expect:'impression'})
       .then(raw=>{
         let text='';
         try{const a=raw.indexOf('{'),b=raw.lastIndexOf('}');if(b>a)text=String((JSON.parse(raw.slice(a,b+1))||{}).impression||'').trim()}catch(e){}
@@ -4021,7 +4121,7 @@ const Game={
   deleteSlot(key){localStorage.removeItem(key);UI.renderSheet('设置');toast('已删除')},
   exportSave(){
     const blob=new Blob([JSON.stringify({game:'带着系统去宫斗',saveVersion:'web-1',exportedAt:new Date().toISOString(),state,history},null,2)],{type:'application/json'});
-    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`红墙引-第${state.turn}旬.json`;a.click();
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`红墙引-第${xunNo()}旬.json`;a.click();
   },
   importSave(){const f=$('#importFile');if(f)f.click()},
   onImportFile(input){
