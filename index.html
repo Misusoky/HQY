@@ -3500,8 +3500,8 @@ const UI={
     const ta=npcSexOf(state,id)==='m'?'他':'她';
     const impRow=([who,v])=>`<div class="rel"><span class="rel-nm">${esc(who)}</span><span class="rel-v" style="width:auto">${esc(v.note||v.tag||'')}</span></div>`;
     const impOther=Object.entries(imp).filter(([w])=>w!==me).map(impRow).join('')||`<div class="sheet-note">未见${ta}对旁人的表态。</div>`;
-    const bio=[...(prof.biography||[])].reverse().map(e=>`<div class="tl-item"><div class="tl-time">${esc(e.time)} ${e.src==='传闻'?'<span class="tag t-rumor">传闻·存疑</span>':`<span class="tag">${esc(e.src||'亲见')}</span>`}</div>${esc(e.text)}</div>`).join('');
-    const recent=(prof.recent||[]).map(x=>`<div class="itemrow"><span>${esc(x)}</span></div>`).join('');
+    const bio=[...(Array.isArray(prof.biography)?prof.biography:[])].reverse().map(e=>`<div class="tl-item"><div class="tl-time">${esc(e.time)} ${e.src==='传闻'?'<span class="tag t-rumor">传闻·存疑</span>':`<span class="tag">${esc(e.src||'亲见')}</span>`}</div>${esc(e.text)}</div>`).join('');
+    const recent=(Array.isArray(prof.recent)?prof.recent:[]).map(x=>`<div class="itemrow"><span>${esc(x)}</span></div>`).join('');
     const realName=n.realName||n.name||id, addr=n.name||id;
     const intel=n.skillIntel&&typeof n.skillIntel==='object'?n.skillIntel:{};
     const bond=bondValue(state,id);
