@@ -1363,10 +1363,12 @@ function applyEmperorPatch(field,v){ // 回写 emperor.*：contact 由前端记�
   else if(field==='hisState'&&typeof v==='string'){e.hisState=v.slice(0,90)}
   return majors;
 }
-function migrateEmperor(s){ // 旧档补恩宠账：知心按宠爱保守初值，上次接触自本旬起算（不追溯历史）
+function migrateEmperor(s){ // 旧档补恩宠账：知心按宠爱保守初值，上次接触自本旬起算（不追溯历史）；已有 emperor 块只补旗标，不动数据
   if(s.emperorV1)return;
-  const favor=Number((s.relationships&&s.relationships['皇帝']||{}).value)||0;
-  s.emperor={intimacy:favor>=70?50:favor>=50?35:favor>=30?20:8,lastContact:xunSerial(s.time),absence:null,hisState:'',memories:[]};
+  if(!s.emperor||typeof s.emperor!=='object'){
+    const favor=Number((s.relationships&&s.relationships['皇帝']||{}).value)||0;
+    s.emperor={intimacy:favor>=70?50:favor>=50?35:favor>=30?20:8,lastContact:xunSerial(s.time),absence:null,hisState:'',memories:[]};
+  }
   s.emperorV1=true;
 }
 function adjudicateEmperor(now,ctx){ // 恩宠账：相处节奏硬约束＋注意力经济软约束；与剧情账并行，剧情额度紧张时降格"并账"
@@ -3244,10 +3246,34 @@ const UI={
     if(role===name)role='';
     return{name,role};
   },
+  isEmperorId(who){return who==='皇帝'||(state.world&&state.world.emperor&&state.world.emperor.name===who)||(((state.relationships||{})[who]||{}).type==='宠爱')},
+  empPill(who){ // 列表行知心徽标：只显阶段不显数字
+    if(!this.isEmperorId(who)||!state.emperor)return '';
+    return `<span class="relpill p-good">${esc(emperorStage(state.emperor.intimacy))}</span>`;
+  },
+  empSection(){ // 知心专页：双轨概况＋共同经历账＋久未召见的原因（数字不外露）
+    const e=state.emperor;if(!e)return '';
+    const stage=emperorStage(e.intimacy);
+    const favor=(state.relationships||{})['皇帝'];
+    const fv=typeof favor==='object'?favor.value:favor;
+    const mems=[...(e.memories||[])].reverse();
+    const gap=typeof e.lastContact==='number'?xunSerial(state.time)-e.lastContact:null;
+    const rows=[
+      `<div class="rowline"><span class="rk">知心</span><span class="rv">${esc(stage)}</span></div>`,
+      (typeof fv==='number')?`<div class="rowline"><span class="rk">宠爱</span><span class="rv num">${fv}</span></div>`:'',
+      (gap===0)?`<div class="rowline"><span class="rk">近来</span><span class="rv">本旬刚见过</span></div>`:(gap>0?`<div class="rowline"><span class="rk">近来</span><span class="rv">距上次有内容相处 ${gap} 旬</span></div>`:''),
+      e.hisState?`<div class="rowline"><span class="rk">他近来</span><span class="rv">${esc(e.hisState)}</span></div>`:'',
+      (e.absence&&e.absence.reason)?`<div class="sheet-note" style="color:var(--cinnabar)">久未召见：${esc(e.absence.reason)}。</div>`:''
+    ].join('');
+    const list=mems.slice(0,10).map(m=>`<div class="tl-item"><div class="tl-time">${esc(m.xun||'')} <span class="tag">${esc(m.type||'共历')}</span>${m.open?' <span class="tag t-rumor">未了</span>':''}</div>${esc(m.text)}</div>`).join('');
+    const more=mems.length>10?`<div class="sheet-note">更早还有 ${mems.length-10} 条，往后正文里自会提起。</div>`:'';
+    return `<div class="sec"><div class="sec-cap">知心</div>${rows}
+      ${list?`<div class="tl" style="margin-top:8px">${list}</div>${more}`:'<div class="sheet-note">尚无共同经历。相处得多了，这里会记下他记得的事、欠下的约定与未解的误会。</div>'}</div>`;
+  },
   npcRowHtml(who,onclick){
     const c=this.npcCard(who);
     const role=c.role?`<span class="nr-role">${esc(c.role)}</span>`:'';
-    return `<button class="npcrow" onclick="${onclick}">${avatarHtml(who,'nr-av')}<span class="nr-main"><span class="nr-name">${esc(c.name)}</span>${role}</span><span class="nr-rel">${this.relBadge(who)}</span></button>`;
+    return `<button class="npcrow" onclick="${onclick}">${avatarHtml(who,'nr-av')}<span class="nr-main"><span class="nr-name">${esc(c.name)}</span>${role}</span><span class="nr-rel">${this.relBadge(who)}${this.empPill(who)}</span></button>`;
   },
   sheetVisit(kind){ // 出门拜访：kind='妃'（六宫）/'医'（太医院）/缺省=全部相识
     const head=kind==='医'?'太医院当值的人不多。':'';
@@ -3379,6 +3405,7 @@ const UI={
         <div class="rowline"><span class="rk">称谓</span><span class="rv">${esc(id)}</span></div>
         <div class="rowline"><span class="rk">关系</span><span class="rv">${this.relBadge(id)}</span></div>
         <div class="rowline"><span class="rk">相识</span><span class="rv">—</span></div></div>
+      ${this.isEmperorId(id)?this.empSection():''}
       <div class="sheet-note">尚无档案。</div>`;
     }
     const prof=n.profile||{};
@@ -3412,6 +3439,7 @@ const UI={
         ${n.faction?`<div class="rowline"><span class="rk">派系</span><span class="rv">${esc(n.faction)}</span></div>`:''}
         <div class="rowline"><span class="rk">相识</span><span class="rv">${esc(n.metAt||'—')}</span></div>
         <div class="rowline"><span class="rk">解锁度</span><span class="rv">${esc(prof.depth||'初识')}</span></div></div>
+      ${this.isEmperorId(id)?this.empSection():''}
       <div class="sec"><div class="sec-cap">已感知的性情</div>${normalizePersona(prof.traits).map(t=>`<span class="tag">${esc(t)}</span>`).join('')||'<div class="sheet-note">所知尚浅。</div>'}</div>
       <div class="sec"><div class="sec-cap">才艺见闻</div>${intelSection||'<div class="sheet-note">尚未听说她精于何艺。多来往，或问身边侍女打听。</div>'}</div>
       <div class="sec"><div class="sec-cap">她对你</div>${this.mindSection(id)}</div>
