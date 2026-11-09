@@ -1127,7 +1127,8 @@ const ENERGY_MODULE = [
 '4. 传膳（前端自结：每旬至多三次，菜色随菜单而定，耗银与回精力各不相同，最贵一味另加属性；菜单每三旬轮换）与精力扣减、昏迷只在剧情本身需要时写入正文与 statePatch。',
 '5. 精力≤20 前端会弹窗建议休息；精力归零主控当场昏迷、体质 -5 并被抬回寝殿强制休息——皆为前端已结算事实，正文写感受与场面。',
 '6. 同旬内第二件事起，玩家指令为「第N旬又一轮：玩家再安排……」，照常先演绎该事过程再检查剧情；时间保持本旬不变。',
-'7. 体质结算（前端自结，覆盖世界书）：体质即气血，存档 protagonist.constitutionBase 为根基（30—90）。气血永不高于根基：散步、药膳、静养的恢复只在气血低于根基时每旬至多+1，康健收益每旬至多结算一次；高出根基的部分每旬自动回落1点（不必写入 statePatch）。拔高根基（长期锻炼、对症药物、系统道具）单次至多+1、一生至多+5、上限90，须同时写 protagonist.constitutionBase 与 protagonist.attributes.体质。'
+'7. 体质结算（前端自结，覆盖世界书）：体质即气血，存档 protagonist.constitutionBase 为根基（30—90）。气血永不高于根基：散步、药膳、静养的恢复只在气血低于根基时每旬至多+1，康健收益每旬至多结算一次；高出根基的部分每旬自动回落1点（不必写入 statePatch）。拔高根基（长期锻炼、对症药物、系统道具）单次至多+1、一生至多+5、上限90，须同时写 protagonist.constitutionBase 与 protagonist.attributes.体质。',
+'8. 存档 location 记主控当前所在，默认本宫住处；御花园散步、赴宴、拜访等一过性外出不写进 location，场景散去仍回住处（除非剧情确实留宿、禁足或困于他处）。'
 ].join('\n');
 
 /* ============================================================ 剧情台账（Plot Ledger）
@@ -1349,7 +1350,9 @@ const SCENE_MODULE = [
 '- scene.parts 必填：按语义把这一轮拆成 2—5 段，而不是按标点硬切。type="narr" 写旁白、动作、神态；type="say" 写对方这一轮的原话（不带引号）；同场换人说话时在该段加 "who"。不要输出空段或纯标点段，台词后的句号、引号不要单独成段。',
 '- 触发剧情的当旬，narrative 必须先交代主控正在何处做什么、此人如何出现（迎面、传唤、偶遇、遣人请去），只写旁白，到"只让人回了句"这类引出语为止；第一句台词放进 scene.parts 的 say 段。界面会先显示 narrative，再按 parts 顺序渲染。',
 '- narrative 只写旁白与动作，人物台词一律放进 scene.parts；不要在 narrative 里写引号对白。scene.line 可省略，仅作旧界面兜底。',
-'- 每轮只演绎对方当即反应与场面变化：scene.state="ongoing"，scene.parts 总长不超过 70 字（只写对方这一轮的话与关键动作，不写主控的动作心理、不铺环境）、scene.where/when（有变化才写）与 2—3 个接话选项（放顶层 options）；此阶段 narrative 必须为空字符串，changes 与 statePatch 为空，不结算数值。',
+'- 每轮只演绎对方当即反应与场面变化：scene.state="ongoing"，scene.parts 总长不超过 70 字（只写对方这一轮的话与关键动作，不写主控的动作心理、不铺环境）、2—3 个接话选项（放顶层 options）；此阶段 narrative 必须为空字符串，changes 与 statePatch 为空，不结算数值。',
+'- scene.where 写本场真实所在：主控在住处说话就写本宫住处（存档 location／residence），在御花园就写园中具体处所；不要照抄上一场的地点，也不要写本场并未去的地方。scene.where/when 只在场景确实移动或换时辰时写，同一处说几轮不必重复。',
+'- 结算时 statePatch.location 写主控本场散去后的所在：回殿即本宫住处；只有确实留宿他处、被禁足或扣在某地时才写别处。一过性的散步、赴宴、拜访不留在 location 里。',
 '- 事已说尽、应对已足或局面已变时：scene.state="resolve"，并一并输出完整结算——narrative（收尾旁白，不写台词）、changes、statePatch（含 statePatch.plots 的变动条目），规则同第二轮。',
 '- 收尾只收束本场对话中已发生的事；须呼应既往前情时，只写存档剧情账与待续事项里已有记载的内容。',
 '- 召宫人问话、临时差遣等旬中插话不是本旬养成：收尾只结算这场对话本身（关系、情报、交办差事、行囊），主角才艺与基础属性留到旬末小结。',
@@ -2283,7 +2286,7 @@ const SCENE_RULES=[
 '【文风】架空盛唐，人物言语符合身份、性情与当下情绪；用古代语汇；只写对方的话与关键动作。',
 '【输出】{"narrative":"","changes":[],"hasEvent":true,"scene":{"state":"ongoing","who":"对方称谓","parts":[{"type":"narr","text":"旁白/动作"},{"type":"say","text":"对方原话，不带引号"}],"where":"有变化才写","when":"有变化才写"},"options":[{"id":"a","text":"≤70字"},{"id":"b","text":"≤70字"}]}',
 '【分段】scene.parts 按语义分 2—5 段：narr 写旁白、动作、神态；say 写对方台词，不带引号。不要按标点硬切，不要空段或纯标点段；同场换人说话时 say 段可带 who。narrative 只写旁白，不写引号对白。',
-'【约束】本轮 scene.state 必须是 "ongoing"；narrative 必须为空字符串，changes=[]，statePatch={}；options 给 2—3 个方向不同的接话，只写当下可见的机会或代价。即使话已说尽，也只写对方收束性的一句，由玩家选择「结束对话」，本轮保持 ongoing。',
+'【约束】本轮 scene.state 必须是 "ongoing"；narrative 必须为空字符串，changes=[]，statePatch={}；options 给 2—3 个方向不同的接话，只写当下可见的机会或代价。scene.where 只有场景确实移动时才写，在本宫说话就写本宫住处，不要重复上一场的地点。即使话已说尽，也只写对方收束性的一句，由玩家选择「结束对话」，本轮保持 ongoing。',
 '【承接】严格承接用户消息里的本场对话记录，把话题往前推；对方只依据自己的性情、目标、与主控的关系及已知信息回应。'
 ].join('\n');
 function buildSceneSystem(who){
@@ -2298,7 +2301,7 @@ function buildSceneSystem(who){
   const rels=state.relationships||{};
   const relationship=rels[who]!=null?rels[who]:(n.name&&rels[n.name]!=null?rels[n.name]:null);
   const payload={
-    time:fmtTime(),location:state.location,
+    time:fmtTime(),location:state.location,residence:Game.homeLocation(),
     protagonist:{name:p.name,rank:p.rank,age:p.age,personality:normalizePersona(p.personality),look:p.look},
     npc:{name:who,realName:n.realName,rank:n.rank,age:n.age,faction:n.faction,
       traits:normalizePersona(prof.traits),hidden,relationship,
@@ -3540,7 +3543,7 @@ function buildOpeningWorld(proto){
       emperor, dowager: dowager?{title:dowager.title, family:dowager.family, personality:dowager.personality, health:dowager.health, stance:dowager.stance}:null,
       factions:factions.map(f=>f.name),
       factionLeaders:factions.map(f=>({name:f.name, leader:f.leader, stance:f.stance, goal:f.goal})),
-      mainConsort:main.name, mainPalace:main.palace.name,
+      mainConsort:main.name, mainPalace:main.palace.name, residence:location,
       heirs:heirs.length?heirs.map(h=>`${h.gender}${h.name}（${h.age}岁，生母${h.mother}）`).join('；'):'暂无皇嗣',
       keyServants:[eunuch.name,guard.name,headMaid.name,physician.name]
     },
@@ -3792,6 +3795,7 @@ const Game={
         :(tb>0&&ti>=tb)?'气血已达根基，散步只作维持、不再提升。'
         :'体质正常且无疾病时，本次散步体质+1（恢复气血）——请写入 changes 与 statePatch。';
       const msg=`第${xunNo()}旬第一轮：玩家往御花园散步闲逛（本旬第 ${walkNo} 次，耗精力 ${focusEnergyCost('散步')}）。演绎一路物候风景与园中见闻：可触发偶遇、宫人闲话、物候小事等轻量事件；偶遇与宠爱顺其自然，稀有资源随缘。${gainNote}（同一旬高强度活动与康健收益不兼得。）${leadHint}${pendHint}`;
+      msg+='散步只是本旬中的一段外出：scene.where 可写园中所在，但 statePatch.location 仍写本宫住处，不要把 location 改成御花园。';
       this.round1(msg,'外出·御花园散步',focusEnergyCost('散步'),{leadIds:hits.map(p=>p.id),pendTexts:phits.map(pendText)}); // 宫城图不关：加载与结果都叠在图上，避免背景弹回房间
       return
     }
@@ -3806,7 +3810,7 @@ const Game={
     const phits=matchPending([who,npc]);
     const leadHint=hits.length?`\n【呼应引线】此人与在途引线相关：${hits.map(p=>`「${p.title}」（${p.line}）`).join('；')}。请借此次会面推进或了结它：能兑现的当旬兑现并回写台账；暂不能了结的，也要让会面与之产生实质关联（新信息、态度变化、埋下下一步），并更新 note。`:'';
     const pendHint=phits.length?`\n【呼应待续】此次行动与待续琐事相关：${phits.map(x=>pendText(x)).join('；')}。请在本旬演绎中顺手办理或问起此事，办妥的从 statePatch.pending 移除；未办妥的更新一句现状（回写即重置挂账计旬）。`:'';
-    const msg=`第${xunNo()}旬第一轮：玩家主动出门拜访「${npc}」。依双方关系、位份、情理与时机如实演接待结果——接见、婉拒、不在宫中都可能，吃闭门羹也是有效结果，见面与否顺其自然。若接见，用剧情对话 scene 结构呈现此次会面（scene.who 填「${npc}」；scene.parts 按语义分段，narr 写旁白动作、say 写台词，不带引号；对方说话、玩家接话，多轮后 resolve 收尾结算）；若未见到，安静结算本旬。${leadHint}${pendHint}`;
+    const msg=`第${xunNo()}旬第一轮：玩家主动出门拜访「${npc}」。依双方关系、位份、情理与时机如实演接待结果——接见、婉拒、不在宫中都可能，吃闭门羹也是有效结果，见面与否顺其自然。若接见，用剧情对话 scene 结构呈现此次会面（scene.who 填「${npc}」，scene.where 写对方所在宫室而不是本宫住处；scene.parts 按语义分段，narr 写旁白动作、say 写台词，不带引号；对方说话、玩家接话，多轮后 resolve 收尾结算）；若未见到，安静结算本旬。${leadHint}${pendHint}`;
     this.round1(msg,'拜访·'+npc,focusEnergyCost('社交拜访'),{skipDice:true,leadIds:hits.map(p=>p.id),pendTexts:phits.map(pendText),whoHint:npc});
   },
   maidTalk(name){ // 日常宫务：不预调 API、不弹"事发"，本地开场白直入对话；开口说话才扣精力（每次5）
@@ -3821,12 +3825,14 @@ const Game={
       `${name}近前来，压着声儿：“奴婢听着呢，小主只管说。”`
     ][Math.floor(Math.random()*3)];
     Game._lastFocus='吩咐·问话'+name;
+    const home=this.homeLocation()||'本宫住处'; // 旧档实在认不出住处时，宁可写得笼统，也不沿用园中地点
+    if(state.location!==home){state.location=home;persistCurrent()} // 在住处吩咐宫人：先把上一场外出留下的地点归位
     this.openScene({eventSource:name,narrative:'',options:[
       {id:'a',text:'交代差事：传话、采买、留意某处动静'},
       {id:'b',text:'打听消息：宫里近日有什么风声'},
       {id:'c',text:'问话：之前交代的事办得如何'},
       {id:'d',text:'闲聊几句，看看她的心思'}
-    ],scene:{state:'ongoing',line:greet,when:fmtTime(),where:state.location}});
+    ],scene:{state:'ongoing',line:greet,when:fmtTime(),where:home}});
     if(sceneCtx){sceneCtx.local=true;sceneCtx.standalone=true} // 本地开场：一言未发即结束时不结算；整场都不算“本旬养成”，只结算问话本身
   },
   nextTurn(){ // 休息，进入下一旬：旬数+1，精力回满，日历按两旬制推进
@@ -3939,6 +3945,7 @@ const Game={
       checkRestWarn();
       if(p.hasEvent&&(p.scene||(Array.isArray(p.options)&&p.options.length))){this.showIncident(p)} // 先弹"事发"简报，确认后进剧情对话
       else{ // 无事发生：本旬结果原地弹窗呈现，不再经纪事中转
+        this.backHome(); // 散步、赴宴等一过性外出到此收束：地点归回本宫住处
         const todo=(p.todo&&p.todo.length)?['待续：'+p.todo.join('；')]:[];
         UI.actResult(focus,filterText(p.narrative),todo);
       }
@@ -3966,11 +3973,28 @@ const Game={
     else if(adj.hit)names.push('剧情骰命中须开全新引子');
     return names.join('；')||'剧情骰命中';
   },
+  /* 本宫住处：以存档 world.residence 为准，旧档回退推算；外出地点不写进这里 */
+  homeLocation(){
+    const st=state||{},w=st.world||{};
+    const loc=String(st.location||'').trim();
+    if(/侧殿|配殿/.test(loc)&&(!w.mainPalace||loc.includes(w.mainPalace)))return loc; // 旧档或迁居后：当前就在自己屋里
+    if(w.residence)return w.residence;
+    const ch=[...(st.chronicle||[]).map(x=>String((x&&x.text)||x||'')),...(st.recentConfirmedFacts||[]).map(String),String(st.lastNode||'')].join('\n');
+    const m=ch.match(/居([^，。；\s]{2,12}?(?:侧殿|配殿))/);
+    if(m)return m[1];
+    if(w.mainPalace)return w.mainPalace+(/官女子/.test((st.protagonist&&st.protagonist.rank)||'')?'配殿':'侧殿');
+    return '';
+  },
+  backHome(){ // 一旬事毕回本宫住处：免得上一场外出地点滞留成下一场的场景
+    if(!state)return;
+    const home=this.homeLocation();
+    if(home&&state.location!==home){state.location=home;persistCurrent()}
+  },
   /* 事发弹窗底图：室外用御花园，他宫用宫室，本宫住处仍用 room.jpg */
   sceneBgKey(where){
     const w=String(where||'').trim();if(!w)return null;
     if(/御花园|花园|园中|园里|御苑|苑|梅林|菊山|亭|池|廊|桥|墙|石径|小径|阶|假山|山石|水边|宫道|殿外|宫外|门外|院中|后院|庭院/.test(w))return 'garden';
-    const st=state||{},home=(st.world&&st.world.mainPalace)||((String(st.location||'').match(/[^殿宫阁轩堂斋楼]{1,6}[殿宫阁轩堂斋楼]/)||[])[0]||'');
+    const st=state||{},home=(st.world&&st.world.mainPalace)||((String(this.homeLocation()||st.location||'').match(/^([^殿宫阁轩堂斋楼]{1,9}[殿宫阁轩堂斋楼])/)||[])[1]||'');
     if(home&&w.includes(home))return /正殿|主殿|中殿|殿中|正厅/.test(w)?'hall':'room'; // 同宫主位正殿算他宫，侧殿才是自己的屋子
     if(/住处|你的屋子|自己屋里/.test(w))return 'room';
     if(/出宫/.test(w))return null; // 宫外暂无专属底图，沿用住处
@@ -4178,21 +4202,32 @@ const Game={
   },
   chatDone(){
     phase='FOCUS_SELECT';
+    this.backHome();
     currentEvent=null;
     $('#chatview').classList.remove('on');
     UI.goHome();toast('本旬事了');
+  },
+  sceneMeta(sc){ // 场景地点/时辰标注：同一场里只在地点或时辰真正变化时显示，避免每轮重复
+    if(!sceneCtx||!sc)return;
+    const when=String(sc.when||'').trim(),where=String(sc.where||'').trim();
+    const prev=sceneCtx.meta||(sceneCtx.meta={when:'',where:''});
+    const wc=!!when&&when!==prev.when, pc=!!where&&where!==prev.where;
+    if(!wc&&!pc)return;
+    if(wc)prev.when=when;
+    if(pc)prev.where=where;
+    this.bubble('sys','',(wc?when:'')+(wc&&pc?'｜':'')+(pc?where:''));
   },
   /* 剧情场景：开场 → 多轮应对（点选项或自由接话）→ resolve 收尾统一结算 */
   openScene(p){
     phase='EVENT_CHOICE';
     const sc=p.scene||{};
-    sceneCtx={who:sceneSpeaker(p,sc),round:1,lastOptions:Array.isArray(p.options)?p.options:(Array.isArray(sc.options)?sc.options:[]),lines:[]};
+    sceneCtx={who:sceneSpeaker(p,sc),round:1,lastOptions:Array.isArray(p.options)?p.options:(Array.isArray(sc.options)?sc.options:[]),lines:[],meta:{when:'',where:''}};
     sceneWhoHint=null; // 说话人已定，兜底提示不再外溢到下一场
     $('#chatTitle').textContent='剧情对话 · '+sceneCtx.who;
     $('#chatAva').innerHTML=avatarHtml(sceneCtx.who);
     $('#chatClock').textContent=fmtTime();
     const body=$('#chatBody');body.innerHTML='';
-    if(sc.when||sc.where)this.bubble('sys','',`${sc.when||''}${sc.when&&sc.where?'｜':''}${sc.where||''}`);
+    this.sceneMeta(sc);
     const parts=this.sceneParts(sc);
     if(p.narrative){this.sayNarrative(p.narrative,!!parts);p._narrShown=true} // 有 parts 时 narrative 整段当旁白，不再按引号猜
     if(parts){this.sayParts(parts);p._narrShown=true} // 新协议：API 已按语义分好旁白与台词，直接渲染
@@ -4243,7 +4278,7 @@ const Game={
       const parts=this.sceneParts(sc);
       if(compact){ // 精简轮只演对方这一句，不 resolve、不结算；收尾留给「结束对话」或轮数上限
         phase='EVENT_CHOICE';
-        if(sc.when||sc.where)this.bubble('sys','',`${sc.when||''}${sc.when&&sc.where?'｜':''}${sc.where||''}`);
+        this.sceneMeta(sc);
         if(parts)this.sayParts(parts);
         else{const line=sc.line?filterText(sc.line):(p.narrative?this.chatLead(p):'');if(line)this.sayLine(line)}
         this.renderSceneOpts(sopts);
@@ -4253,7 +4288,7 @@ const Game={
       // 模型没给 resolve、也没给语义分段/台词和选项：按收尾处理，避免卡在只有"结束对话"的死循环
       if(sc.state==='resolve'||(!sc.line&&!parts&&!sopts.length)){this._sceneResolve(p);return}
       phase='EVENT_CHOICE';
-      if(sc.when||sc.where)this.bubble('sys','',`${sc.when||''}${sc.when&&sc.where?'｜':''}${sc.where||''}`);
+      this.sceneMeta(sc);
       if(parts)this.sayParts(parts);
       else if(sc.line)this.sayLine(sc.line);
       this.renderSceneOpts(sopts);
@@ -4312,6 +4347,7 @@ const Game={
   },
   sceneDone(){
     phase='FOCUS_SELECT'; // 剧情收尾后必须复位，否则主界面所有行动都会被"请先结束当前旬务"挡下
+    this.backHome(); // 戏散了人就回殿：别让本场地名留在存档里
     sceneCtx=null;currentEvent=null;
     $('#chatview').classList.remove('on');
     UI.goHome();toast('本旬事了');
