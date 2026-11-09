@@ -1458,14 +1458,14 @@ const SCENE_MODULE = [
 SCENE_PARTS_RULES,
 '- 触发剧情的当旬，narrative 必须先交代主控正在何处做什么、此人如何出现（迎面、传唤、偶遇、遣人请去），只写完全旁白，到"只让人回了句"这类引出语为止；第一句台词放进 scene.parts 的 say 段。界面会先显示 narrative，再按 parts 顺序渲染。',
 '- narrative 只写完全旁白（主控所见、其他人物、场面与客观环节），人物台词一律放进 scene.parts；当前说话人的动作神态放进 act，不要写进 narrative，也不要在 narrative 里写引号对白。scene.line 可省略，仅作旧界面兜底。',
-'- 每轮只演绎对方当即反应与场面变化：scene.state="ongoing"，scene.parts 总长不超过 70 字（act 写对方这一轮的动作神态，say 写对方的话；不写主控的动作心理、不铺环境）、2—3 个接话选项（放顶层 options）；此阶段 narrative 必须为空字符串，changes 与 statePatch 为空，不结算数值。',
+'- 每轮只演绎对方当即反应与场面变化：scene.state="ongoing"（继续对谈）或 "wrap"（对方主动收话，见下两条），scene.parts 总长不超过 70 字（act 写对方这一轮的动作神态，say 写对方的话；不写主控的动作心理、不铺环境）、2—3 个接话选项（放顶层 options）；此阶段 narrative 必须为空字符串，changes 与 statePatch 为空，不结算数值。',
 '- scene.where 写本场真实所在：主控在住处说话就写本宫住处（存档 location／residence），在御花园就写园中具体处所；不要照抄上一场的地点，也不要写本场并未去的地方。scene.where/when 只在场景确实移动或换时辰时写，同一处说几轮不必重复。',
 '- 结算时 statePatch.location 写主控本场散去后的所在：回殿即本宫住处；只有确实留宿他处、被禁足或扣在某地时才写别处。一过性的散步、赴宴、拜访不留在 location 里。',
 '- 事已说尽、应对已足或局面已变时：scene.state="resolve"，并一并输出完整结算——narrative（收尾旁白，不写台词）、changes、statePatch（含 statePatch.plots 的变动条目），规则同第二轮。',
 '- 收尾只收束本场对话中已发生的事；须呼应既往前情时，只写存档剧情账与待续事项里已有记载的内容。',
 '- 召宫人问话、临时差遣等旬中插话不是本旬养成：收尾只结算这场对话本身（关系、情报、交办差事、行囊），主角才艺与基础属性留到旬末小结。',
-'- 对话以 2—3 轮自然收束：事情说尽、该告退时让人物主动收话（如"还有什么要交代的""奴婢省得，这便去办"），随后 scene.state="resolve"。玩家随时可选"结束对话"，你应声简短收尾（narrative 一两句即可）。',
-'- 玩家每轮可点选项，也可自定义输入一句话或一个动作；每接一句前端扣玩家精力 5（结束对话不扣），精力不济时玩家只能结束对话。自定义内容符合世界规则即认真承接。',
+'- 对话以 2—3 轮自然收束：事情说尽、该告退或对方乏了时，让人物主动收话（如"我要歇息了""改日再叙""还有什么要交代的"），scene.state 写 "wrap"——只写她这一句收话，不结算、不写道别旁白，由玩家自决「再追问一句」还是「就此告辞」。追问可能被婉拒：拒时 scene.state="resolve"，写一句拒绝收场的台词并照常结算；肯再答则回到 "ongoing" 或 "wrap"。',
+'- 玩家每轮可点选项，也可自定义输入一句话或一个动作；接话不扣精力，玩家随时可选"结束对话"，你应声简短收尾（narrative 一两句即可）。自定义内容符合世界规则即认真承接。',
 '- 若不适合对话形式（突发事态、文书、独自发现等），可不用 scene，按原有 hasEvent+options 两轮制输出。'
 ].join('\n');
 
@@ -1557,7 +1557,6 @@ function mealLeft(){return Math.max(0,MEAL_LIMIT_PER_XUN-(Number(state&&state.me
 const REST_THRESHOLD=20;     // 低于等于此值弹窗建议休息
 const COLLAPSE_PENALTY=5;    // 昏迷扣体质
 const SCENE_MAX_ROUNDS=6;    // 剧情对话软上限：达到后下一轮必须收尾结算（3 轮常在剧情刚起势时硬收，对话"莫名其妙断掉"）
-const SCENE_EXTRA_COST=5;    // 对话中每接一句（含首轮开口，非结束对话）消耗的精力；精力不济只能结束
 const PLOT_TRIGGER_BASE=0.55; // 剧情骰基础触发概率：一旬一次，冷却期自动不触发；到期/超期/发酵不受骰子限制
 const PLOT_NEW_LEAD_CHANCE=0.3; // 骰中后开全新引子的概率（其余为在途剧情线的后续）；无在途线时必为新引子
 const STALE_PLOT_XUN=4;      // 无期限在途线悬置 N 旬未推进即"发酵"：旬首强制处理（兑现/改写/作废），不许干挂
@@ -2557,10 +2556,10 @@ function buildMessages(userMsg,noHistory){
 const SCENE_RULES=[
 '你是文字游戏《带着系统去宫斗》的主持人，现在只推进一段剧情对话里「对方这一句」。时间与数值留到收尾结算。只输出 JSON。',
 '【文风】架空盛唐，人物言语符合身份、性情与当下情绪；用古代语汇；只写对方的话与关键动作。',
-'【输出】{"narrative":"","changes":[],"hasEvent":true,"scene":{"state":"ongoing","who":"对方称谓","parts":[{"type":"act","text":"对方的动作神态"},{"type":"say","text":"对方原话，不带引号"}],"where":"有变化才写","when":"有变化才写"},"options":[{"id":"a","text":"≤70字"},{"id":"b","text":"≤70字"}]}',
+'【输出】{"narrative":"","changes":[],"hasEvent":true,"scene":{"state":"ongoing","who":"对方称谓","parts":[{"type":"act","text":"对方的动作神态"},{"type":"say","text":"对方原话，不带引号"}],"where":"有变化才写","when":"有变化才写"},"options":[{"id":"a","text":"≤70字"},{"id":"b","text":"≤70字"}]}　scene.state 只写 "ongoing"（继续对谈）或 "wrap"（对方主动收话：事情说尽、乏了或有事欲别，只写她一句收话如"我要歇息了""改日再叙"），不要写 "resolve"。',
 SCENE_PARTS_RULES,
 '【收尾】narrative 只写旁白，不写引号对白。',
-'【约束】本轮 scene.state 必须是 "ongoing"；narrative 必须为空字符串，changes=[]，statePatch={}；options 给 2—3 个方向不同的接话，只写当下可见的机会或代价。scene.where 只有场景确实移动时才写，在本宫说话就写本宫住处，不要重复上一场的地点。即使话已说尽，也只写对方收束性的一句，由玩家选择「结束对话」，本轮保持 ongoing。',
+'【约束】本轮 scene.state 必须是 "ongoing" 或 "wrap"，不得是 "resolve"；narrative 必须为空字符串，changes=[]，statePatch={}；options 给 2—3 个方向不同的接话，只写当下可见的机会或代价。scene.where 只有场景确实移动时才写，在本宫说话就写本宫住处，不要重复上一场的地点。话已说尽、对方乏了或有事欲别时，用 "wrap" 收话（如"我要歇息了"），不结算、不写道别旁白——玩家会自决再追问还是就此告辞。',
 '【承接】严格承接用户消息里的本场对话记录，把话题往前推；对方只依据自己的性情、目标、与主控的关系及已知信息回应。'
 ].join('\n');
 function buildSceneSystem(who){
@@ -3148,7 +3147,7 @@ const UI={
     const maidRows=maids.map(m=>`<button class="npcrow" onclick="Game.maidTalk('${esc(m)}')"><span class="nr-name">${esc(m)}</span><span class="nr-depth">配属宫女</span></button>`).join('');
     return `<div class="focus-cap">— 吩咐 · 精力 ${state.energy}／${ENERGY_MAX} —</div>`+
       (pend?`<div class="sheet-note" style="margin:0 0 8px">临期引线：${esc(pend)}</div>`:'')+
-      (maidRows?`<div class="sec"><div class="sec-cap">召宫人问话</div>${maidRows}<div class="sheet-note" style="margin-top:6px">进对话不耗精力，开口说话每句耗 ${SCENE_EXTRA_COST}：交代差事、打听消息、问办差进度皆可，吩咐下去的事日后兑现。</div></div>`:'<div class="sheet-note">暂无配属宫人。</div>');
+      (maidRows?`<div class="sec"><div class="sec-cap">召宫人问话</div>${maidRows}<div class="sheet-note" style="margin-top:6px">进对话、开口问话都不耗精力：交代差事、打听消息、问办差进度皆可，吩咐下去的事日后兑现。</div></div>`:'<div class="sheet-note">暂无配属宫人。</div>');
   },
   sheetState(){ // 局面：当前处境 + 剧情到期 + 剧情账 + 待续（原"本旬纪事"的信息归此）
     const adj=(state.plots&&state.plots.length)?adjudicatePlots():{due:[],overdue:[],stale:[],pendStale:[]};
@@ -4676,7 +4675,7 @@ const Game={
     const msg=`第${xunNo()}旬第一轮：玩家主动出门拜访「${npc}」。依双方关系、位份、情理与时机如实演接待结果——接见、婉拒、不在宫中都可能，吃闭门羹也是有效结果，见面与否顺其自然。若接见，用剧情对话 scene 结构呈现此次会面（scene.who 填「${npc}」，scene.where 写对方所在宫室而不是本宫住处；scene.parts 按语义分段，act 写对方动作神态、say 写对方台词、quote 写转述他人原话、narr 只写其他人物与客观场面，台词都不带引号；对方说话、玩家接话，多轮后 resolve 收尾结算）；若未见到，安静结算本旬。${leadHint}${pendHint}`;
     this.round1(msg,'拜访·'+npc,focusEnergyCost('社交拜访'),{skipDice:true,leadIds:hits.map(p=>p.id),pendTexts:phits.map(pendText),whoHint:npc});
   },
-  maidTalk(name){ // 日常宫务：不预调 API、不弹"事发"，本地开场白直入对话；开口说话才扣精力（每次5）
+  maidTalk(name){ // 日常宫务：不预调 API、不弹"事发"，本地开场白直入对话；问话不耗精力
     if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
     if((state.energy??0)<=0){this.collapse();return}
     ensureXunBook();
@@ -4696,7 +4695,7 @@ const Game={
       {id:'c',text:'问话：之前交代的事办得如何'},
       {id:'d',text:'闲聊几句，看看她的心思'}
     ],scene:{state:'ongoing',line:greet,when:fmtTime(),where:home}});
-    if(sceneCtx){sceneCtx.local=true;sceneCtx.standalone=true;sceneCtx.maid=true} // 本地开场：一言未发即结束不结算；maid：问话不设自动收尾，只能由主控点「结束对话」
+    if(sceneCtx){sceneCtx.local=true;sceneCtx.standalone=true;sceneCtx.maid=true} // 本地开场：一言未发即结束不结算；maid：问话不设轮数上限，可由她主动收话（wrap）或主控点「结束对话/就此告辞」收场
   },
   nextTurn(){ // 休息，进入下一旬：旬数+1，精力回满，日历按两旬制推进
     const prevTime=Object.assign({},state.time);
@@ -5179,10 +5178,25 @@ const Game={
     phase='EVENT_CHOICE';
     if(sceneCtx)sceneCtx.lastOptions=options||[];
     const box=$('#chatOpts');
-    box.innerHTML=`<div class="cap">— 接话或行动 · 多接一句耗精力 ${SCENE_EXTRA_COST} —</div>`+
+    box.innerHTML=`<div class="cap">— 接话或行动 —</div>`+
       (options||[]).map((o,i)=>`<button class="chat-opt" onclick="Game.scenePick(${i})">${esc(o.text||o)}</button>`).join('')+
       `<button class="chat-opt" onclick="Game.sceneEnd()">结束对话</button>`+
       `<div class="chat-act"><input id="chatInput" placeholder="接句话、或描述你的动作" onkeydown="if(event.key==='Enter')Game.sceneCustom()"><button class="go" onclick="Game.sceneCustom()">发送</button></div>`;
+  },
+  renderWrapOpts(){ // 对方已主动收话（scene.state="wrap"）：只给追问或告辞两条路，不另行播报"对话结束"
+    phase='EVENT_CHOICE';
+    if(sceneCtx)sceneCtx.lastOptions=[];
+    const box=$('#chatOpts');
+    box.innerHTML=`<div class="cap">— 接话或行动 —</div>`+
+      `<button class="chat-opt" onclick="Game.scenePress()">再追问一句</button>`+
+      `<button class="chat-opt" onclick="Game.sceneAcceptEnd()">就此告辞</button>`+
+      `<div class="chat-act"><input id="chatInput" placeholder="还想问什么，径直说" onkeydown="if(event.key==='Enter')Game.sceneWrapCustom()"><button class="go" onclick="Game.sceneWrapCustom()">发送</button></div>`;
+  },
+  sceneWrapCustom(){
+    if(phase!=='EVENT_CHOICE'||!sceneCtx)return;
+    const v=($('#chatInput')&&$('#chatInput').value||'').trim();
+    if(!v){toast('想说什么，写一句再发');return}
+    this.scenePress(v);
   },
   scenePick(i){
     if(phase!=='EVENT_CHOICE'||!sceneCtx)return;
@@ -5201,7 +5215,7 @@ const Game={
     const lines=sceneCtx.lines.slice(-10).map(l=>`${l.who==='me'?'玩家':l.who==='npc'?sceneCtx.who:l.who==='quote'?'转述'+(l.name?'·'+l.name:''):'旁白'}：${String(l.text||'').slice(0,80)}`).join('\n');
     return `\n【本场对话记录】\n${lines}\n请承接以上对话，不要重复已说过的话。`;
   },
-  requestScene(msg,choice,maxTokens,noHistory,compact,endReq){ // 场景请求统一出口：失败可重试，重试不重复扣精力；endReq=主控点「结束对话」的收尾请求，响应必须结算收场
+  requestScene(msg,choice,maxTokens,noHistory,compact,endReq){ // 场景请求统一出口：失败可重试；endReq=主控点「结束对话/就此告辞」的收尾请求，响应必须结算收场
     phase='RESOLVING';this.chatBusy(true);
     lastRequest={type:'sc',msg,choice,maxTokens,noHistory,compact,endReq};
     const req={};if(maxTokens)req.maxTokens=maxTokens;
@@ -5212,23 +5226,24 @@ const Game={
       const sc=p.scene||{};
       const sopts=(Array.isArray(p.options)&&p.options.length)?p.options:(Array.isArray(sc.options)?sc.options:[]);
       const parts=this.sceneParts(sc);
-      if(compact){ // 精简轮只演对方这一句，不 resolve、不结算；收尾留给「结束对话」或轮数上限
+      if(compact){ // 精简轮只演对方这一句，不结算；对方当场回绝追问（resolve）或空输出则直接收尾
+        if(sc.state==='resolve'||(!sc.line&&!parts&&!sopts.length)){this._sceneResolve(p);return}
         phase='EVENT_CHOICE';
         this.sceneMeta(sc);
         if(parts)this.sayParts(parts);
         else{const line=sc.line?filterText(sc.line):(p.narrative?this.chatLead(p):'');if(line)this.sayLine(line)}
-        this.renderSceneOpts(sopts);
+        if(sc.state==='wrap')this.renderWrapOpts();else this.renderSceneOpts(sopts);
         $('#chatBody').scrollTop=$('#chatBody').scrollHeight;
         return;
       }
-      // 收尾请求（玩家点「结束对话」）响应必须结算收场；其余轮次：模型没给 resolve、也没给语义分段/台词和选项时按收尾处理，避免卡在只有"结束对话"的死循环
+      // 收尾请求（玩家点「结束对话/就此告辞」）响应必须结算收场；其余轮次：模型没给 resolve、也没给语义分段/台词和选项时按收尾处理，避免卡在只有"结束对话"的死循环
       const maidHold=sceneCtx&&sceneCtx.maid&&!endReq; // 宫女问话 ongoing 轮不得自行 resolve、收场、告退；但主控主动收场时必须结算，否则结算被丢弃、对话永远结束不了
       if(!maidHold&&(endReq||sc.state==='resolve'||(!sc.line&&!parts&&!sopts.length))){this._sceneResolve(p);return}
       phase='EVENT_CHOICE';
       this.sceneMeta(sc);
       if(parts)this.sayParts(parts);
       else if(sc.line)this.sayLine(sc.line);
-      this.renderSceneOpts(sopts);
+      if(sc.state==='wrap')this.renderWrapOpts();else this.renderSceneOpts(sopts);
       $('#chatBody').scrollTop=$('#chatBody').scrollHeight;
     }).catch(e=>{
       this.chatBusy(false);
@@ -5241,17 +5256,36 @@ const Game={
   sceneRound(choice){
     if(!sceneCtx)return;
     if(sceneCtx.standalone&&!sceneCtx.logged){logXunAction('问话·'+sceneCtx.who);sceneCtx.logged=true}
-    if((state.energy??0)<SCENE_EXTRA_COST){toast('精力将尽，这话说不成了——不如就此打住');phase='EVENT_CHOICE';this.renderSceneOpts(sceneCtx.lastOptions||[]);return}
-    state.energy=Math.max(0,Math.round(state.energy-SCENE_EXTRA_COST));UI.updateStatusbar();checkRestWarn(); // 多接一句的代价
     this.recordLine('me',choice);
     sceneCtx.round++;
     const r=sceneCtx.round,cap=!sceneCtx.maid&&r>=SCENE_MAX_ROUNDS; // 宫女问话不设自动收尾上限
     const settlement=sceneCtx.standalone
       ?'并收束这场问话：只结算它实际带来的关系、情报、差事与行囊变化；主角才艺与属性成长留到旬末小结，修习、散步等与问话无关的收益也留到那时。没有变化就不写 changes。'
       :'并一并完整结算本旬养成与剧情（narrative 收尾、changes、statePatch，含 statePatch.plots 的变动条目）。';
-    const maidNote=sceneCtx.maid?'本场是主控在住处吩咐宫女：scene.state 必须始终为 "ongoing"，不得自行 resolve、收场、告退或写她离开；话已说尽也只写她应声待命（如"奴婢记下了，这便去办"）。何时收场只由主控点「结束对话」决定。':'';
-    const msg=`第${xunNo()}旬剧情对话第${r}轮：玩家应对「${choice}」。只演绎${sceneCtx.who}的当即反应与场面变化：输出 scene.parts（2—5 段，act 写对方动作神态并会并入她的对话气泡，say 写对方台词，quote 写转述他人原话，narr 只写其他人物与客观场面，台词都不带引号，按语义分段而非按标点硬切；总长 ≤70 字）、scene.where/when（有变化才写）、scene.state 与 2—3 个接话选项；此阶段不结算数值。${cap?`本场对话已达上限，本轮 scene.state 必须为"resolve"，${settlement}`:'本轮只演 ongoing：narrative 留空字符串，changes=[]，statePatch={}，只写 scene 与 options；即使话已说尽，也只写对方收束性的一句，由玩家选择「结束对话」。'}${maidNote}`+this.sceneContextBlock();
+    const maidNote=sceneCtx.maid?'本场是主控在住处吩咐宫女：scene.state 只可写 "ongoing" 或 "wrap"，不得自行 resolve 收场结算；她还要当差或话已说尽时可用 "wrap" 收一句（如"奴婢还要去当值，小主若无别的吩咐……"），不结算；主控点「结束对话」或「就此告辞」时才收尾结算。':'';
+    const msg=`第${xunNo()}旬剧情对话第${r}轮：玩家应对「${choice}」。只演绎${sceneCtx.who}的当即反应与场面变化：输出 scene.parts（2—5 段，act 写对方动作神态并会并入她的对话气泡，say 写对方台词，quote 写转述他人原话，narr 只写其他人物与客观场面，台词都不带引号，按语义分段而非按标点硬切；总长 ≤70 字）、scene.where/when（有变化才写）、scene.state 与 2—3 个接话选项；此阶段不结算数值。${cap?`本场对话已达上限，本轮 scene.state 必须为"resolve"，${settlement}`:'本轮 scene.state 写 "ongoing"（继续对谈）或 "wrap"（对方主动收话：事情说尽、乏了或有事欲别时，只写她一句收话，如"我要歇息了""改日再叙"，不结算、不写道别旁白），玩家会自决再追问还是就此告辞。'}${maidNote}`+this.sceneContextBlock();
     this.requestScene(msg,choice,MAX_OUTPUT_TOKENS,!cap,!cap); // 未到上限：精简提示词 + 不带历史；到上限：完整提示词收尾结算
+  },
+  scenePress(text){ // 对方已主动收话（wrap），主控仍想追问：可能被婉拒（resolve+结算），也可能再得一句答话（ongoing/wrap）
+    if(phase!=='EVENT_CHOICE'||!sceneCtx)return;
+    const press=String(text||'').trim()||'（仍想再追问一句）';
+    this.bubble('me','',press);
+    this.recordLine('me',press);
+    sceneCtx.round++;
+    const r=sceneCtx.round,cap=!sceneCtx.maid&&r>=SCENE_MAX_ROUNDS; // 追问同样吃轮数上限，不能无限纠缠
+    const settlement=sceneCtx.standalone
+      ?'并收束这场问话：只结算它实际带来的关系、情报、差事与行囊变化；主角才艺与属性成长留到旬末小结，修习、散步等与问话无关的收益也留到那时。没有变化就不写 changes。'
+      :'并一并完整结算本旬养成与剧情（narrative 收尾、changes、statePatch，含 statePatch.plots 的变动条目）。';
+    const msg=`第${xunNo()}旬剧情对话第${r}轮：对方刚把话收住（欲告退、要歇息或说改日再叙），玩家不肯就此作罢，仍追问下去。只演绎${sceneCtx.who}的当即反应——她可婉拒：scene.state="resolve"，写一句拒绝或收场的台词（如"我要歇息了，小主请回吧"），${settlement}她也可再简要答一两句：scene.state 写 "ongoing" 或 "wrap"，narrative 留空字符串，changes=[]，statePatch={}，并给 2—3 个接话选项。scene.parts 规则不变（2—5 段、act 写动作神态、say 写台词、quote 写转述、narr 写场面，总长 ≤70 字、台词不带引号）。${cap?'本场对话已达上限：本轮必须 resolve 收尾结算，不再给她答话的余地。':''}`+this.sceneContextBlock();
+    this.requestScene(msg,press,MAX_OUTPUT_TOKENS,!cap,!cap);
+  },
+  sceneAcceptEnd(){ // 对方已主动收话，主控不再追问、顺势告辞：请模型收尾结算；不显式播报"结束对话"
+    if(phase!=='EVENT_CHOICE'||!sceneCtx)return;
+    const settle=sceneCtx.standalone
+      ?'这只是一位宫中人在旬中回话，并非本旬养成重心：只结算这场问话实际带来的关系、情报、交办差事与行囊变化；主角才艺与属性成长留到旬末小结，修习、散步等无关收益也留到那时。没有变化就不写 changes。'
+      :'并完整结算本旬养成与剧情（changes、statePatch，含 statePatch.plots 的变动条目）。';
+    const msg=`第${xunNo()}旬剧情对话：对方已把话收住（要歇息、欲告退或说改日再叙），玩家不再追问，就此告辞。请收尾：scene.state="resolve"，补一两句简短收场旁白（如各自散去、欠身告退；不写引号对白），${settle}收场只写本场已发生的事。`+this.sceneContextBlock();
+    this.requestScene(msg,'（就此告辞）',undefined,undefined,undefined,true); // endReq：响应必须收场结算
   },
   sceneEnd(){ // 玩家主动结束：对方应声简短收尾，统一结算（不耗精力）；本地开场且一言未发则不调 API、不结算
     if(phase!=='EVENT_CHOICE'||!sceneCtx)return;
