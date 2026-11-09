@@ -1183,7 +1183,8 @@ function sanitizePlot(p){ // 单条台账归一；字段缺失时给默认值（
     stage:['进行中','已兑现','已作废'].includes(p.stage)?p.stage:'进行中',
     earliest:numOrNull(p.earliest),latest:numOrNull(p.latest),
     dueText:String(p.dueText||'').slice(0,40),note:String(p.note||'').slice(0,140),
-    touch:numOrNull(p.touch),staleMiss:numOrNull(p.staleMiss)||0 // touch=最近推进旬号；staleMiss=发酵后连续被无视次数
+    touch:numOrNull(p.touch),staleMiss:numOrNull(p.staleMiss)||0, // touch=最近推进旬号（xunSerial 单位，与裁决一致）；staleMiss=发酵后连续被无视次数
+    echo:numOrNull(p.echo),echoMiss:numOrNull(p.echoMiss)||0 // echo=最近被呼应的旬号；echoMiss=连续被呼应却无台账回写的次数
   };
 }
 function mergePlots(base,incoming,nowTurn){ // 增量回写：模型只给变化条目，未提及的保持不变；凡回写即记 touch=本旬
@@ -1201,7 +1202,7 @@ function mergePlots(base,incoming,nowTurn){ // 增量回写：模型只给变化
     const merged=Object.assign({},old);
     for(const k of ['title','line','stage','earliest','latest','dueText','note'])if(raw[k]!==undefined)merged[k]=raw[k];
     const p=sanitizePlot(merged);
-    if(p){p.touch=nowTurn;Object.assign(old,p)}
+    if(p){p.touch=nowTurn;p.echoMiss=0;p.staleMiss=0;Object.assign(old,p)} // 回写即推进：touch 刷新、呼应/发酵落空计数清零
   }
   return list;
 }
@@ -1271,7 +1272,10 @@ function adjudicatePlots(skipDice){ // 旬首裁决：到期强制兑现 + 前�
 function matchLeads(ctxList){ // 与给定语境（人名/地名/事由）相关的在途引线：标题或备注含对方名讳/地名即命中
   const cvs=(ctxList||[]).map(s=>String(s||'').trim()).filter(s=>s.length>=2);
   if(!cvs.length||!state)return[];
+  const now=xunSerial(state.time);
   return activePlots().filter(p=>{
+    if((p.echoMiss||0)>=ECHO_MISS_MAX)return false; // 连续呼应无回写：不再借散步拜访硬凑交集，留待旬首发酵强制处置
+    if(p.echo===now)return false; // 本旬已呼应过：同一引线不连演两场，免得每次闲逛都撞同一件事
     const hay=`${p.title||''}｜${p.note||''}`;
     if(!hay||hay==='｜')return false;
     return cvs.some(cv=>{
@@ -1302,7 +1306,7 @@ function autoExpireStalePlots(adj){ // 发酵条目模型连续不理会：计 s
   if(Array.isArray(adj.stale))for(const old of adj.stale){
     const p=(state.plots||[]).find(x=>x.id===old.id);
     if(!p||p.stage!=='进行中')continue;
-    if(p.touch===state.turn){p.staleMiss=0;continue} // 本旬已回写（兑现/改写/作废）：重置计数
+    if(p.touch===now){p.staleMiss=0;continue} // 本旬已回写（兑现/改写/作废）：重置计数（touch 与 now 同为 xunSerial 旬号）
     if(p.latest!=null)continue; // 已改为有期限：转到期/超期流程
     if(now-(p.touch??now)<STALE_PLOT_XUN)continue;
     p.staleMiss=(p.staleMiss||0)+1;
@@ -1334,7 +1338,7 @@ const PLOTS_MODULE = [
 '每旬第一轮请求附有【剧情裁决】块：是否触发剧情由前端掷骰并写明（剧情骰命中/未命中、命中哪条线），到期/超期条目必须当旬兑现，模型不再自行决定是否触发。每旬至多一条主要剧情（世界书既有纪律仍有效）。',
 '无期限（缓图）条目并非永久挂账：悬置超过 4 旬未推进即"发酵"，会在裁决块以【须处理·搁置发酵】列出，当旬必须择一处理——兑现为剧情（旬首直接弹出，hasEvent=true）、改写期限（note 说明理由并给新 dueText）或作废（注明发酵后果）；连续 3 旬不回写前端自动作废。',
 '每轮结算（第一、二轮皆然）只经 statePatch.plots 回写【发生变化的条目】（新增、更新、兑现、作废）；只回写发生变化的条目，前端按 id 合并，漏写视为不变。',
-'玩家主动拜访某人、或往御花园散步时，请求会附【呼应引线】块：所列在途引线与该人/该地相关，须借此次行动实质推进（兑现、或产生新信息/态度变化并更新 note）；该行动本身即算推进，前端会刷新其悬置计旬。',
+'玩家主动拜访某人、或往御花园散步时，请求可能附【呼应引线】块：所列在途引线与该人/该地相关，须借此次行动实质推进（兑现、或产生新信息/态度变化并经 statePatch.plots 更新 note）；只演绎不回写不算推进——同一引线连续两次被呼应却无回写，前端不再提示它，并交回旬首"发酵"强制处置。若此番确无新进展，照实写一两句无获即可，不要为凑交集硬编事件。',
 'pending（待续琐事）与引线同生命周期：挂账超 4 旬未办即"发酵"，旬首以【须处理·琐事发酵】列入裁决块，须当旬择一处理——本旬办掉（从 statePatch.pending 移除）、升级为剧情引线（移入 statePatch.plots）或改写文本说明现状（回写即重置计旬）；连续 3 旬不理前端自动清除。'
 ].join('\n');
 
@@ -1450,6 +1454,7 @@ const PLOT_TRIGGER_BASE=0.55; // 剧情骰基础触发概率：一旬一次，�
 const PLOT_NEW_LEAD_CHANCE=0.3; // 骰中后开全新引子的概率（其余为在途剧情线的后续）；无在途线时必为新引子
 const STALE_PLOT_XUN=4;      // 无期限在途线悬置 N 旬未推进即"发酵"：旬首强制处理（兑现/改写/作废），不许干挂
 const STALE_AUTO_EXPIRE=3;   // 发酵后连续 N 旬被裁决列出仍无回写：前端自动作废（机会流失）
+const ECHO_MISS_MAX=2;       // 同一引线连续被散步/拜访呼应 N 次却无台账回写：此后不再借行动硬凑交集，留待旬首发酵处置
 function focusEnergyCost(focus){ // 各类行动精力消耗
   const f=String(focus||'');
   if(/使用道具|使用物品/.test(f))return 5; // 用物最轻
@@ -2539,7 +2544,7 @@ function applyPatch(patch){
     if(k==='turn')continue; // 回合数前端自管
     if(k==='time')continue;  // 日历前端自管（两旬制固定规则，避免与模型重复推进）
     if(k==='inventory.add'){addToInventory(Array.isArray(patch[k])?patch[k]:[patch[k]]);continue} // 行囊入库（前端合并件数）
-    if(k==='plots'){state.plots=mergePlots(state.plots,patch[k],state.turn);continue} // 剧情台账按 id 增量合并；回写即记 touch=本旬
+    if(k==='plots'){state.plots=mergePlots(state.plots,patch[k],xunSerial(state.time));continue} // 剧情台账按 id 增量合并；回写即记 touch=本旬（统一用 xunSerial 旬号，与发酵裁决同一单位）
     if(k==='pending'){state.pending=normalizePending(Array.isArray(patch[k])?patch[k]:[patch[k]],state.turn).filter(x=>!/当票|赎当|已逾期/.test(x.t));continue} // 模型回写也过滤：典当类话口不入待续
     if(/^items\./.test(k)){ // 旧式分类写入：转行囊
       const cat=k.slice(5),arr=Array.isArray(patch[k])?patch[k]:[patch[k]];
@@ -3808,7 +3813,7 @@ const Game={
       if((state.energy??0)<=0){$('#mapview').classList.remove('on');this.collapse();return}
       const hits=matchLeads(['御花园','花园','散步']);
       const phits=matchPending(['御花园','花园','散步']);
-      const leadHint=hits.length?`\n【呼应引线】园中散步与在途引线相关：${hits.map(p=>`「${p.title}」（${p.line}）`).join('；')}。请让此番闲逛与之产生实质交集（撞见、听闻、想起要办的事），能推进的推进并回写台账，暂不能的也在 note 留一笔现状。`:'';
+      const leadHint=hits.length?`\n【呼应引线】园中散步与在途引线相关：${hits.map(p=>`「${p.title}」（${p.line}）`).join('；')}。请让此番闲逛与之产生实质交集（撞见、听闻、想起要办的事），能推进的推进并回写台账；暂不能的也在 note 留一笔现状。若确无新进展，照实写一两句无获即可，勿为凑交集硬编；连续两次无回写的引线前端不再提示，交由旬首发酵处置。`:'';
       const pendHint=phits.length?`\n【呼应待续】园中散步与待续琐事相关：${phits.map(x=>pendText(x)).join('；')}。请顺势办理或想起此事，办妥的从 statePatch.pending 移除，未办妥的更新现状。`:'';
       const walkNo=(Number(state.walkCount)||0)+1;state.walkCount=walkNo; // 康健收益每旬至多结算一次
       const ti=Number(state.protagonist&&state.protagonist.attributes&&state.protagonist.attributes['体质'])||0;
@@ -3829,7 +3834,7 @@ const Game={
     const npc=(state.npcs&&state.npcs[who]&&(state.npcs[who].name||who))||who;
     const hits=matchLeads([who,npc]);
     const phits=matchPending([who,npc]);
-    const leadHint=hits.length?`\n【呼应引线】此人与在途引线相关：${hits.map(p=>`「${p.title}」（${p.line}）`).join('；')}。请借此次会面推进或了结它：能兑现的当旬兑现并回写台账；暂不能了结的，也要让会面与之产生实质关联（新信息、态度变化、埋下下一步），并更新 note。`:'';
+    const leadHint=hits.length?`\n【呼应引线】此人与在途引线相关：${hits.map(p=>`「${p.title}」（${p.line}）`).join('；')}。请借此次会面推进或了结它：能兑现的当旬兑现并回写台账；暂不能了结的，也要让会面与之产生实质关联（新信息、态度变化、埋下下一步），并更新 note。若确无新进展，照实写一两句无获即可，勿为凑交集硬编；连续两次无回写的引线前端不再提示，交由旬首发酵处置。`:'';
     const pendHint=phits.length?`\n【呼应待续】此次行动与待续琐事相关：${phits.map(x=>pendText(x)).join('；')}。请在本旬演绎中顺手办理或问起此事，办妥的从 statePatch.pending 移除；未办妥的更新一句现状（回写即重置挂账计旬）。`:'';
     const msg=`第${xunNo()}旬第一轮：玩家主动出门拜访「${npc}」。依双方关系、位份、情理与时机如实演接待结果——接见、婉拒、不在宫中都可能，吃闭门羹也是有效结果，见面与否顺其自然。若接见，用剧情对话 scene 结构呈现此次会面（scene.who 填「${npc}」，scene.where 写对方所在宫室而不是本宫住处；scene.parts 按语义分段，narr 写旁白动作、say 写台词、quote 写转述他人原话，台词都不带引号；对方说话、玩家接话，多轮后 resolve 收尾结算）；若未见到，安静结算本旬。${leadHint}${pendHint}`;
     this.round1(msg,'拜访·'+npc,focusEnergyCost('社交拜访'),{skipDice:true,leadIds:hits.map(p=>p.id),pendTexts:phits.map(pendText),whoHint:npc});
@@ -3948,9 +3953,14 @@ const Game={
       pendingBuys=[];soldNotes=[];lastUseIdx=null;
       finalize(p,{focus,adj});
       logXunAction(focus);
-      if(opts&&opts.leadIds&&opts.leadIds.length){ // 与本次行动相关的引线：主动推进过，刷新 touch（不兑现也不发酵）
+      if(opts&&opts.leadIds&&opts.leadIds.length){ // 呼应过的引线：模型回写台账才算实质推进（touch 已由 mergePlots 刷新）；只演不写记一次落空
         const now=xunSerial(state.time);
-        for(const id of opts.leadIds){const pl=(state.plots||[]).find(x=>x.id===id&&x.stage==='进行中');if(pl)pl.touch=now}
+        const written=new Set((Array.isArray(p.statePatch&&p.statePatch.plots)?p.statePatch.plots:[p.statePatch&&p.statePatch.plots]).map(x=>x&&String(x.id)));
+        for(const id of opts.leadIds){const pl=(state.plots||[]).find(x=>x.id===id&&x.stage==='进行中');if(!pl)continue;
+          pl.echo=now;
+          if(written.has(String(id)))pl.echoMiss=0; // 有回写：实质推进
+          else pl.echoMiss=(pl.echoMiss||0)+1; // 无回写：落空一次；满 ECHO_MISS_MAX 后不再呼应，交由旬首发酵处置
+        }
       }
       if(opts&&opts.pendTexts&&opts.pendTexts.length){ // 相关的待续琐事同理：办过问过即刷新挂账计旬
         for(const t of opts.pendTexts){const it=(state.pending||[]).find(x=>pendText(x)===t);if(it)it.touch=state.turn}
@@ -4299,9 +4309,9 @@ const Game={
     const lines=sceneCtx.lines.slice(-10).map(l=>`${l.who==='me'?'玩家':l.who==='npc'?sceneCtx.who:l.who==='quote'?'转述'+(l.name?'·'+l.name:''):'旁白'}：${String(l.text||'').slice(0,80)}`).join('\n');
     return `\n【本场对话记录】\n${lines}\n请承接以上对话，不要重复已说过的话。`;
   },
-  requestScene(msg,choice,maxTokens,noHistory,compact){ // 场景请求统一出口：失败可重试，重试不重复扣精力
+  requestScene(msg,choice,maxTokens,noHistory,compact,endReq){ // 场景请求统一出口：失败可重试，重试不重复扣精力；endReq=主控点「结束对话」的收尾请求，响应必须结算收场
     phase='RESOLVING';this.chatBusy(true);
-    lastRequest={type:'sc',msg,choice,maxTokens,noHistory,compact};
+    lastRequest={type:'sc',msg,choice,maxTokens,noHistory,compact,endReq};
     const req={};if(maxTokens)req.maxTokens=maxTokens;
     if(compact)req.messages=[{role:'system',content:buildSceneSystem(sceneCtx?sceneCtx.who:'')},{role:'user',content:msg}]; // ongoing：精简提示词，不结算
     else if(noHistory)req.noHistory=true; // 收尾轮保留完整提示词，只省历史正文
@@ -4319,8 +4329,9 @@ const Game={
         $('#chatBody').scrollTop=$('#chatBody').scrollHeight;
         return;
       }
-      // 模型没给 resolve、也没给语义分段/台词和选项：按收尾处理，避免卡在只有"结束对话"的死循环
-      if(!(sceneCtx&&sceneCtx.maid)&&(sc.state==='resolve'||(!sc.line&&!parts&&!sopts.length))){this._sceneResolve(p);return} // 宫女问话只由主控点「结束对话」收场
+      // 收尾请求（玩家点「结束对话」）响应必须结算收场；其余轮次：模型没给 resolve、也没给语义分段/台词和选项时按收尾处理，避免卡在只有"结束对话"的死循环
+      const maidHold=sceneCtx&&sceneCtx.maid&&!endReq; // 宫女问话 ongoing 轮不得自行 resolve、收场、告退；但主控主动收场时必须结算，否则结算被丢弃、对话永远结束不了
+      if(!maidHold&&(endReq||sc.state==='resolve'||(!sc.line&&!parts&&!sopts.length))){this._sceneResolve(p);return}
       phase='EVENT_CHOICE';
       this.sceneMeta(sc);
       if(parts)this.sayParts(parts);
@@ -4365,7 +4376,7 @@ const Game={
       ?'这只是一位宫中人在旬中回话，并非本旬养成重心：只结算这场问话实际带来的关系、情报、交办差事与行囊变化；主角才艺与属性成长留到旬末小结，修习、散步等无关收益也留到那时。没有变化就不写 changes。'
       :'并完整结算本旬养成与剧情（changes、statePatch，含 statePatch.plots 的变动条目）。';
     const msg=`第${xunNo()}旬剧情对话：玩家示意话已说完，结束与${sceneCtx.who}的对话。请收尾：scene.state="resolve"，补一段简短的收场演绎（narrative 一两句旁白即可，如各自散去、欠身告退；不写引号对白），${settle}收场只写本场已发生的事。`+this.sceneContextBlock();
-    this.requestScene(msg,'（结束对话）');
+    this.requestScene(msg,'（结束对话）',undefined,undefined,undefined,true); // endReq：响应必须收场结算，宫女问话亦不例外
   },
   _sceneResolve(p){
     phase='RESOLVING';
@@ -4409,7 +4420,7 @@ const Game={
     if(!lastRequest)return;
     const r=lastRequest;
     if(r.type==='r1')this.round1(r.msg,r.focus,r.cost,r.opts);
-    else if(r.type==='sc')this.requestScene(r.msg,r.choice,r.maxTokens,r.noHistory,r.compact);
+    else if(r.type==='sc')this.requestScene(r.msg,r.choice,r.maxTokens,r.noHistory,r.compact,r.endReq);
     else if(r.type==='r2'){UI.showBusy('铺排中','正在结算本旬应对……',true);phase='RESOLVING';
       callModel(r.msg).then(raw=>{UI.hideBusy();const p=parsePayload(raw);const last=history[history.length-1];finalize(p,{focus:last?last.focus:'',choice:r.choice,adj:Game._lastAdj});UI.actResult(last?last.focus:'本旬行事',filterText(p.narrative),[])}).catch(e=>{UI.hideBusy();this.handleCallErr(e)})}
     else if(r.type==='newgame'){if(this._createdProtagonist)this.startWorldGen();else this.askNewGame()}
