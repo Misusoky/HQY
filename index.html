@@ -322,6 +322,12 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
 .bubble.me{background:var(--cinnabar);color:#fdfbf5;border-top-right-radius:4px}
 .bubble.narr{align-self:center;width:94%;max-width:100%;background:var(--paper-deep);border:1px dashed var(--line);border-radius:10px;box-shadow:none;color:var(--ink-soft);font-size:14px;text-align:justify}
 .bubble.narr::before{content:'旁 白';display:block;text-align:center;color:var(--gold);font-size:10px;letter-spacing:.6em;text-indent:.6em;margin-bottom:5px;opacity:.85}
+.msg.quote{align-self:center;width:88%}
+.bubble.quote{width:100%;background:var(--paper-deep);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:10px;box-shadow:none;color:var(--ink-soft);font-size:14px;padding:9px 14px}
+.bubble.quote .qtag{font-size:10px;letter-spacing:.3em;color:var(--gold);margin-bottom:4px}
+.bubble.quote .qtext{text-align:justify}
+.bubble.quote .qtext::before{content:'「'}
+.bubble.quote .qtext::after{content:'」'}
 .bubble.sys{align-self:center;background:transparent;box-shadow:none;color:var(--ink-soft);font-size:12px;padding:2px 8px;text-align:center}
 .msg.typing .bubble{color:var(--ink-soft);font-size:13px;min-width:64px;text-align:center}
 .chat-opts{flex:none;display:flex;flex-direction:column;gap:8px;padding:10px 14px calc(10px + var(--sab));border-top:1px solid var(--line);background:var(--card)}
@@ -1332,6 +1338,17 @@ const PLOTS_MODULE = [
 'pending（待续琐事）与引线同生命周期：挂账超 4 旬未办即"发酵"，旬首以【须处理·琐事发酵】列入裁决块，须当旬择一处理——本旬办掉（从 statePatch.pending 移除）、升级为剧情引线（移入 statePatch.plots）或改写文本说明现状（回写即重置计旬）；连续 3 旬不理前端自动清除。'
 ].join('\n');
 
+/* 剧情分段协议：narr 旁白 / say 本人台词 / quote 转述他人原话。完整提示与 ongoing 精简提示共用同一段 */
+const SCENE_PARTS_RULES = [
+'【scene.parts 分段协议】按语义拆 2—5 段，每段只做一件事，禁止把旁白、台词、他人引语混在同一段：',
+'narr＝旁白：所见、动作、神态、心理与场面，不写任何人的原话；引出下面的话时，写到“说”“问了句”“末了赏她一句：”为止。',
+'say＝当前说话人（scene.who）此刻亲口说的原话：直接写说了什么，不带引号，也不带“他说”“她说”之类的提示语。',
+'quote＝转述/引用第三方的原话：某人复述别人（贵嫔、皇上、太后、宫女等）说过的话，或信里、传闻里、圣旨里的原话；who 写原话者的称谓（确无出处可省），text 仍不带引号。',
+'分辨：当前说话人亲口说→say；他转述第三个人说的话→quote；不是任何人的原话→narr。',
+'例：{"parts":[{"type":"narr","text":"素心福身往正殿去，两刻才回，说贵嫔只问了三句，末了赏她一句："},{"type":"quote","who":"贵嫔","text":"回得干净"},{"type":"say","text":"娘娘还说，这样的回话往后多学着些"}]}',
+'不输出空段、纯标点段；台词末尾的句号、引号不单独成段；同一句不要既写进 narr 又写进 say/quote。'
+].join('\n');
+
 /* 剧情对话（scene）骨架协议：触发剧情时优先用 scene 结构输出，多轮应对后以 resolve 收尾统一结算 */
 const SCENE_MODULE = [
 '## 九、剧情对话（scene）',
@@ -1347,7 +1364,7 @@ const SCENE_MODULE = [
 ' "statePatch":{}}',
 '```',
 '- scene.who 必填，写清对方是谁：用存档中的人物称谓或姓名（如"太后""韦昭仪""春韶"），顶层 eventSource 写同一人；界面据此显示姓名与头像。',
-'- scene.parts 必填：按语义把这一轮拆成 2—5 段，而不是按标点硬切。type="narr" 写旁白、动作、神态；type="say" 写对方这一轮的原话（不带引号）；同场换人说话时在该段加 "who"。不要输出空段或纯标点段，台词后的句号、引号不要单独成段。',
+SCENE_PARTS_RULES,
 '- 触发剧情的当旬，narrative 必须先交代主控正在何处做什么、此人如何出现（迎面、传唤、偶遇、遣人请去），只写旁白，到"只让人回了句"这类引出语为止；第一句台词放进 scene.parts 的 say 段。界面会先显示 narrative，再按 parts 顺序渲染。',
 '- narrative 只写旁白与动作，人物台词一律放进 scene.parts；不要在 narrative 里写引号对白。scene.line 可省略，仅作旧界面兜底。',
 '- 每轮只演绎对方当即反应与场面变化：scene.state="ongoing"，scene.parts 总长不超过 70 字（只写对方这一轮的话与关键动作，不写主控的动作心理、不铺环境）、2—3 个接话选项（放顶层 options）；此阶段 narrative 必须为空字符串，changes 与 statePatch 为空，不结算数值。',
@@ -2285,7 +2302,8 @@ const SCENE_RULES=[
 '你是文字游戏《带着系统去宫斗》的主持人，现在只推进一段剧情对话里「对方这一句」。时间与数值留到收尾结算。只输出 JSON。',
 '【文风】架空盛唐，人物言语符合身份、性情与当下情绪；用古代语汇；只写对方的话与关键动作。',
 '【输出】{"narrative":"","changes":[],"hasEvent":true,"scene":{"state":"ongoing","who":"对方称谓","parts":[{"type":"narr","text":"旁白/动作"},{"type":"say","text":"对方原话，不带引号"}],"where":"有变化才写","when":"有变化才写"},"options":[{"id":"a","text":"≤70字"},{"id":"b","text":"≤70字"}]}',
-'【分段】scene.parts 按语义分 2—5 段：narr 写旁白、动作、神态；say 写对方台词，不带引号。不要按标点硬切，不要空段或纯标点段；同场换人说话时 say 段可带 who。narrative 只写旁白，不写引号对白。',
+SCENE_PARTS_RULES,
+'【收尾】narrative 只写旁白，不写引号对白。',
 '【约束】本轮 scene.state 必须是 "ongoing"；narrative 必须为空字符串，changes=[]，statePatch={}；options 给 2—3 个方向不同的接话，只写当下可见的机会或代价。scene.where 只有场景确实移动时才写，在本宫说话就写本宫住处，不要重复上一场的地点。即使话已说尽，也只写对方收束性的一句，由玩家选择「结束对话」，本轮保持 ongoing。',
 '【承接】严格承接用户消息里的本场对话记录，把话题往前推；对方只依据自己的性情、目标、与主控的关系及已知信息回应。'
 ].join('\n');
@@ -3659,7 +3677,8 @@ function sceneSpeaker(p,sc){ // 定对话对方：模型漏写 who 时，先认 
   const raw=String((sc&&sc.who)||(p&&p.eventSource)||'').trim();
   if(raw&&!/^(宫中来人|来人|某人|众人|宫人|宫女|太监|不详|事发)$/.test(raw))return raw;
   const parts=Array.isArray(sc&&sc.parts)?sc.parts:[];
-  const partWho=[...new Set(parts.map(x=>x&&x.who).filter(Boolean).map(x=>String(x).trim()))].filter(Boolean);
+  const isQuote=x=>/^(quote|quoted|cite|citation|refer|references|引用|转述|引述)$/i.test(String((x&&(x.type||x.t||x.role))||'').trim());
+  const partWho=[...new Set(parts.filter(x=>!isQuote(x)).map(x=>x&&x.who).filter(Boolean).map(x=>String(x).trim()))].filter(Boolean); // quote 的 who 是原话者，不是对话对方
   if(partWho.length===1)return partWho[0];
   if(sceneWhoHint)return sceneWhoHint; // 主动拜访：拜访对象比叙述里被提及的人更可靠
   const line=[String((sc&&sc.line)||''),...parts.map(x=>String((x&&x.text)||x||''))].join(' ');
@@ -3810,7 +3829,7 @@ const Game={
     const phits=matchPending([who,npc]);
     const leadHint=hits.length?`\n【呼应引线】此人与在途引线相关：${hits.map(p=>`「${p.title}」（${p.line}）`).join('；')}。请借此次会面推进或了结它：能兑现的当旬兑现并回写台账；暂不能了结的，也要让会面与之产生实质关联（新信息、态度变化、埋下下一步），并更新 note。`:'';
     const pendHint=phits.length?`\n【呼应待续】此次行动与待续琐事相关：${phits.map(x=>pendText(x)).join('；')}。请在本旬演绎中顺手办理或问起此事，办妥的从 statePatch.pending 移除；未办妥的更新一句现状（回写即重置挂账计旬）。`:'';
-    const msg=`第${xunNo()}旬第一轮：玩家主动出门拜访「${npc}」。依双方关系、位份、情理与时机如实演接待结果——接见、婉拒、不在宫中都可能，吃闭门羹也是有效结果，见面与否顺其自然。若接见，用剧情对话 scene 结构呈现此次会面（scene.who 填「${npc}」，scene.where 写对方所在宫室而不是本宫住处；scene.parts 按语义分段，narr 写旁白动作、say 写台词，不带引号；对方说话、玩家接话，多轮后 resolve 收尾结算）；若未见到，安静结算本旬。${leadHint}${pendHint}`;
+    const msg=`第${xunNo()}旬第一轮：玩家主动出门拜访「${npc}」。依双方关系、位份、情理与时机如实演接待结果——接见、婉拒、不在宫中都可能，吃闭门羹也是有效结果，见面与否顺其自然。若接见，用剧情对话 scene 结构呈现此次会面（scene.who 填「${npc}」，scene.where 写对方所在宫室而不是本宫住处；scene.parts 按语义分段，narr 写旁白动作、say 写台词、quote 写转述他人原话，台词都不带引号；对方说话、玩家接话，多轮后 resolve 收尾结算）；若未见到，安静结算本旬。${leadHint}${pendHint}`;
     this.round1(msg,'拜访·'+npc,focusEnergyCost('社交拜访'),{skipDice:true,leadIds:hits.map(p=>p.id),pendTexts:phits.map(pendText),whoHint:npc});
   },
   maidTalk(name){ // 日常宫务：不预调 API、不弹"事发"，本地开场白直入对话；开口说话才扣精力（每次5）
@@ -3954,7 +3973,7 @@ const Game={
       const p0=parsePayload(raw);
       const noEvent=(this._eventMandated(adj)||(opts&&opts._xunPop))&&!p0.hasEvent; // 裁决要求触发而模型没触发：仍纠正一次（旬首发酵弹出为硬强制）
       if(noEvent){
-        const fixMsg=msg+`\n【纠正】前端剧情裁决已裁定本旬必须触发剧情（${this._mandateText(adj)}），你却输出 hasEvent=false。请重新输出完整 JSON：hasEvent=true，用剧情对话 scene 结构呈现本轮剧情（scene.state="ongoing"、scene.parts 按语义分段：narr 写旁白/动作，say 写对方台词、不带引号、不按标点硬切；顶层 options 给 2—4 个接话选项），停下等待玩家应对、不结算后果；本旬养成过程简要并入 narrative。`;
+        const fixMsg=msg+`\n【纠正】前端剧情裁决已裁定本旬必须触发剧情（${this._mandateText(adj)}），你却输出 hasEvent=false。请重新输出完整 JSON：hasEvent=true，用剧情对话 scene 结构呈现本轮剧情（scene.state="ongoing"、scene.parts 按语义分段：narr 写旁白/动作，say 写对方台词，quote 写转述他人原话，台词都不带引号、不按标点硬切；顶层 options 给 2—4 个接话选项），停下等待玩家应对、不结算后果；本旬养成过程简要并入 narrative。`;
         lastRequest={type:'r1',msg:fixMsg,focus,cost,opts};
         UI.showBusy('铺排中','正在重新生成剧情……',true);
         return callModel(fixMsg).then(raw2=>settle(parsePayload(raw2)));
@@ -4015,7 +4034,7 @@ const Game={
     const title=plot?plot.title:(who==='宫中来人'?'事发':who);
     const meta=[sc.when,sc.where].filter(Boolean).join('｜');
     const parts=this.sceneParts(sc);
-    const lead=sc.line?filterText(sc.line):(parts?parts.map(x=>x.type==='say'?`“${x.text}”`:x.text).join(''):this.chatLead(p));
+    const lead=sc.line?filterText(sc.line):(parts?parts.map(x=>x.type==='say'?`“${x.text}”`:x.type==='quote'?`${x.who?x.who+'说：':''}「${x.text}」`:x.text).join(''):this.chatLead(p));
     const setup=filterText(p.narrative||'');
     const setupTail=setup?setup.split(/(?<=[。！？])/).filter(Boolean).slice(-2).join('').slice(-180):''; // 先交代在何处遇上谁，避免剧情凭空开始
     $('#incTitle').textContent=title==='事发'?'事发':'事发 · '+title;
@@ -4099,15 +4118,29 @@ const Game={
       const text=filterText(typeof p==='string'?p:(p.text??p.content??'')).trim();
       if(!text||/^[\s。，、；：！？…—·'"“”‘’「」『』()（）]+$/.test(text))continue;
       const raw=String(p.type||p.t||p.role||'').trim().toLowerCase();
+      const isQuote=['quote','quoted','cite','citation','refer','references','引用','转述','引述'].includes(raw);
       const isSay=['say','dialog','dialogue','npc','speech','character','char','台词','对白'].includes(raw);
-      out.push({type:isSay?'say':'narr',text,who:p.who?String(p.who).trim():''});
+      out.push({type:isQuote?'quote':isSay?'say':'narr',text,who:p.who?String(p.who).trim():''});
     }
     return out.length?out:null;
   },
-  sayParts(parts,who){ // 按 API 给的语义段渲染：say 带头像，narr 走旁白
+  quoteBubble(who,text){ // 转述他人原话：不挂当前说话人头像，单独成一只引文气泡
+    const body=$('#chatBody');
+    const wrap=document.createElement('div');wrap.className='msg quote';
+    const b=document.createElement('div');b.className='bubble quote';
+    const tag=document.createElement('div');tag.className='qtag';tag.textContent=who?`转 述 · ${who}`:'转 述';
+    const clean=String(text||'').replace(/^[「『“"]\s*|\s*[」』”"]$/g,''); // 模型若自带引号，去掉以免与样式里的「」叠成两层
+    const t=document.createElement('div');t.className='qtext';t.textContent=clean;
+    b.appendChild(tag);b.appendChild(t);wrap.appendChild(b);body.appendChild(wrap);
+    body.scrollTop=body.scrollHeight;
+  },
+  sayParts(parts,who){ // 按 API 给的语义段渲染：say 带头像，quote 走转述，narr 走旁白
     const fallback=who||(sceneCtx?sceneCtx.who:'');
     for(const p of parts){
-      if(p.type==='say'){
+      if(p.type==='quote'){
+        this.quoteBubble(p.who||'',p.text);
+        if(sceneCtx)sceneCtx.lines.push({who:'quote',name:p.who||'',text:p.text});
+      }else if(p.type==='say'){
         this.bubble('npc',p.who||fallback,p.text);
         if(sceneCtx)sceneCtx.lines.push({who:'npc',text:p.text});
       }else{
@@ -4262,7 +4295,7 @@ const Game={
   },
   sceneContextBlock(){ // 本场已发生对话，供模型承接；只取最近 10 句且每句截断
     if(!sceneCtx||!sceneCtx.lines.length)return '';
-    const lines=sceneCtx.lines.slice(-10).map(l=>`${l.who==='me'?'玩家':l.who==='npc'?sceneCtx.who:'旁白'}：${String(l.text||'').slice(0,80)}`).join('\n');
+    const lines=sceneCtx.lines.slice(-10).map(l=>`${l.who==='me'?'玩家':l.who==='npc'?sceneCtx.who:l.who==='quote'?'转述'+(l.name?'·'+l.name:''):'旁白'}：${String(l.text||'').slice(0,80)}`).join('\n');
     return `\n【本场对话记录】\n${lines}\n请承接以上对话，不要重复已说过的话。`;
   },
   requestScene(msg,choice,maxTokens,noHistory,compact){ // 场景请求统一出口：失败可重试，重试不重复扣精力
@@ -4311,7 +4344,7 @@ const Game={
     const settlement=sceneCtx.standalone
       ?'并收束这场问话：只结算它实际带来的关系、情报、差事与行囊变化；主角才艺与属性成长留到旬末小结，修习、散步等与问话无关的收益也留到那时。没有变化就不写 changes。'
       :'并一并完整结算本旬养成与剧情（narrative 收尾、changes、statePatch，含 statePatch.plots 的变动条目）。';
-    const msg=`第${xunNo()}旬剧情对话第${r}轮：玩家应对「${choice}」。只演绎${sceneCtx.who}的当即反应与场面变化：输出 scene.parts（2—5 段，narr 写旁白/动作/神态，say 写对方台词、不带引号，按语义分段而非按标点硬切；总长 ≤70 字）、scene.where/when（有变化才写）、scene.state 与 2—3 个接话选项；此阶段不结算数值。${cap?`本场对话已达上限，本轮 scene.state 必须为"resolve"，${settlement}`:'本轮只演 ongoing：narrative 留空字符串，changes=[]，statePatch={}，只写 scene 与 options；即使话已说尽，也只写对方收束性的一句，由玩家选择「结束对话」。'}`+this.sceneContextBlock();
+    const msg=`第${xunNo()}旬剧情对话第${r}轮：玩家应对「${choice}」。只演绎${sceneCtx.who}的当即反应与场面变化：输出 scene.parts（2—5 段，narr 写旁白/动作/神态，say 写对方台词，quote 写转述他人原话，台词都不带引号，按语义分段而非按标点硬切；总长 ≤70 字）、scene.where/when（有变化才写）、scene.state 与 2—3 个接话选项；此阶段不结算数值。${cap?`本场对话已达上限，本轮 scene.state 必须为"resolve"，${settlement}`:'本轮只演 ongoing：narrative 留空字符串，changes=[]，statePatch={}，只写 scene 与 options；即使话已说尽，也只写对方收束性的一句，由玩家选择「结束对话」。'}`+this.sceneContextBlock();
     this.requestScene(msg,choice,MAX_OUTPUT_TOKENS,!cap,!cap); // 未到上限：精简提示词 + 不带历史；到上限：完整提示词收尾结算
   },
   sceneEnd(){ // 玩家主动结束：对方应声简短收尾，统一结算（不耗精力）；本地开场且一言未发则不调 API、不结算
