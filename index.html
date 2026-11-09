@@ -1209,7 +1209,10 @@ function mergePlots(base,incoming,nowTurn){ // 增量回写：模型只给变化
     const merged=Object.assign({},old);
     for(const k of ['title','line','stage','earliest','latest','dueText','note'])if(raw[k]!==undefined)merged[k]=raw[k];
     const p=sanitizePlot(merged);
-    if(p){p.touch=nowTurn;p.echoMiss=0;p.staleMiss=0;Object.assign(old,p)} // 回写即推进：touch 刷新、呼应/发酵落空计数清零
+    if(p){
+      const progressed=(raw.stage!==undefined&&raw.stage!==old.stage)||(raw.latest!=null&&raw.latest!==old.latest)||(raw.earliest!=null&&raw.earliest!==old.earliest)||(raw.dueText!==undefined&&raw.dueText!==old.dueText); // 实质推进：兑现/作废/立改期限；原样重发期限或只改写 note 文案都不算（防止"每旬换个说法"架空发酵裁决）
+      if(progressed){p.touch=nowTurn;p.staleMiss=0}else{p.touch=old.touch;p.staleMiss=old.staleMiss} // 敷衍回写：挂账时钟照走
+      p.echoMiss=0;Object.assign(old,p)}
   }
   return list;
 }
@@ -2800,7 +2803,13 @@ function applyPatch(patch){
     if(k==='time')continue;  // 日历前端自管（两旬制固定规则，避免与模型重复推进）
     if(k==='inventory.add'){addToInventory(Array.isArray(patch[k])?patch[k]:[patch[k]]);continue} // 行囊入库（前端合并件数）
     if(k==='plots'){state.plots=mergePlots(state.plots,patch[k],xunSerial(state.time));continue} // 剧情台账按 id 增量合并；回写即记 touch=本旬（统一用 xunSerial 旬号，与发酵裁决同一单位）
-    if(k==='pending'){state.pending=normalizePending(Array.isArray(patch[k])?patch[k]:[patch[k]],state.turn).filter(x=>!/当票|赎当|已逾期/.test(x.t));continue} // 模型回写也过滤：典当类话口不入待续
+    if(k==='pending'){ // 模型回写也过滤：典当类话口不入待续；原样照抄的旧条目不重置挂账计旬（重置只在文本变化/新立时，防"每旬换个说法"永不过期）
+      const prev=state.pending||[];
+      state.pending=normalizePending(Array.isArray(patch[k])?patch[k]:[patch[k]],state.turn).filter(x=>!/当票|赎当|已逾期/.test(x.t)).map(x=>{
+        const old2=prev.find(o=>pendText(o)===x.t);
+        if(old2){x.touch=old2.touch;x.staleMiss=old2.staleMiss||0}
+        return x;
+      });continue}
     if(k.indexOf('emperor.')===0){majors.push(...applyEmperorPatch(k.slice(8),patch[k]));continue} // 恩宠账：contact 记旬/memories 追加/absence/intimacy/hisState
     if(/^items\./.test(k)){ // 旧式分类写入：转行囊
       const cat=k.slice(5),arr=Array.isArray(patch[k])?patch[k]:[patch[k]];
@@ -4807,9 +4816,7 @@ const Game={
           else pl.echoMiss=(pl.echoMiss||0)+1; // 无回写：落空一次；满 ECHO_MISS_MAX 后不再呼应，交由旬首发酵处置
         }
       }
-      if(opts&&opts.pendTexts&&opts.pendTexts.length){ // 相关的待续琐事同理：办过问过即刷新挂账计旬
-        for(const t of opts.pendTexts){const it=(state.pending||[]).find(x=>pendText(x)===t);if(it)it.touch=state.turn}
-      }
+      // 相关的待续琐事：挂账计旬是否重置只看本轮 statePatch 是否真改/真删（见 applyPatch 的 pending 分支），不再"提过即刷新"，免得一条琐事被每旬顺口一提就永不过期
       const meta=ensurePlotMeta();
       if(p.hasEvent||adj.due.length||adj.overdue.length||adj.mainPub||adj.gardenMeet)meta.lastEventTurn=state.turn;
       if(adj.mainPub)meta._mainMissed=!activePlots().some(x=>x.line==='主线'); // 新主线是否落账：未落账则下轮裁决加重语气
