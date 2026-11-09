@@ -1461,6 +1461,17 @@ const SKILL_MODULE = [
 '5. 藏书阁前端暂未开放；相关内容留待其开放后。'
 ].join('\n');
 
+/* 手作成品：前端已生成并入库，主模型只承接，不重复结算 */
+const CRAFT_MODULE = [
+'## 十五、手作成品（新增玩法，优先级高于旧例）',
+'1. 主控可用材料、精力与灵感手作绣物、香料、丹丸等。成品由手作接口单独生成，含名称、类别、品质、特质、一句描述与使用效果；前端已完成扣料、扣精力与入囊，正文不得重复结算材料、精力或物品。',
+'2. 品质分五档：粗陋、寻常、精巧、珍品、绝品。品质影响表现、赠礼体面、献物评价与典卖价格，但不保证好感、宠爱或宫斗成功；人物反应仍按其性情、立场、关系与时机结算。',
+'3. 成品 traits 可为风格（典雅、华丽、质朴、清冷等）或性质（安神、提神、活血、止血、剧毒、致幻等），使用效果以存档中的 effect 为准；正文写效用时不得超出 effect 的范围。',
+'4. 赠礼、献物、委托兑现走正常社交与剧情规则：品质与心意只提供更好的起点，收礼者可欣然、客气、推辞、起疑或转赠他人。',
+'5. 医药手作只作温和调理、缓解与救急，不得起死回生、保证怀孕或出现现代医学；剧毒、致幻、迷香类成品只在材料带毒性且灵感明确要求时存在，使用时须有前置、败露与追查风险。',
+'6. 带手作暗记的成品可被追查来源；御赐、禁物、信物、剧毒之物不可典卖。'
+].join('\n');
+
 /* ============================================================ 工具 */
 const $=s=>document.querySelector(s);
 const MONTHS=['','正月','二月','三月','四月','五月','六月','七月','八月','九月','十月','冬月','腊月'];
@@ -2193,6 +2204,7 @@ function normalizeState(s){
   if(!s.pawnFix1){for(const it of s.inventory)it.pawnable=guessPawnable(it.name,it.note);s.pawnFix1=true} // 一次性重算可否典卖
   if(!s.itemFlagV1){for(const it of s.inventory)it.usable=guessUsable(it.name,it.note);s.itemFlagV1=true} // 旧档一次性重算可否使用
   for(const it of s.inventory)itemFlags(it); // 补齐缺失词条
+  ensureCraftState(s); // 手作：补 craft 状态；旧档首次接入补一份入门材料
   if(!s.plotLedgerV1){migratePlotLedger(s);s.plotLedgerV1=true} // 一次性迁移剧情台账
   migrateEmperor(s); // 恩宠账：旧档补知心/上次接触/共同经历（内部一次性守卫）
   if(!Array.isArray(s.plots))s.plots=[];
@@ -2237,6 +2249,16 @@ function applyShopCatalog(it){ // 商城词条落地：usable=false 写死者（
 }
 function itemFlags(it){ // 补齐物品词条：可使用 / 可典当；商城长期之物再落 durable
   if(!it)return it;
+  if(it.mat){ // 手作材料：只能当料，不能直接使用
+    it.usable=false;
+    if(typeof it.pawnable!=='boolean')it.pawnable=!/御赐|禁物/.test(String(it.name||'')+String(it.note||''));
+    return it;
+  }
+  if(it.crafted){ // 手作成品：词条由手作接口生成，不再按名字猜
+    if(typeof it.usable!=='boolean')it.usable=true;
+    if(typeof it.pawnable!=='boolean')it.pawnable=!/剧毒|禁物|御赐|僭越|信物/.test(String((it.traits||[]).join(''))+String(it.note||'')+String(it.effect||''));
+    return it;
+  }
   if(typeof it.usable!=='boolean')it.usable=guessUsable(it.name,it.note);
   if(typeof it.pawnable!=='boolean')it.pawnable=guessPawnable(it.name,it.note);
   return applyShopCatalog(it);
@@ -2249,7 +2271,7 @@ function addToInventory(list){ // 入库：按 名+备注 合并件数，件数�
     if(!raw||!raw.name)continue;
     const it=itemFlags(Object.assign({count:1,note:''},raw));
     const n=Number(it.count);it.count=Number.isFinite(n)?n:1;
-    let key=state.inventory.findIndex(o=>o.name===it.name&&o.note===it.note);
+    let key=state.inventory.findIndex(o=>o.name===it.name&&o.note===it.note&&!(it.crafted||o.crafted)); // 手作成品不并堆：每件都保留自己的描述与效果
     if(key<0&&it.count<0)key=state.inventory.findIndex(o=>o.name===it.name); // 消耗/送出：备注可能不同，按名扣减
     if(key>=0){
       const ex=state.inventory[key];
@@ -2265,6 +2287,11 @@ function addToInventory(list){ // 入库：按 名+备注 合并件数，件数�
   }
 }
 function pawnPrice(it){ // 典卖估价：按质地分档（本地即时结算，通报主持人）
+  if(it&&it.crafted){ // 手作成品：按生成时记下的估价与品质走
+    const v=Number(it.craftValue);
+    if(Number.isFinite(v)&&v>0)return Math.max(1,Math.round(v));
+    return CRAFT_QUALITY_VALUE[it.quality]||4;
+  }
   const s=String(it.name||'')+String(it.note||'');
   if(/赤金|金错|东珠|红宝石|白玉|翡翠|玛瑙/.test(s))return 20;
   if(/云锦|锦缎|织金|缂丝|裘/.test(s))return 12;
@@ -2299,13 +2326,28 @@ function compactState(s){ // 只压缩送入模型的那一份，localStorage �
   const out=Object.assign({},s);
   out.turn=xunNoOf(s.turn); // 对外统一 1 起旬号，与指令里的「第N旬」一致
   // 前端内部标记与展示字段不送模型
-  for(const k of ['avatarMap','plotMeta','xunBook','saveVersion','plotLedgerV1','pawnFix1','itemFlagV1','readMindV1','energyWarned','mealCount','lastSalaryMonth','items'])delete out[k];
+  for(const k of ['avatarMap','plotMeta','xunBook','saveVersion','plotLedgerV1','pawnFix1','itemFlagV1','readMindV1','energyWarned','mealCount','lastSalaryMonth','items','craftV1'])delete out[k];
   if(out.protagonist&&typeof out.protagonist==='object'){
     out.protagonist=Object.assign({},s.protagonist);
     delete out.protagonist.avatar; // 头像由前端按身份分配
   }
   // 行囊只送名字/件数/短备注：usable/pawnable/src 由前端结算，模型不需要每旬背
-  if(Array.isArray(s.inventory))out.inventory=s.inventory.map(it=>({name:it.name,count:it.count,note:String(it.note||'').slice(0,40)}));
+  // 手作材料标一句 mat；手作成品补品质、特质与效果，不把完整描述/配方塞进每旬上下文
+  if(Array.isArray(s.inventory))out.inventory=s.inventory.map(it=>{
+    const o={name:it.name,count:it.count,note:String(it.note||'').slice(0,40)};
+    if(it.mat)o.mat=it.matKind||true;
+    if(it.crafted){
+      o.quality=it.quality;
+      o.traits=Array.isArray(it.traits)?it.traits.slice(0,3):[];
+      o.effect=String(it.effect||'').slice(0,60);
+    }
+    return o;
+  });
+  // 手作：只带最近三次成品名目，配方与效果留在行囊详情里
+  if(s.craft&&typeof s.craft==='object'){
+    const h=Array.isArray(s.craft.history)?s.craft.history:[];
+    out.craft={recent:h.slice(-3).map(x=>({time:x.time,name:x.name,quality:x.quality,traits:x.traits}))};
+  }
   // 商城由前端管理，模型无需每旬背整张价目表
   if(out.system&&typeof out.system==='object'){out.system=Object.assign({},s.system);delete out.system.shop;delete out.system.shopCycle}
   // 关系备注截断
@@ -2384,7 +2426,7 @@ function buildStaticSystem(){
       .replace('{{世界书全文：02-世界书.md}}',WORLD_BOOK_RUNTIME)
       .replace('{{叙事文风全文：03-叙事文风.md}}',STYLE_GUIDE)
       .replace('{{当前存档 JSON：04-当前存档-v36.json 或玩家当前档}}','（见本提示词末尾「当前存档」段，动态存档在最后）')
-      +'\n\n'+NPC_MODULE+'\n\n'+ENERGY_MODULE+'\n\n'+PLOTS_MODULE+'\n\n'+EMPEROR_MODULE+'\n\n'+SCENE_MODULE+'\n\n'+SKILL_MODULE+'\n\n'+PERSONA_MODULE+'\n\n'+LENGTH_MODULE;
+      +'\n\n'+NPC_MODULE+'\n\n'+ENERGY_MODULE+'\n\n'+PLOTS_MODULE+'\n\n'+EMPEROR_MODULE+'\n\n'+SCENE_MODULE+'\n\n'+SKILL_MODULE+'\n\n'+CRAFT_MODULE+'\n\n'+PERSONA_MODULE+'\n\n'+LENGTH_MODULE;
   }
   return _staticSystem;
 }
@@ -2488,6 +2530,17 @@ async function callModel(userMsg,opts){
         if(b>a)ok=typeof (JSON.parse(t.slice(a,b+1))||{}).impression==='string';
       }catch(e){}
       if(!ok){const err=new Error('返回不是 JSON');err.raw=String(raw==null?'':raw).trim();err.invalidJson=true;throw err}
+    }
+    if(expect==='craft'){
+      let ok=false;
+      try{
+        const t=String(raw==null?'':raw),a=t.indexOf('{'),b=t.lastIndexOf('}');
+        if(b>a){
+          const o=JSON.parse(t.slice(a,b+1))||{};
+          ok=typeof o.name==='string'&&!!o.name.trim()&&typeof o.quality==='string';
+        }
+      }catch(e){}
+      if(!ok){const err=new Error('返回不是手作 JSON');err.raw=String(raw==null?'':raw).trim();err.invalidJson=true;throw err}
     }
   };
   const send=async(messages,useStream=true)=>{
@@ -3600,6 +3653,338 @@ function refreshShop(s){ // 三旬一换：从总商品库按轮次挑 SHOP_SLOT
   sys.shop=idx.slice(0,SHOP_SLOTS).map(i=>({name:names[i],cost:SHOP_CATALOG[names[i]].cost}));
   sys.shopCycle=cycle;
 }
+
+/* ============================================================ 手作系统（后端）
+   材料 + 精力 + 灵感 → 单独调用 API 生成成品。
+   公开入口：Craft.materials() / Craft.validate(input) / Craft.make(input)
+   本文件没有服务器，以下逻辑即项目约定的“后端层”，全部内联在 index.html。 */
+const CRAFT_QUALITY=['粗陋','寻常','精巧','珍品','绝品'];
+const CRAFT_QUALITY_ALIAS={
+  '粗陋':'粗陋','粗糙':'粗陋','劣质':'粗陋','下品':'粗陋','粗制':'粗陋',
+  '寻常':'寻常','普通':'寻常','一般':'寻常','中品':'寻常','家常':'寻常',
+  '精巧':'精巧','精良':'精巧','上品':'精巧','精品':'精巧','细致':'精巧','工整':'精巧',
+  '珍品':'珍品','珍稀':'珍品','珍异':'珍品','极品':'珍品','上上品':'珍品',
+  '绝品':'绝品','神品':'绝品','孤品':'绝品','传世':'绝品','无双':'绝品'
+};
+const CRAFT_QUALITY_VALUE={'粗陋':2,'寻常':4,'精巧':8,'珍品':16,'绝品':30};
+const CRAFT_ENERGY_MIN=10;
+const CRAFT_ENERGY_MAX=50;
+const CRAFT_MAX_KINDS=4;       // 一次最多放几种材料
+const CRAFT_MAX_TOTAL=8;       // 一次最多放几份材料
+const CRAFT_INSPIRATION_MAX=120;
+const CRAFT_STARTER_ON=true;   // 首次接入是否送入门材料；不想白送就改成 false
+const CRAFT_STARTER=[          // 旧档/新档首次接入时的一次性入门材料：只够试做一两件
+  ['素绢',2],['绣线',2],['檀香末',1],['黄芪',1],['当归',1],['蜂蜜',1]
+];
+const CRAFT_MATERIALS={
+  /* 绣作 */
+  '素绢':{kind:'绣',tier:1,tags:['布帛','素净']},
+  '素缎':{kind:'绣',tier:2,tags:['布帛','光润']},
+  '细麻布':{kind:'绣',tier:1,tags:['布帛','粗朴']},
+  '绣线':{kind:'绣',tier:1,tags:['线','彩色']},
+  '彩线':{kind:'绣',tier:1,tags:['线','彩色']},
+  '金线':{kind:'绣',tier:2,tags:['线','贵重','华贵']},
+  '云锦':{kind:'绣',tier:4,tags:['布帛','华贵','御赐','不可轻动']},
+  '旧衣料':{kind:'绣',tier:1,tags:['布帛','旧物','可拆改']},
+  /* 合香 */
+  '檀香末':{kind:'香',tier:1,tags:['香','温沉']},
+  '沉香屑':{kind:'香',tier:4,tags:['香','贵重','清远']},
+  '榆皮粉':{kind:'香',tier:1,tags:['黏合','无味']},
+  '蜂蜜':{kind:'香',tier:1,tags:['甘润','黏合']},
+  '龙脑':{kind:'香',tier:3,tags:['香','清凉','贵重','提神']},
+  '麝香':{kind:'香',tier:4,tags:['香','浓烈','贵重','孕者忌']},
+  '艾草':{kind:'花',tier:1,tags:['草','辛香','端午','驱虫']},
+  /* 花材 */
+  '干桂花':{kind:'花',tier:2,tags:['花','甜香','秋']},
+  '干茉莉':{kind:'花',tier:2,tags:['花','清甜','夏']},
+  '白菊':{kind:'花',tier:1,tags:['花','清苦','秋']},
+  '红梅':{kind:'花',tier:2,tags:['花','冷香','冬']},
+  '荷花瓣':{kind:'花',tier:1,tags:['花','清润','夏']},
+  '忍冬':{kind:'花',tier:1,tags:['花','清热解毒','夏']},
+  /* 丸散 */
+  '黄芪':{kind:'药',tier:1,tags:['药','补气']},
+  '当归':{kind:'药',tier:1,tags:['药','养血']},
+  '茯苓':{kind:'药',tier:1,tags:['药','安神','健脾']},
+  '酸枣仁':{kind:'药',tier:1,tags:['药','安神']},
+  '甘草':{kind:'药',tier:1,tags:['药','调和']},
+  '三七':{kind:'药',tier:2,tags:['药','止血','化瘀']},
+  '川芎':{kind:'药',tier:1,tags:['药','活血']},
+  '白芍':{kind:'药',tier:1,tags:['药','柔肝']},
+  '葛花':{kind:'药',tier:1,tags:['药','解酒']},
+  '黄酒':{kind:'药',tier:1,tags:['酒','行药']},
+  '附子':{kind:'药',tier:3,tags:['药','大热','有毒']},
+  '乌头':{kind:'药',tier:3,tags:['药','剧毒','禁物']},
+  '牵机药':{kind:'药',tier:4,tags:['药','剧毒','禁物']}
+};
+const CRAFT_SYSTEM=[
+'你是文字游戏《带着系统去宫斗》的手作裁定器。玩家在架空盛唐后宫里，用材料、精力和一句“灵感”亲手做一件东西。你只负责裁定成品，不推进剧情、不结算剧情、不输出解释。',
+'',
+'【输入】materials 是实际投入的材料（含种类、份数、品级、性质），energy 是投入精力（10—50），inspiration 是玩家写的灵感，protagonist.skills 是相关才艺。',
+'【品质】只能是：粗陋、寻常、精巧、珍品、绝品。',
+'- 材料品级高、份数足、精力多、灵感具体且与材料相合、相关才艺高，则品质高；反之则低。',
+'- 材料与灵感明显不合时降品，但仍须做出成品，不要拒绝。',
+'- 技艺门槛：绣作看女红，合香看香道，丸散看医术/药理，花作看莳花。相关技艺未习或很低时，成品仍可做，但品质最多寻常，effect 要写出将就、生涩或火候不足；相关技艺达到 50 才可能出珍品，达到 80 才可能出绝品。',
+'- 绝品极罕见：至少需要高档材料、足量精力、具体灵感与高才艺之一加持；没有就不给。',
+'【成品】',
+'- name：2—8 个汉字，古风，像宫里人会叫的名字，不要引号。',
+'- category：绣、香、药、花、杂 之一。',
+'- traits：1—3 项，每项 2—6 个汉字。可写风格（典雅、华丽、质朴、清冷、端方、俏皮、古拙）或性质（安神、提神、驱虫、活血、止血、润燥、解酒、致幻、剧毒、易燃、易碎、御赐、僭越）。traits 必须与 effect 一致。',
+'- description：一句，不超过 50 字，写它看起来、闻起来或摸起来如何，不要写数值。',
+'- effect：一句，不超过 80 字，写使用后的具体效果与代价。医药只写温和调理、缓解、救急；不得起死回生、不得保证怀孕、不得出现现代医学。剧毒、致幻、迷香只有在材料带毒性且灵感明确要求时才可出现，并写明败露、追查或反噬风险。',
+'- usable：能否实际使用、服用或生效；赠人不受此限。',
+'- pawnable：能否典卖；御赐、禁物、信物、剧毒之物为 false，寻常手作为 true。',
+'【输出】只输出一个 JSON 对象，不要 markdown、不要解释、不要多余字段。格式：',
+'{"name":"","category":"绣","quality":"精巧","traits":["典雅","安神"],"description":"","effect":"","usable":true,"pawnable":true}'
+].join('\n');
+
+function craftPushItemTo(s,item){ // 不依赖全局 state 的入库：供旧档迁移补入门材料
+  if(!s||!Array.isArray(s.inventory)||!item||!item.name)return null;
+  const it=itemFlags(Object.assign({count:1,note:''},item));
+  const n=Number(it.count);it.count=Number.isFinite(n)?n:1;
+  if(it.count<=0)return null;
+  if(!it.crafted){
+    const ex=s.inventory.find(o=>o&&o.name===it.name&&o.note===it.note&&!o.crafted);
+    if(ex){ex.count=(Number(ex.count)||0)+it.count;return ex}
+  }
+  s.inventory.push(it);
+  return it;
+}
+function ensureCraftState(s){ // 旧档/新档：补 craft 状态；只补一次入门材料，不追溯历史成品
+  if(!s||typeof s!=='object')return;
+  if(!s.craft||typeof s.craft!=='object'||Array.isArray(s.craft))s.craft={v:1,history:[]};
+  if(!Array.isArray(s.craft.history))s.craft.history=[];
+  if(!s.craft.v)s.craft.v=1;
+  if(!s.craftV1){
+    s.craftV1=true;
+    if(!Array.isArray(s.inventory))s.inventory=[];
+    const hasMat=s.inventory.some(craftIsMaterialItem); // 已有材料就不补，避免未来重复发
+    if(CRAFT_STARTER_ON&&!hasMat){
+      for(const [name,count] of CRAFT_STARTER){
+        const meta=CRAFT_MATERIALS[name];if(!meta)continue;
+        craftPushItemTo(s,{name,count,note:'手作材料',usable:false,pawnable:true,src:'内务府',mat:true,matKind:meta.kind,matTier:meta.tier,matTags:meta.tags});
+      }
+    }
+  }
+}
+function craftIsMaterialItem(it){ // 材料判定：有 mat 标记，或名字在材料库中且不是同名成品
+  return !!(it&&it.name&&(it.mat||(CRAFT_MATERIALS[it.name]&&!it.crafted)));
+}
+function craftMaterialMeta(name){
+  const key=String(name||'').trim();
+  if(CRAFT_MATERIALS[key])return CRAFT_MATERIALS[key];
+  const it=(state&&Array.isArray(state.inventory))?state.inventory.find(x=>x&&x.name===key&&craftIsMaterialItem(x)):null;
+  if(!it)return null;
+  return {kind:it.matKind||'杂',tier:Number(it.matTier)||1,tags:Array.isArray(it.matTags)?it.matTags:[]};
+}
+function craftInventoryCount(name,s){
+  s=s||state;
+  if(!s||!Array.isArray(s.inventory))return 0;
+  return s.inventory.reduce((a,it)=>a+((it&&it.name===name&&craftIsMaterialItem(it))?(Number(it.count)||0):0),0);
+}
+function craftMaterialsInBag(){ // 手作面板用：只列真正可当材料的东西；同名材料合并计数
+  if(!state||!Array.isArray(state.inventory))return [];
+  const byName={};
+  for(const it of state.inventory){
+    const n=Number(it&&it.count)||0;
+    if(n<=0||!craftIsMaterialItem(it))continue;
+    const cat=CRAFT_MATERIALS[it.name]||{};
+    if(!byName[it.name]){
+      byName[it.name]={
+        name:it.name,count:0,
+        kind:it.matKind||cat.kind||'杂',
+        tier:Number(it.matTier)||Number(cat.tier)||1,
+        tags:(Array.isArray(it.matTags)&&it.matTags.length)?it.matTags:(cat.tags||[])
+      };
+    }
+    byName[it.name].count+=n;
+  }
+  return Object.keys(byName).map(k=>byName[k]);
+}
+function craftValidate(input){ // 只校验、不扣料；返回 {ok,errors,data}
+  const errs=[];
+  if(!state||!state.protagonist)errs.push('尚未开局');
+  const rawMats=Array.isArray(input&&input.materials)
+    ? input.materials
+    : (input&&input.materials&&typeof input.materials==='object'
+      ? Object.keys(input.materials).map(name=>({name,count:input.materials[name]}))
+      : []);
+  if(!rawMats.length)errs.push('至少放一样材料');
+  const mats=[],seen=new Set();
+  for(const x of rawMats){
+    const name=String((x&&x.name)||x||'').trim();
+    if(!name)continue;
+    const count=Math.max(1,Math.round(Number(x&&x.count)||1));
+    if(seen.has(name)){errs.push('「'+name+'」放了不止一次');continue}
+    seen.add(name);
+    const meta=craftMaterialMeta(name);
+    if(!meta){errs.push('「'+name+'」不是可用的手作材料');continue}
+    const have=craftInventoryCount(name);
+    if(have<count)errs.push('「'+name+'」不够（有 '+have+' 份，需 '+count+' 份）');
+    mats.push({name,count,kind:meta.kind||'杂',tier:Number(meta.tier)||1,tags:Array.isArray(meta.tags)?meta.tags:[]});
+  }
+  if(mats.length>CRAFT_MAX_KINDS)errs.push('材料至多 '+CRAFT_MAX_KINDS+' 种');
+  const total=mats.reduce((a,m)=>a+m.count,0);
+  if(total>CRAFT_MAX_TOTAL)errs.push('材料总数至多 '+CRAFT_MAX_TOTAL+' 份');
+  const energy=Math.round(Number(input&&input.energy));
+  if(!Number.isFinite(energy)||energy<CRAFT_ENERGY_MIN||energy>CRAFT_ENERGY_MAX)errs.push('精力须在 '+CRAFT_ENERGY_MIN+'—'+CRAFT_ENERGY_MAX+' 之间');
+  if((Number(state&&state.energy)||0)<energy)errs.push('本旬精力不足（余 '+(Number(state&&state.energy)||0)+'）');
+  const inspiration=String((input&&input.inspiration)||'').replace(/\s+/g,' ').trim();
+  if(!inspiration)errs.push('先写一句灵感');
+  if(inspiration.length>CRAFT_INSPIRATION_MAX)errs.push('灵感最多 '+CRAFT_INSPIRATION_MAX+' 字');
+  return {ok:errs.length===0,errors:errs,data:{materials:mats,energy,inspiration}};
+}
+function craftBuildPayload(data){
+  const p=(state&&state.protagonist)||{};
+  const sk=p.skills||{},relevant={};
+  for(const k in sk)if(/女红|香道|医术|药理|莳花|画|书/.test(k))relevant[k]=sk[k];
+  return {
+    time:fmtTime(),
+    place:(state&&state.location)||'',
+    protagonist:{name:p.name,rank:p.rank,age:p.age,personality:normalizePersona(p.personality),skills:relevant},
+    materials:data.materials.map(m=>({name:m.name,count:m.count,kind:m.kind,tier:m.tier,tags:m.tags})),
+    energy:data.energy,
+    inspiration:data.inspiration
+  };
+}
+function craftParseJson(raw){
+  const src=String(raw==null?'':raw);
+  const t=src.trim().replace(/^```(?:json)?\s*/i,'').replace(/```\s*$/,'').trim();
+  const a=t.indexOf('{'),b=t.lastIndexOf('}');
+  const fail=m=>{const e=new Error(m);e.raw=src;e.invalidJson=true;throw e};
+  if(a<0||b<=a)fail('手作结果不是完整 JSON');
+  try{return JSON.parse(t.slice(a,b+1))}catch(e){fail('手作结果 JSON 解析失败：'+e.message)}
+}
+function craftCleanText(v,max){
+  if(v&&typeof v==='object')v=v.text||v.content||v.value||'';
+  return String(v==null?'':v).replace(/\s+/g,' ').replace(/^["'“”‘’《》「」]+|["'“”‘’《》「」]+$/g,'').trim().slice(0,max);
+}
+function craftNormalizeQuality(q){
+  const s=String(q||'').trim();
+  if(CRAFT_QUALITY.includes(s))return s;
+  for(const k in CRAFT_QUALITY_ALIAS)if(s.includes(k))return CRAFT_QUALITY_ALIAS[k];
+  return '寻常';
+}
+function craftNormalizeTraits(v){
+  const raw=(Array.isArray(v)?v:String(v==null?'':v).split(/[、,，;；/|]+/)).map(x=>x&&typeof x==='object'?(x.name||x.trait||x.label||x.text||''):x);
+  const out=[];
+  for(const x of raw){
+    const t=String(x||'').replace(/\s+/g,'').replace(/^\[object Object\]$/,'').slice(0,8);
+    if(t&&!out.includes(t))out.push(t);
+    if(out.length>=3)break;
+  }
+  return out.length?out:['质朴'];
+}
+function craftNormalizeCategory(c,data){
+  const s=String(c||'').trim();
+  if(['绣','香','药','花','杂'].includes(s))return s;
+  if(/绣|织|帕|囊|屏|衣|线/.test(s))return '绣';
+  if(/香|熏|线香|露/.test(s))return '香';
+  if(/药|丹|丸|散|膏|汤/.test(s))return '药';
+  if(/花|草|枝/.test(s))return '花';
+  const kinds=((data&&data.materials)||[]).map(m=>m.kind);
+  for(const k of ['绣','香','药','花'])if(kinds.includes(k))return k;
+  return '杂';
+}
+function craftFallbackDescription(category,traits){
+  const t=traits[0]||'寻常';
+  const noun=category==='绣'?'针线':(category==='香'?'香物':(category==='药'?'丸散':'手作'));
+  return '一件'+t+'的'+noun+'，看得出是你亲手做的。';
+}
+function craftFallbackEffect(traits){
+  return '使用后显出「'+traits.join('、')+'」的性情，具体效用随情境而定。';
+}
+function craftParse(raw,data){
+  const obj=craftParseJson(raw);
+  const name=craftCleanText(obj.name,12);
+  if(!name)throw new Error('手作结果缺少名字');
+  const category=craftNormalizeCategory(obj.category,data);
+  const quality=craftNormalizeQuality(obj.quality);
+  const traits=craftNormalizeTraits(obj.traits);
+  const description=craftCleanText(obj.description,60)||craftFallbackDescription(category,traits);
+  const effect=craftCleanText(obj.effect||obj.useEffect||obj.use,100)||craftFallbackEffect(traits);
+  const usable=obj.usable!==false;
+  let pawnable=obj.pawnable!==false;
+  if(/剧毒|禁物|御赐|僭越|信物/.test(traits.join('')+description+effect))pawnable=false;
+  return {name,category,quality,traits,description,effect,usable,pawnable};
+}
+function craftValueFor(parsed,data){
+  const base=CRAFT_QUALITY_VALUE[parsed.quality]||4;
+  const tierSum=(data.materials||[]).reduce((a,m)=>a+(Number(m.tier)||1),0);
+  return Math.max(1,Math.round(base+tierSum*0.5));
+}
+function craftConsumeMaterials(s,mats){
+  for(const m of mats){
+    let left=m.count;
+    for(let i=(s.inventory||[]).length-1;i>=0&&left>0;i--){
+      const it=s.inventory[i];
+      if(!it||it.name!==m.name||!craftIsMaterialItem(it))continue;
+      const have=Number(it.count)||0;
+      const take=Math.min(have,left);
+      it.count=have-take;left-=take;
+      if(it.count<=0)s.inventory.splice(i,1);
+    }
+    if(left>0)throw new Error('材料「'+m.name+'」不足');
+  }
+}
+function craftCommit(data,parsed,s){ // 校验通过且 API 返回成功后，才真正扣料、扣精力、入库
+  s=s||state;
+  for(const m of data.materials){
+    if(craftInventoryCount(m.name,s)<m.count)throw new Error('材料「'+m.name+'」不足');
+  }
+  if((Number(s.energy)||0)<data.energy)throw new Error('精力不足，手作未成');
+  craftConsumeMaterials(s,data.materials);
+  s.energy=Math.max(0,Math.round((Number(s.energy)||0)-data.energy));
+  const item={
+    name:parsed.name,count:1,
+    note:'手作·'+parsed.quality+'·'+parsed.traits.join('・'),
+    usable:parsed.usable,pawnable:parsed.pawnable,src:'手作',
+    crafted:true,category:parsed.category,quality:parsed.quality,traits:parsed.traits,
+    description:parsed.description,effect:parsed.effect,
+    inspiration:data.inspiration,
+    materials:data.materials.map(m=>m.name+'×'+m.count),
+    energy:data.energy,
+    maker:(s.protagonist&&s.protagonist.name)||'',
+    madeAt:fmtTime(),
+    craftValue:craftValueFor(parsed,data)
+  };
+  craftPushItemTo(s,item); // 用捕获的存档入库：避免请求期间切换存档后写错档
+  if(typeof acquiredThisTurn!=='undefined'&&Array.isArray(acquiredThisTurn))acquiredThisTurn.push({name:item.name,usable:item.usable,pawnable:item.pawnable});
+  const c=s.craft=s.craft&&typeof s.craft==='object'?s.craft:{v:1,history:[]};
+  if(!Array.isArray(c.history))c.history=[];
+  c.history.push({turn:s.turn,time:fmtTime(),name:item.name,quality:item.quality,traits:item.traits,materials:item.materials,energy:item.energy,inspiration:item.inspiration});
+  if(c.history.length>30)c.history=c.history.slice(-30);
+  if(typeof logXunAction==='function')logXunAction('手作·'+item.name);
+  if(typeof persistCurrent==='function')persistCurrent();
+  if(typeof UI!=='undefined'&&UI.updateStatusbar)UI.updateStatusbar();
+  return item;
+}
+async function craftMake(input){ // 公开入口：失败不扣料、不扣精力
+  if(abortCtrl)throw new Error('已有请求正在进行，稍候再开手作');
+  const s=state; // 捕获本次手作所属存档：请求期间即使切档，也不把成品写进别的档
+  const v=craftValidate(input);
+  if(!v.ok){const e=new Error(v.errors[0]||'手作条件不足');e.craftErrors=v.errors;throw e}
+  const data=v.data;
+  const payload=craftBuildPayload(data);
+  const userMsg='请按规则生成一件手作成品。输入：'+JSON.stringify(payload);
+  const raw=await callModel(userMsg,{
+    messages:[{role:'system',content:CRAFT_SYSTEM},{role:'user',content:userMsg}],
+    maxTokens:700,
+    expect:'craft'
+  });
+  if(state!==s)throw new Error('手作期间存档已切换，成品未入库');
+  const parsed=craftParse(raw,data);
+  return craftCommit(data,parsed,s);
+}
+const Craft={ // 后端公开接口：供手作面板与调试台调用
+  quality:CRAFT_QUALITY,
+  energy:{min:CRAFT_ENERGY_MIN,max:CRAFT_ENERGY_MAX},
+  materials:craftMaterialsInBag,
+  meta:craftMaterialMeta,
+  validate:craftValidate,
+  make:craftMake,
+  parse:craftParse,
+  starter:CRAFT_STARTER.slice()
+};
 
 const WL_HIGH_RANKS = {
   '贵妃':'正二品 贵妃','贤妃':'从二品 贤妃','良妃':'从二品 良妃','淑妃':'从二品 淑妃',
@@ -4902,7 +5287,7 @@ const Game={
     const label=`使用「${it.name}」`;
     const cost=focusEnergyCost('使用道具');
     const cat=SHOP_CATALOG[it.name];
-    const fxNote=cat?`此物效用：${cat.fx}`:'';
+    const fxNote=cat?`此物效用：${cat.fx}`:(it.effect?`此物效用：${it.effect}${Array.isArray(it.traits)&&it.traits.length?`（特质：${it.traits.join('、')}；品质：${it.quality||'—'}）`:''}`:'');
     UI.closeSheet();
     this.round1(`第${xunNo()}旬第一轮：玩家消耗精力 ${cost} ${label}（${gone?'已用尽':'尚余 '+it.count+' 件'}${it.note?'；'+it.note:''}）。${fxNote}演绎使用此物的具体过程与其效果，然后决定是否触发剧情（hasEvent）。`,label,cost);
   },
