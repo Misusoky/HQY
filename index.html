@@ -779,6 +779,7 @@ const SCENE_MODULE = [
 '- 每轮只演绎对方当即反应与场面变化：scene.state="ongoing"，给 scene.line（一段不超过 70 字，只写对方这一轮的话与关键动作，不写主控的动作心理、不铺环境）、scene.where/when（有变化才写）与 2—3 个接话选项（放顶层 options）；此阶段 narrative 必须为空字符串，changes 与 statePatch 为空，不结算数值。',
 '- 事已说尽、应对已足或局面已变时：scene.state="resolve"，并一并输出完整结算——narrative（收尾演绎）、changes、statePatch（含 statePatch.plots 的变动条目），规则同第二轮。',
 '- 收尾只收束本场对话中已发生的事：不得虚构主控未亲历的往事、冲突或警告（如从未发生过的"某人当面警告"），不得引入与场景无关的新人物新事件；须呼应既往前情时，只写存档剧情账与待续事项里已有记载的内容。',
+'- 召宫人问话、临时差遣等旬中插话不是本旬养成：收尾只结算这场对话本身（关系、情报、交办差事、行囊），不得写主角才艺或基础属性的成长，也不得把本旬未做的修习、散步收益补进来。',
 '- 对话以 2—3 轮自然收束：事情说尽、该告退时让人物主动收话（如"还有什么要交代的""奴婢省得，这便去办"），随后 scene.state="resolve"；不得无限拖延。玩家随时可选"结束对话"，你应声简短收尾（narrative 一两句即可）。',
 '- 玩家每轮可点选项，也可自定义输入一句话或一个动作；每接一句前端扣玩家精力 5（结束对话不扣），精力不济时玩家只能结束对话。自定义内容符合世界规则即认真承接。',
 '- 若不适合对话形式（突发事态、文书、独自发现等），可不用 scene，按原有 hasEvent+options 两轮制输出。'
@@ -2607,6 +2608,28 @@ function isMajorTurn(patch,payload){
   const blob=JSON.stringify(patch)+' '+(payload.changes||[]).join(' ');
   return /晋|降位|有孕|遇喜|喜脉|薨|病逝|死亡|派系|剧情阶段/.test(blob);
 }
+/* 侍女问话等旬中插话：本旬养成不在此结算。模型若仍写了才艺/属性成长，剔除键与对应变化条目 */
+const STANDALONE_GROWTH_RE=/^(琴艺|棋艺|书法|画艺|歌艺|舞艺|女红|医术|药理|莳花|香道|外貌|才华|交际|忌惮|手段|威望|体质|孕率)\s*[+＋\-－]/;
+function stripStandaloneGrowth(p){
+  if(!p)return p;
+  const patch=(p.statePatch&&typeof p.statePatch==='object'&&!Array.isArray(p.statePatch))?p.statePatch:{};
+  const dropped=[];
+  const walk=(o,pre)=>{
+    for(const k of Object.keys(o)){
+      const key=pre?pre+'.'+k:k;
+      if(/^protagonist\.(skills|attributes)\./.test(key)){dropped.push(k);delete o[k];continue}
+      const v=o[k];
+      if(v&&typeof v==='object'&&!Array.isArray(v)&&/^protagonist(\.(skills|attributes))?$/.test(key))walk(v,key);
+    }
+  };
+  walk(patch,'');
+  if(Array.isArray(p.changes))p.changes=p.changes.filter(c=>{
+    const s=String(c);
+    if(dropped.some(n=>n&&s.includes(n)))return false;
+    return !STANDALONE_GROWTH_RE.test(s.trim());
+  });
+  return p;
+}
 function finalize(payload,meta){
   try{
     const majors=applyPatch(payload.statePatch);
@@ -2662,9 +2685,12 @@ const UI={
     const s=Math.max(cw/804,ch/1748),dw=804*s,dh=1748*s;
     const ox=(cw-dw)/2,oy=ch-dh; // 锚定底部
     const tb=document.querySelector('.topbar');const minY=(tb?tb.offsetHeight:72)+16;
+    const er=document.querySelector('#screen-main .energyrow');
+    const erTop=er?er.getBoundingClientRect().top:ch-118; // 精力条实际顶边：随底部安全区浮动，不能写死
     document.querySelectorAll('#hotspots .hs').forEach(el=>{
       const px=Math.min(Math.max(ox+parseFloat(el.dataset.x)*dw,58),cw-58);
-      const floor=el.classList.contains('hs-up')?ch-118:ch-158; // 标签在上的键可更贴近底栏
+      const halfH=(el.offsetHeight||54)/2;
+      const floor=el.classList.contains('hs-up')?erTop-16-halfH:ch-158; // 标签在上的键须整体停在精力条上方
       const py=Math.min(Math.max(oy+parseFloat(el.dataset.y)*dh,minY),floor);
       el.style.left=px+'px';
       el.style.top=py+'px';
@@ -3719,7 +3745,7 @@ const Game={
       {id:'c',text:'问话：之前交代的事办得如何'},
       {id:'d',text:'闲聊几句，看看她的心思'}
     ],scene:{state:'ongoing',line:greet,when:fmtTime(),where:state.location}});
-    if(sceneCtx)sceneCtx.local=true; // 本地开场：一言未发即结束时，不调 API、不结算，场面话直接收场
+    if(sceneCtx){sceneCtx.local=true;sceneCtx.standalone=true} // 本地开场：一言未发即结束时不结算；整场都不算“本旬养成”，只结算问话本身
   },
   nextTurn(){ // 休息，进入下一旬：旬数+1，精力回满，日历按两旬制推进
     state.turn=(state.turn||0)+1;state.energy=ENERGY_MAX;state.energyWarned=false;state.mealCount=0;state.time=advanceTime(state.time);
@@ -4069,7 +4095,10 @@ const Game={
     this.recordLine('me',choice);
     sceneCtx.round++;
     const r=sceneCtx.round,cap=r>=SCENE_MAX_ROUNDS;
-    const msg=`第${xunNo()}旬剧情对话第${r}轮：玩家应对「${choice}」。只演绎${sceneCtx.who}的当即反应与场面变化：输出 scene.line（≤70 字，对方本轮的话或动作）、scene.where/when（有变化才写）、scene.state 与 2—3 个接话选项；此阶段不结算数值。${cap?'本场对话已达上限，本轮 scene.state 必须为"resolve"，并一并完整结算本旬养成与剧情（narrative 收尾、changes、statePatch，含 statePatch.plots 的变动条目）。':'本轮只演 ongoing：narrative 必须为空字符串，changes=[]，statePatch={}，只写 scene 与 options；不得输出 resolve，不得结算。即使话已说尽，也只写对方收束性的一句，由玩家选择「结束对话」。'}`+this.sceneContextBlock();
+    const settlement=sceneCtx.standalone
+      ?'并收束这场问话：只结算它实际带来的关系、情报、差事与行囊变化，不结算本旬养成——不得写 protagonist.skills 或 protagonist.attributes 的成长，不得把修习、散步等与问话无关的收益补进来，没有变化就不写 changes。'
+      :'并一并完整结算本旬养成与剧情（narrative 收尾、changes、statePatch，含 statePatch.plots 的变动条目）。';
+    const msg=`第${xunNo()}旬剧情对话第${r}轮：玩家应对「${choice}」。只演绎${sceneCtx.who}的当即反应与场面变化：输出 scene.line（≤70 字，对方本轮的话或动作）、scene.where/when（有变化才写）、scene.state 与 2—3 个接话选项；此阶段不结算数值。${cap?`本场对话已达上限，本轮 scene.state 必须为"resolve"，${settlement}`:'本轮只演 ongoing：narrative 必须为空字符串，changes=[]，statePatch={}，只写 scene 与 options；不得输出 resolve，不得结算。即使话已说尽，也只写对方收束性的一句，由玩家选择「结束对话」。'}`+this.sceneContextBlock();
     this.requestScene(msg,choice,MAX_OUTPUT_TOKENS,!cap,!cap); // 未到上限：精简提示词 + 不带历史；到上限：完整提示词收尾结算
   },
   sceneEnd(){ // 玩家主动结束：对方应声简短收尾，统一结算（不耗精力）；本地开场且一言未发则不调 API、不结算
@@ -4084,12 +4113,16 @@ const Game={
       $('#chatOpts').innerHTML='<button class="btn btn-primary" style="letter-spacing:.2em;text-indent:.2em" onclick="Game.sceneDone()">继续</button>';
       return;
     }
-    const msg=`第${xunNo()}旬剧情对话：玩家示意话已说完，结束与${sceneCtx.who}的对话。请收尾：scene.state="resolve"，补一段简短的收场演绎（narrative 一两句即可，如各自散去、欠身告退），并完整结算本旬养成与剧情（changes、statePatch，含 statePatch.plots 的变动条目）。收场只写本场已发生的事，不得虚构主控未亲历的往事或警告。`+this.sceneContextBlock();
+    const settle=sceneCtx.standalone
+      ?'这只是一位宫中人在旬中回话，并非本旬养成重心：只结算这场问话实际带来的关系、情报、交办差事与行囊变化，不得写 protagonist.skills 或 protagonist.attributes 的成长，不得把修习、散步等无关收益补进来；没有变化就不写 changes。'
+      :'并完整结算本旬养成与剧情（changes、statePatch，含 statePatch.plots 的变动条目）。';
+    const msg=`第${xunNo()}旬剧情对话：玩家示意话已说完，结束与${sceneCtx.who}的对话。请收尾：scene.state="resolve"，补一段简短的收场演绎（narrative 一两句即可，如各自散去、欠身告退），${settle}收场只写本场已发生的事，不得虚构主控未亲历的往事或警告。`+this.sceneContextBlock();
     this.requestScene(msg,'（结束对话）');
   },
   _sceneResolve(p){
     phase='RESOLVING';
     const body=$('#chatBody');
+    if(sceneCtx&&sceneCtx.standalone)p=stripStandaloneGrowth(p); // 旬中问话不结算本旬养成，兜底剔除模型硬塞的才艺/属性成长
     if(!p._narrShown)this.sayNarrative(p.narrative);
     if(p.changes&&p.changes.length)this.bubble('sys','',p.changes.join('　'));
     finalize(p,{focus:Game._lastFocus||'剧情',choice:'剧情应对',adj:Game._lastAdj});
