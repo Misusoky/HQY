@@ -1380,6 +1380,21 @@ function autoExpireStalePlots(adj){ // 发酵条目模型连续不理会：计 s
   return expired;
 }
 function cur_note(p){return (p.note?p.note+'；':'')}
+function xunMainQuestCheck(){ // 旬首主线判定（每旬开头一次）：了结通报＋逾期提醒；断档发新主线由 _xunStartPop 负责
+  if(!state||!Array.isArray(state.plots))return;
+  const meta=ensurePlotMeta();
+  const now=xunSerial(state.time);
+  if(!Array.isArray(meta.ackedMain))meta.ackedMain=state.plots.filter(p=>p.line==='主线'&&p.stage!=='进行中').map(p=>p.id); // 旧档既往了结不补报，免得翻旧账刷屏
+  const main=state.plots.find(p=>p.line==='主线'&&p.stage==='进行中')||null;
+  const closed=state.plots.filter(p=>p.line==='主线'&&p.stage!=='进行中'&&!meta.ackedMain.includes(p.id));
+  for(const p of closed){
+    meta.ackedMain.push(p.id);
+    const tail=main?'':'新主线随后接续发布。';
+    UI.pushCard(`<article class="turncard"><div class="card-head"><div><div class="card-focus">【宫斗系统】<b>主线任务${p.stage==='已作废'?'作废':'了结'}</b></div></div>${UI.seal()}</div><div class="card-body">主线任务「${p.title}」${p.stage==='已作废'?'已作废':'已完成'}。${tail}</div></article>`);
+  }
+  if(main&&main.latest!=null&&now>main.latest)toast(`【宫斗系统】警示：主线任务「${main.title}」已逾期（期限：${main.dueText||'已过'}）。本旬务必了结；再搁置将按发酵处置。`,5200);
+  if(closed.length)persistCurrent(); // 记 ack：刷新重进不重复通报
+}
 /* ============================================================ 恩宠账（帝感情线双轨）
    明面恩宠=relationships.皇帝.value（宠爱，面板可见）；内里知心=emperor.intimacy（不显示数字，只显阶段）。
    代码管节奏：相处逾期注入裁决；模型管演绎：写戏并经 statePatch["emperor.*"] 回写。 */
@@ -3187,7 +3202,7 @@ const UI={
     const adj=(state.plots&&state.plots.length)?adjudicatePlots():{due:[],overdue:[],stale:[],pendStale:[]};
     const due=[...adj.overdue,...adj.due];
     const stale=adj.stale||[];
-    const plots=(state.plots||[]).filter(p=>p.stage==='进行中').map(p=>`<div class="itemrow"><span>${esc(p.title)}　<span class="tag">${esc(p.line)}</span></span><span class="cnt">${esc(p.dueText||(p.latest!=null?'有期限':(stale.some(s=>s.id===p.id)?'搁置发酵':'缓图')))}</span></div>`).join('')||'<div class="sheet-note">暂无在途剧情线。</div>';
+    const plots=(state.plots||[]).filter(p=>p.stage==='进行中').map(p=>`<div class="itemrow"><span>${esc(p.title)}　<span class="tag">${esc(p.line)}</span></span><span class="cnt">${p.latest!=null&&xunSerial(state.time)>p.latest?'已逾期·':''}${esc(p.dueText||(p.latest!=null?'有期限':(stale.some(s=>s.id===p.id)?'搁置发酵':'缓图')))}</span></div>`).join('')||'<div class="sheet-note">暂无在途剧情线。</div>';
     const pStale=(adj.pendStale||[]).map(x=>pendText(x));
     const pend=(state.pending||[]).map(x=>`<div class="itemrow"><span>${esc(pendText(x))}</span><span class="cnt">${pStale.includes(pendText(x))?'搁置发酵·须处理':'缓办'}</span></div>`).join('')||'<div class="sheet-note">暂无待续事项</div>';
     return `<div class="sec"><div class="sec-cap">当前局面</div>
@@ -3419,7 +3434,7 @@ const UI={
     const skills=Object.entries(sk).map(([k,v])=>this.meter(k,v,(Number(v)||0)>100?'m-gold':'m-indigo')).join('');
     const talent=`<div class="itemrow"><span>才华</span><span class="cnt num">${esc(at.才华??'—')}</span></div>`;
     const pend=(state.pending||[]).map(x=>`<div class="itemrow"><span>${esc(pendText(x))}</span></div>`).join('')||'<div class="sheet-note">暂无待续事项</div>';
-    const plotRows=(state.plots||[]).filter(p=>p.stage==='进行中').map(p=>`<div class="itemrow"><span>${esc(p.title)}　<span class="tag">${esc(p.line)}</span></span><span class="cnt">${esc(p.dueText||(p.latest!=null?'有期限':'缓图'))}</span></div>`).join('')||'<div class="sheet-note">暂无在途剧情线。</div>';
+    const plotRows=(state.plots||[]).filter(p=>p.stage==='进行中').map(p=>`<div class="itemrow"><span>${esc(p.title)}　<span class="tag">${esc(p.line)}</span></span><span class="cnt">${p.latest!=null&&xunSerial(state.time)>p.latest?'已逾期·':''}${esc(p.dueText||(p.latest!=null?'有期限':'缓图'))}</span></div>`).join('')||'<div class="sheet-note">暂无在途剧情线。</div>';
     return `<div class="sec"><div class="sec-cap">属性</div>${this.meter('精力',Math.round(state.energy??ENERGY_MAX),'m-cinnabar')}${tiMeter}${attrs||'<div class="sheet-note">—</div>'}${baseNote}
         <div class="itemrow"><span>月俸</span><span class="cnt num">每月 ${esc(salary)} 两</span></div>
         <div class="sheet-note">按位份发放，每月下旬末自动入账；位份升降后随新月俸结算。</div></div>
@@ -4863,7 +4878,8 @@ const Game={
     phase='FOCUS_SELECT'; // 新的一旬从住处即可直接安排行事
     UI.goHome();
     markSafe(); // 新旬落定：此后卡死只退回本旬开头
-    this._xunStartPop(); // 旬首检查：已发酵事项直接弹出强制处理，不待命
+    xunMainQuestCheck(); // 旬首主线判定：主线了结通报＋逾期提醒
+    this._xunStartPop(); // 旬首检查：已发酵事项直接弹出强制处理；主线断档亦在此直接弹新主线，不待命
   },
   _payMonthlySalary(prevTime){ // 月俸前端自结：每月下旬末按位份入账，同一月只发一次
     if(!state||!state.protagonist||!prevTime||prevTime.xun!=='下旬')return null;
@@ -4877,13 +4893,19 @@ const Game={
     state.lastSalaryMonth=key;
     return {amount,rank,text:`${prevTime.era||''}${toCN(prevTime.year)}年${MONTHS[prevTime.month]||''}俸银（${rank}）`};
   },
-  _xunStartPop(){ // 旬首强制处置：发酵引线/琐事一旬之首直接弹出（hasEvent=true），不待玩家先行动
+  _xunStartPop(){ // 旬首强制处置：发酵引线/琐事一旬之首直接弹出（hasEvent=true），不待玩家先行动；主线断档（无进行中主线）同在此处直接弹新主线
     if(!state||phase!=='FOCUS_SELECT')return;
     const adj=adjudicatePlots(true); // skipDice：本旬剧情额度即此，不再另掷
-    if(!adj.stale.length&&!adj.pendStale.length)return;
+    const mainMiss=adj.needMain; // 主线断档：进行中的主线一清零，旬首即补新主线——做完了不会没下文
+    if(!adj.stale.length&&!adj.pendStale.length&&!mainMiss)return;
     const items=[...adj.stale.map(p=>`「${p.title}」`),...adj.pendStale.map(x=>pendText(x))].join('；');
-    const msg=`第${xunNo()}旬旬首：以下事项已搁置发酵，须立即处置：${items}。本旬首个剧情额度即用于此事——请用剧情对话 scene 结构开场（state="ongoing"，对方的话或动作开场，嵌入主控当前处境自然发生：来人传话、事发、旧事被翻上门等皆可），给 2—4 个应对选项后停止，不结算应对后果；应对后 resolve 时统一结算并回写台账/待续（兑现者 stage 改"已兑现"；琐事办掉即从 pending 移除）。`;
-    this.round1(msg,'旬首·发酵处置',0,{skipDice:true,_xunPop:true}); // 强制处置不占精力
+    let msg=`第${xunNo()}旬旬首：`;
+    if(items)msg+=`以下事项已搁置发酵，须立即处置：${items}。`;
+    if(mainMiss)msg+=`${items?'同场处置（了结旧事时引出新线头）——':''}剧情账中已无进行中的主线任务，本旬旬首即须发布新主线：从主控位份、处境、派系、恩宠与既有伏笔自然长出（晋升之途、子嗣、旧案、母族、新敌皆可）。`;
+    msg+='请用剧情对话 scene 结构开场（state="ongoing"，对方的话或动作开场，嵌入主控当前处境自然发生：来人传话、事发、旧事被翻上门等皆可），给 2—4 个接话选项后停止，不结算应对后果；';
+    if(mainMiss)msg+=`并务必以 statePatch.plots 落账一条 line="主线" 的新条目（id 用 "p-" 加短标题，note 一句话写清走向，可给 dueText 期限）${ensurePlotMeta()._mainMissed?'——此前已要求开立新主线仍未落账，本轮务必落账':''}；`;
+    else msg+='应对后 resolve 时统一结算并回写台账/待续（兑现者 stage 改"已兑现"；琐事办掉即从 pending 移除）；';
+    this.round1(msg,mainMiss?'旬首·新主线发布':'旬首·发酵处置',0,{skipDice:true,_xunPop:true,_mainPubPop:!!mainMiss}); // 强制处置不占精力
   },
   collapse(){ // 精力归零：当场昏迷，扣体质，弹窗确认后强制进入下一旬
     $('#mapview').classList.remove('on'); // 从宫城图直接触发时也兜底收起
@@ -4973,7 +4995,7 @@ const Game={
       // 相关的待续琐事：挂账计旬是否重置只看本轮 statePatch 是否真改/真删（见 applyPatch 的 pending 分支），不再"提过即刷新"，免得一条琐事被每旬顺口一提就永不过期
       const meta=ensurePlotMeta();
       if(p.hasEvent||adj.due.length||adj.overdue.length||adj.mainPub||adj.gardenMeet)meta.lastEventTurn=state.turn;
-      if(adj.mainPub)meta._mainMissed=!activePlots().some(x=>x.line==='主线'); // 新主线是否落账：未落账则下轮裁决加重语气
+      if(adj.mainPub||opts._mainPubPop)meta._mainMissed=!activePlots().some(x=>x.line==='主线'); // 新主线是否落账：未落账则下轮裁决加重语气（含旬首断档直弹）
       if(isMajorTurn(p.statePatch,p))meta.lastBigTurn=state.turn;
       if(adj.hit){meta.rollHit=false;meta.rollTargetId=null} // 本旬骰子已用毕，同旬后续行动不再重复强制
       state.energy=Math.max(0,Math.min(ENERGY_MAX,Math.round((typeof state.energy==='number'?state.energy:ENERGY_MAX)-(typeof cost==='number'?cost:focusEnergyCost(focus)))));
@@ -4992,7 +5014,7 @@ const Game={
       const newMainIn=Array.isArray(p0.statePatch&&p0.statePatch.plots)&&p0.statePatch.plots.some(x=>x&&x.line==='主线'&&(!x.stage||x.stage==='进行中')); // 新主线已借正文或与发酵处置同场埋入并落账：hasEvent=false 也算兑现，不再纠正
       const noEvent=((this._eventMandated(adj)&&!(adj.mainPub&&newMainIn))||(opts&&opts._xunPop))&&!p0.hasEvent; // 裁决要求触发而模型没触发：仍纠正一次（旬首发酵弹出为硬强制）
       if(noEvent){
-        const fixMsg=msg+`\n【纠正】前端剧情裁决已裁定本旬必须触发剧情（${this._mandateText(adj)}），你却输出 hasEvent=false。请重新输出完整 JSON：hasEvent=true，用剧情对话 scene 结构呈现本轮剧情（scene.state="ongoing"、scene.parts 按语义分段：act 写对方动作神态，say 写对方台词，quote 写转述他人原话，narr 只写其他人物与客观场面，台词都不带引号、不按标点硬切；顶层 options 给 2—4 个接话选项），停下等待玩家应对、不结算后果；本旬养成过程简要并入 narrative。`;
+        const fixMsg=msg+`\n【纠正】前端剧情裁决已裁定本旬必须触发剧情（${this._mandateText(adj,opts)}），你却输出 hasEvent=false。请重新输出完整 JSON：hasEvent=true，用剧情对话 scene 结构呈现本轮剧情（scene.state="ongoing"、scene.parts 按语义分段：act 写对方动作神态，say 写对方台词，quote 写转述他人原话，narr 只写其他人物与客观场面，台词都不带引号、不按标点硬切；顶层 options 给 2—4 个接话选项），停下等待玩家应对、不结算后果；本旬养成过程简要并入 narrative。`;
         lastRequest={type:'r1',msg:fixMsg,focus,cost,opts};
         UI.showBusy('铺排中','正在重新生成剧情……',true);
         return callModel(fixMsg).then(raw2=>settle(parsePayload(raw2)));
@@ -5002,9 +5024,10 @@ const Game={
   },
   /* 剧情触发判定辅助：裁决是否强制本旬出剧情（到期/超期/剧情骰命中/主线断档/御花园偶遇） */
   _eventMandated(adj){return !!(adj&&(adj.due&&adj.due.length||adj.overdue&&adj.overdue.length||adj.hit||adj.mainPub||adj.gardenMeet||adj.empDue))},
-  _mandateText(adj){
+  _mandateText(adj,opts){
     if(!adj)return '';
     const names=[...(adj.overdue||[]),...(adj.due||[])].map(p=>`「${p.title}」到期须兑现`);
+    if(opts&&opts._mainPubPop)names.push('主线断档须以 scene 开新主线并落账');
     if(adj.stale&&adj.stale.length)names.push(`「${adj.stale.map(p=>p.title).join('」「')}」发酵须处置`);
     if(adj.pendStale&&adj.pendStale.length)names.push(`待续琐事（${adj.pendStale.map(pendText).join('；')}）发酵须处置`);
     if(adj.target)names.push(`剧情骰命中「${adj.target.title}」须在途线后续`);
