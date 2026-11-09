@@ -1238,6 +1238,9 @@ function adjudicatePlots(skipDice){ // 旬首裁决：到期强制兑现 + 前�
   const overdue=eligible.filter(p=>p.latest!=null&&now>p.latest);
   const stale=eligible.filter(p=>p.latest==null&&now-(p.touch??now)>=STALE_PLOT_XUN); // 无期限条目久未推进：发酵，旬首强制处理
   const pendStale=(state.pending||[]).filter(x=>(state.turn||0)-(x.touch??state.turn)>=STALE_PLOT_XUN); // 待续琐事同款发酵：挂账超 N 旬未办须处理
+  const hasMain=(state.plots||[]).some(p=>p.stage==='进行中'&&p.line==='主线'); // 主线断档检测：进行中的主线清零即须发布新主线，主线没有"完结散场"
+  const graceNow=(meta.graceTurn||0)>(state.turn||0); // 新入宫缓冲期不开新主线：引导内容已占剧情额度
+  const needMain=!graceNow&&!hasMain;
   // 剧情骰：触发权从模型收回，代码真随机；一旬只掷一次（同旬内所有行动共用结果与目标）
   if(skipDice){meta.rollHit=false;meta.rollTargetId=null;meta.graceOn=false} // 主动触发：骰子让位，不沿用旧掷留
   else if(meta.rollTurn!==state.turn){
@@ -1251,8 +1254,9 @@ function adjudicatePlots(skipDice){ // 旬首裁决：到期强制兑现 + 前�
     meta.rollTargetId=(meta.rollHit&&!fresh&&pool0.length)?pool0[Math.floor(Math.random()*pool0.length)].id:null;
     meta.graceOn=grace;
   }
-  const hit=!!meta.rollHit&&!(due.length||overdue.length||stale.length||pendStale.length); // 到期/超期/发酵优先，命中不与之叠加
+  const hit=!!meta.rollHit&&!(due.length||overdue.length||stale.length||pendStale.length||needMain); // 到期/超期/发酵/新主线优先，命中不与之叠加
   const target=hit?(state.plots.find(p=>p.id===meta.rollTargetId&&p.stage==='进行中')||null):null; // 命中：掷骰时抽定的在途线做后续；否则开全新引子
+  const mainPub=needMain&&!skipDice&&!(due.length||overdue.length||stale.length||pendStale.length); // 主线断档且本旬无其他必办剧情：当旬发布新主线（玩家主动触发轮让位，顺延至下一次常规行动）
   const lines=[];
   if(overdue.length)lines.push(`【须立即兑现·已超期】${overdue.map(describePlot).join('；')}。本轮必须触发，且正文须体现其搁置期间发酵的后果；原场景不成立时，改写为符合当前处境的兑现方式。`);
   if(due.length)lines.push(`【须兑现·本旬到期】${due.map(describePlot).join('；')}。本轮必须触发，嵌入主控所选重心场景自然发生。`);
@@ -1260,14 +1264,16 @@ function adjudicatePlots(skipDice){ // 旬首裁决：到期强制兑现 + 前�
   if(pendStale.length)lines.push(`【须处理·琐事发酵】${pendStale.map(x=>pendText(x)).join('；')}。挂账超 ${STALE_PLOT_XUN} 旬未办，同样须在本旬逐一处理：①本旬办掉——演绎中顺手办完，从 statePatch.pending 移除；②升级为剧情——移入 statePatch.plots 立为引线（从 pending 移除，按引线规则走）；③仍需时日——改写文本说明现状（回写即重置计旬）。连续 ${STALE_AUTO_EXPIRE} 旬列入仍无变动，前端自动清除。`);
   if(target)lines.push(`【触发·剧情骰命中】${describePlot(target)}。本轮必须触发该线的后续剧情，用剧情对话 scene 结构呈现（对方说话、玩家接话），让它推进或了结；本轮 hasEvent=true。`);
   else if(hit)lines.push('【触发·全新引子】剧情骰命中：本轮必须触发一条全新剧情引子，用 scene 对话结构呈现；引子须从主控本旬所选重心与当前处境自然长出（主控正在做的事、主控见过或将见的人）；事后为它立一条新引线写入 statePatch.plots（id 用 "p-" 加短标题）。');
+  else if(mainPub)lines.push(`【发布·新主线】剧情账中已无进行中的主线（前主线已兑现或作废）。本旬必须开立新主线：从主控位份、处境、派系、恩宠与既有伏笔自然长出（晋升之途、子嗣、旧案、母族、新敌皆可），用剧情对话 scene 结构呈现（hasEvent=true），并以 statePatch.plots 新增一条 line="主线" 的台账条目（id 用 "p-" 加短标题，note 一句话写清走向，可给 dueText 期限）。${meta._mainMissed?'此前已要求开立新主线仍未见台账回写，本轮务必落账。':''}`);
   else if(stale.length||pendStale.length)lines.push('【触发·发酵条目优先】本旬的主要剧情额度用于处理上述搁置发酵条目（含琐事），不再另开新剧情；处理完毕并回写台账后，本旬其余安排照常演绎养成。');
   else if(!due.length&&!overdue.length)lines.push(skipDice?'本轮为玩家主动触发，剧情骰不参与、不消耗；按上方指令照常演绎，相关剧情线变动仍须回写台账。':meta.graceOn?`新入宫·引导旬（第 ${(state.turn||0)+1}／${meta.graceTurn} 旬）：不触发需要应对的随机剧情，hasEvent 保持 false。请在演绎本旬重心的同时，自然带出一项入宫引导——${GRACE_GUIDE[Math.min(state.turn||0,GRACE_GUIDE.length-1)]}。`:`本旬剧情骰未命中（触发概率 ${Math.round(PLOT_TRIGGER_BASE*100)}%；冷却：距上次主要剧情 ${state.turn-(meta.lastEventTurn??-99)} 旬、距上次大事件 ${state.turn-(meta.lastBigTurn??-99)} 旬）。本旬不触发需要应对的剧情，只演绎养成过程；可酌情添加不占冷却的轻量日常碎事。`);
   if(due.length||overdue.length)lines.push('本旬至多突出一条主要剧情；到期剧情兑现时 hasEvent=true，给出选项或 scene 对话后停止，不结算应对后果。');
   else if(stale.length||pendStale.length)lines.push('发酵条目兑现时 hasEvent=true，给出选项或 scene 对话后停止，不结算应对后果；改写期限或作废（琐事办掉/升级/改写）则 hasEvent 可保持 false，但 statePatch.plots 与 statePatch.pending 必须回写。');
   else if(hit)lines.push('剧情骰命中的触发同样每旬至多一条；进入 scene 对话后给 2—4 个接话选项，等待玩家应对。');
+  else if(mainPub)lines.push('新主线发布同样每旬至多一条：hasEvent=true，scene 对话呈现，给 2—4 个接话选项后停止，不结算应对后果；新主线条目必须随本轮 statePatch.plots 落账。');
   lines.push('结算只经 statePatch.plots 回写【发生变化】的台账条目：兑现者 stage 改"已兑现"；改写期限者须在 note 说明理由并给出新 dueText；新埋引线新增条目（id 用 "p-" 加短标题，与现存 id 区分）；作废者 stage 改"已作废"并注明缘由。只回写变化的条目，前端按 id 合并。pending 只留非剧情琐事。');
   const before={};[...overdue,...due].forEach(p=>before[p.id]=p.dueText||'');
-  return {due,overdue,stale,pendStale,target,hit,before,text:'【剧情裁决 · 本旬】（前端判定：到期/超期强制兑现＋搁置发酵强制处理＋剧情骰被动触发，覆盖"自行决定是否触发剧情"）\n'+lines.map((l,i)=>`${i+1}. ${l}`).join('\n')};
+  return {due,overdue,stale,pendStale,target,hit,mainPub:!!mainPub,needMain:!!needMain,gardenMeet:'',before,text:'【剧情裁决 · 本旬】（前端判定：到期/超期强制兑现＋搁置发酵强制处理＋主线断档强制发布＋剧情骰被动触发，覆盖"自行决定是否触发剧情"）\n'+lines.map((l,i)=>`${i+1}. ${l}`).join('\n')};
 }
 function matchLeads(ctxList){ // 与给定语境（人名/地名/事由）相关的在途引线：标题或备注含对方名讳/地名即命中
   const cvs=(ctxList||[]).map(s=>String(s||'').trim()).filter(s=>s.length>=2);
@@ -1336,6 +1342,7 @@ const PLOTS_MODULE = [
 '存档 plots 为结构化剧情账，是剧情触发与兑现的唯一依据；pending 只留非剧情琐事（当票、节令预备、回礼等），不再记剧情引线。',
 '条目字段：id（唯一，长期沿用）、line（主线/支线/引线/敌对/目标）、title、stage（进行中/已兑现/已作废）、earliest/latest（内部旬号由前端维护，到期与否以每旬请求中的【剧情裁决】块为准）、dueText（人类可读期限）、note（一句话现状，随推进更新）。',
 '每旬第一轮请求附有【剧情裁决】块：是否触发剧情由前端掷骰并写明（剧情骰命中/未命中、命中哪条线），到期/超期条目必须当旬兑现，模型不再自行决定是否触发。每旬至多一条主要剧情（世界书既有纪律仍有效）。',
+'主线不断档：进行中的主线兑现或作废后清零，裁决块会以【发布·新主线】要求最近一个无其他必办剧情的常规回合开立新主线；模型须用 scene 剧情呈现，并经 statePatch.plots 新增 line="主线" 条目（id 用 "p-" 加短标题）。',
 '无期限（缓图）条目并非永久挂账：悬置超过 4 旬未推进即"发酵"，会在裁决块以【须处理·搁置发酵】列出，当旬必须择一处理——兑现为剧情（旬首直接弹出，hasEvent=true）、改写期限（note 说明理由并给新 dueText）或作废（注明发酵后果）；连续 3 旬不回写前端自动作废。',
 '每轮结算（第一、二轮皆然）只经 statePatch.plots 回写【发生变化的条目】（新增、更新、兑现、作废）；只回写发生变化的条目，前端按 id 合并，漏写视为不变。',
 '玩家主动拜访某人、或往御花园散步时，请求可能附【呼应引线】块：所列在途引线与该人/该地相关，须借此次行动实质推进（兑现、或产生新信息/态度变化并经 statePatch.plots 更新 note）；只演绎不回写不算推进——同一引线连续两次被呼应却无回写，前端不再提示它，并交回旬首"发酵"强制处置。若此番确无新进展，照实写一两句无获即可，不要为凑交集硬编事件。',
@@ -1448,13 +1455,14 @@ function mealMenu(){return MEAL_MENUS[mealMenuIndex()]}
 function mealLeft(){return Math.max(0,MEAL_LIMIT_PER_XUN-(Number(state&&state.mealCount)||0))}
 const REST_THRESHOLD=20;     // 低于等于此值弹窗建议休息
 const COLLAPSE_PENALTY=5;    // 昏迷扣体质
-const SCENE_MAX_ROUNDS=3;    // 剧情对话软上限：达到后下一轮必须收尾结算
+const SCENE_MAX_ROUNDS=6;    // 剧情对话软上限：达到后下一轮必须收尾结算（3 轮常在剧情刚起势时硬收，对话"莫名其妙断掉"）
 const SCENE_EXTRA_COST=5;    // 对话中每接一句（含首轮开口，非结束对话）消耗的精力；精力不济只能结束
 const PLOT_TRIGGER_BASE=0.55; // 剧情骰基础触发概率：一旬一次，冷却期自动不触发；到期/超期/发酵不受骰子限制
 const PLOT_NEW_LEAD_CHANCE=0.3; // 骰中后开全新引子的概率（其余为在途剧情线的后续）；无在途线时必为新引子
 const STALE_PLOT_XUN=4;      // 无期限在途线悬置 N 旬未推进即"发酵"：旬首强制处理（兑现/改写/作废），不许干挂
 const STALE_AUTO_EXPIRE=3;   // 发酵后连续 N 旬被裁决列出仍无回写：前端自动作废（机会流失）
 const ECHO_MISS_MAX=2;       // 同一引线连续被散步/拜访呼应 N 次却无台账回写：此后不再借行动硬凑交集，留待旬首发酵处置
+const GARDEN_MEET_CHANCE=0.7; // 御花园散步偶遇熟人概率：前端代码掷骰硬约束，不交给提示词"随缘"；皇帝太后走正式觐见不入偶遇池
 function focusEnergyCost(focus){ // 各类行动精力消耗
   const f=String(focus||'');
   if(/使用道具|使用物品/.test(f))return 5; // 用物最轻
@@ -3803,6 +3811,11 @@ const Game={
   openFocus(){if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}UI.openSheet('吩咐')}, // 吩咐：自拟本旬要做的事
   hsGoOut(){if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}$('#mapClock').textContent=fmtTime();$('#mapview').classList.add('on')}, // 出门＝宫城图选目的地
   mapBack(){$('#mapview').classList.remove('on')},
+  _gardenMeetPick(){ // 御花园偶遇人选：主控已认识的宫中人物随机一位；皇帝、太后走正式觐见，不入偶遇池
+    const npcs=(state&&state.npcs)||{};
+    const pool=Object.keys(npcs).filter(id=>{const n=npcs[id];return n&&n.known&&!/皇帝|皇上|陛下|太后/.test(id+(n.rank||''))});
+    return pool.length?pool[Math.floor(Math.random()*pool.length)]:null;
+  },
   mapGo(place){ // 宫城图目的地：养心殿见驾、六宫访妃嫔、太医院问医、藏书阁寻书、御花园散步闲逛；出宫暂留空
     if(place==='养心殿'){this.visitNpc('皇帝');return}
     if(place==='六宫'){UI.openSheet('六宫');return}       // 不关宫城图：面板浮在图上，拜访落定由 settle 收图
@@ -3821,8 +3834,13 @@ const Game={
       const gainNote=(walkNo>1)?'本旬康健收益已结算过，此次只演见闻、体质不再提升。'
         :(tb>0&&ti>=tb)?'气血已达根基，散步只作维持、不再提升。'
         :'体质正常且无疾病时，本次散步体质+1（恢复气血）——请写入 changes 与 statePatch。';
-      const msg=`第${xunNo()}旬第一轮：玩家往御花园散步闲逛（本旬第 ${walkNo} 次，耗精力 ${focusEnergyCost('散步')}）。演绎一路物候风景与园中见闻：可触发偶遇、宫人闲话、物候小事等轻量事件；偶遇与宠爱顺其自然，稀有资源随缘。${gainNote}（同一旬高强度活动与康健收益不兼得。）${leadHint}${pendHint}散步只是本旬中的一段外出：scene.where 可写园中所在，但 statePatch.location 仍写本宫住处，不要把 location 改成御花园。`;
-      this.round1(msg,'外出·御花园散步',focusEnergyCost('散步'),{leadIds:hits.map(p=>p.id),pendTexts:phits.map(pendText)}); // 宫城图不关：加载与结果都叠在图上，避免背景弹回房间
+      const meetWho=this._gardenMeetPick();
+      const meetHit=!!meetWho&&Math.random()<GARDEN_MEET_CHANCE; // 偶遇由前端代码掷骰硬约束，不交给提示词"随缘"
+      const meetNote=meetHit
+        ?`本轮偶遇骰已命中（概率 ${Math.round(GARDEN_MEET_CHANCE*100)}%）：玩家须在园中偶遇「${meetWho}」，用剧情对话 scene 结构呈现（scene.who 填「${meetWho}」，地点写园中所在）；偶遇内容须与在途引线、双方关系或主控当前处境自然相关，给 2—4 个接话选项后停止，不结算应对后果；本轮 hasEvent 必须为 true。`
+        :`本轮偶遇骰未命中（概率 ${Math.round(GARDEN_MEET_CHANCE*100)}%）：只演物候风景、宫人闲话等轻量见闻，不安排与具体人物的撞见剧情。`;
+      const msg=`第${xunNo()}旬第一轮：玩家往御花园散步闲逛（本旬第 ${walkNo} 次，耗精力 ${focusEnergyCost('散步')}）。演绎一路物候风景与园中见闻。${meetNote}${gainNote}（同一旬高强度活动与康健收益不兼得。）${leadHint}${pendHint}散步只是本旬中的一段外出：scene.where 可写园中所在，但 statePatch.location 仍写本宫住处，不要把 location 改成御花园。`;
+      this.round1(msg,'外出·御花园散步',focusEnergyCost('散步'),{skipDice:meetHit,meetWho:meetHit?meetWho:null,leadIds:hits.map(p=>p.id),pendTexts:phits.map(pendText),whoHint:meetHit?meetWho:undefined}); // 偶遇命中即本轮剧情额度；宫城图不关：加载与结果都叠在图上，避免背景弹回房间
       return
     }
     toast(place+' · 暂未开放，敬请期待');
@@ -3944,6 +3962,7 @@ const Game={
     phase='NARRATING';UI.showBusy('铺排中','正在铺排本旬剧情……',true);
     if(soldNotes.length){msg+=`\n另：主控已将 ${soldNotes.join('、')} 典卖换银（银两已自行囊前端结算，请在世界后台与传闻中承接，勿重复发银）。`}
     const adj=adjudicatePlots(opts&&opts.skipDice); // 旬首剧情裁决：到期/超期剧情与冷却状态（主动触发时骰子让位）
+    if(opts&&opts.meetWho)adj.gardenMeet=opts.meetWho; // 御花园偶遇命中：本轮必须触发与这个人的 scene 事件
     Game._lastAdj=adj;Game._lastFocus=focus; // 供剧情场景收尾与纪事摘要
     if(adj.text)msg+='\n'+adj.text;
     lastRequest={type:'r1',msg,focus,cost,opts};
@@ -3966,7 +3985,8 @@ const Game={
         for(const t of opts.pendTexts){const it=(state.pending||[]).find(x=>pendText(x)===t);if(it)it.touch=state.turn}
       }
       const meta=ensurePlotMeta();
-      if(p.hasEvent||adj.due.length||adj.overdue.length)meta.lastEventTurn=state.turn;
+      if(p.hasEvent||adj.due.length||adj.overdue.length||adj.mainPub||adj.gardenMeet)meta.lastEventTurn=state.turn;
+      if(adj.mainPub)meta._mainMissed=!activePlots().some(x=>x.line==='主线'); // 新主线是否落账：未落账则下轮裁决加重语气
       if(isMajorTurn(p.statePatch,p))meta.lastBigTurn=state.turn;
       if(adj.hit){meta.rollHit=false;meta.rollTargetId=null} // 本旬骰子已用毕，同旬后续行动不再重复强制
       state.energy=Math.max(0,Math.min(ENERGY_MAX,Math.round((typeof state.energy==='number'?state.energy:ENERGY_MAX)-(typeof cost==='number'?cost:focusEnergyCost(focus)))));
@@ -3992,8 +4012,8 @@ const Game={
       settle(p0);
     }).catch(e=>{UI.hideBusy();this.handleCallErr(e)});
   },
-  /* 剧情触发判定辅助：裁决是否强制本旬出剧情（到期/超期/剧情骰命中） */
-  _eventMandated(adj){return !!(adj&&(adj.due&&adj.due.length||adj.overdue&&adj.overdue.length||adj.hit))},
+  /* 剧情触发判定辅助：裁决是否强制本旬出剧情（到期/超期/剧情骰命中/主线断档/御花园偶遇） */
+  _eventMandated(adj){return !!(adj&&(adj.due&&adj.due.length||adj.overdue&&adj.overdue.length||adj.hit||adj.mainPub||adj.gardenMeet))},
   _mandateText(adj){
     if(!adj)return '';
     const names=[...(adj.overdue||[]),...(adj.due||[])].map(p=>`「${p.title}」到期须兑现`);
@@ -4001,6 +4021,8 @@ const Game={
     if(adj.pendStale&&adj.pendStale.length)names.push(`待续琐事（${adj.pendStale.map(pendText).join('；')}）发酵须处置`);
     if(adj.target)names.push(`剧情骰命中「${adj.target.title}」须在途线后续`);
     else if(adj.hit)names.push('剧情骰命中须开全新引子');
+    if(adj.mainPub)names.push('主线断档须开立新主线并落账');
+    if(adj.gardenMeet)names.push(`御花园偶遇「${adj.gardenMeet}」须触发`);
     return names.join('；')||'剧情骰命中';
   },
   /* 本宫住处：以存档 world.residence 为准，旧档回退推算；外出地点不写进这里 */
