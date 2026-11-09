@@ -3953,6 +3953,22 @@ const Game={
     else if(adj.hit)names.push('剧情骰命中须开全新引子');
     return names.join('；')||'剧情骰命中';
   },
+  /* 事发弹窗底图：室外用御花园，他宫用宫室，本宫住处仍用 room.jpg */
+  sceneBgKey(where){
+    const w=String(where||'').trim();if(!w)return null;
+    if(/御花园|花园|园中|园里|御苑|苑|梅林|菊山|亭|池|廊|桥|墙|石径|小径|阶|假山|山石|水边|宫道|殿外|宫外|门外|院中|后院|庭院/.test(w))return 'garden';
+    const st=state||{},home=(st.world&&st.world.mainPalace)||((String(st.location||'').match(/[^殿宫阁轩堂斋楼]{1,6}[殿宫阁轩堂斋楼]/)||[])[0]||'');
+    if(home&&w.includes(home))return /正殿|主殿|中殿|殿中|正厅/.test(w)?'hall':'room'; // 同宫主位正殿算他宫，侧殿才是自己的屋子
+    if(/住处|你的屋子|自己屋里/.test(w))return 'room';
+    if(/出宫/.test(w))return null; // 宫外暂无专属底图，沿用住处
+    if(/殿|宫|阁|轩|堂|斋|楼|暖阁|厢房|寝/.test(w))return 'hall';
+    return null;
+  },
+  applySceneBg(where){
+    const el=document.querySelector('.homebg');if(!el)return;
+    const key=this.sceneBgKey(where)||'room';
+    el.style.backgroundImage=`url(assets/${key}.jpg)`;
+  },
   showIncident(p){ // 事发简报：说明发生了什么事，确认后进全屏对话应对
     const adj=Game._lastAdj||{due:[],overdue:[],target:null,hit:false};
     const sc=p.scene||{};
@@ -3968,10 +3984,12 @@ const Game={
       +(setupTail&&setupTail!==lead?`<div style="line-height:1.9;margin-bottom:8px">${esc(setupTail)}</div>`:'')
       +`<div style="line-height:1.9">${esc(lead)}</div>`;
     Game._pendingEvent=p;
+    this.applySceneBg(sc.where||(state&&state.location));
     $('#incidentModal').classList.add('on');
   },
   incidentGo(){ // 简报确认：进入剧情对话界面
     $('#incidentModal').classList.remove('on');
+    this.applySceneBg();
     const p=Game._pendingEvent;Game._pendingEvent=null;
     if(!p){phase='FOCUS_SELECT';UI.goHome();return}
     if(p.scene){this.openScene(p);return}
