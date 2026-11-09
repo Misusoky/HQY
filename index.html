@@ -142,9 +142,9 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
 .tab:active{opacity:.6}
 
 /* ---------- 查询面板（bottom sheet） ---------- */
-.scrim{position:fixed;inset:0;z-index:31;background:var(--scrim);opacity:0;pointer-events:none;transition:opacity .25s}
+.scrim{position:fixed;inset:0;z-index:68;background:var(--scrim);opacity:0;pointer-events:none;transition:opacity .25s}
 .scrim.on{opacity:1;pointer-events:auto}
-.sheet{position:fixed;left:0;right:0;bottom:0;z-index:32;background:var(--paper);border-radius:16px 16px 0 0;max-height:86dvh;display:flex;flex-direction:column;transform:translateY(105%);transition:transform .28s cubic-bezier(.32,.72,.35,1);padding-bottom:var(--sab)}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:70;background:var(--paper);border-radius:16px 16px 0 0;max-height:86dvh;display:flex;flex-direction:column;transform:translateY(105%);transition:transform .28s cubic-bezier(.32,.72,.35,1);padding-bottom:var(--sab)}
 .sheet.on{transform:translateY(0)}
 .sheet-handle{width:42px;height:4px;border-radius:2px;background:var(--line);margin:10px auto 4px}
 .sheet-head{display:flex;align-items:center;justify-content:space-between;padding:6px 18px 10px;border-bottom:1px solid var(--line)}
@@ -232,6 +232,11 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
 /* toast */
 .toast{position:fixed;left:50%;bottom:calc(96px + var(--sab));transform:translateX(-50%) translateY(20px);z-index:40;background:var(--ink);color:var(--paper);font-size:13px;padding:8px 16px;border-radius:999px;opacity:0;pointer-events:none;transition:all .25s;max-width:80vw;text-align:center;font-family:var(--sans)}
 .toast.on{opacity:.92;transform:translateX(-50%) translateY(0)}
+
+/* 全局设置入口：压在加载/弹窗之上，对话与铺排中也能打开 */
+.global-set{position:fixed;right:0;top:calc(var(--sat) + 58px);z-index:67;display:none;flex-direction:column;align-items:center;justify-content:center;width:30px;padding:8px 0;border:1px solid rgba(245,239,227,.26);border-right:0;border-radius:8px 0 0 8px;background:rgba(45,40,33,.7);color:#f5efe3;font-family:var(--serif);font-size:12px;line-height:1.35;letter-spacing:.08em;backdrop-filter:blur(3px);box-shadow:-2px 2px 8px rgba(0,0,0,.14)}
+.global-set.on{display:flex}
+.global-set:active{background:var(--cinnabar)}
 
 /* ============================================================
    THEME v2 增量 —— 依据：design/v2-深宫辞主界面（Kimi Design 定稿）
@@ -418,6 +423,7 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
   <div class="sheet-body" id="sheetBody"></div>
 </div>
 <div class="toast" id="toast"></div>
+<button class="global-set" id="globalSet" type="button" aria-label="打开设置" onclick="Game.openSettings()"><span>设</span><span>置</span></button>
 
 <!-- 剧情对话：全屏聊天气泡 -->
 <div class="chatview" id="chatview">
@@ -2322,6 +2328,49 @@ const REQUEST_TIMEOUT=120000;   // 单次请求超时（毫秒），超时立即
 const HISTORY_FULL_TURNS=3;     // 送入上下文的完整近旬数，更早的只送一句摘要
 const HISTORY_CAP=80;           // 本地最多保留的旬数
 
+/* 脱困：每次操作落定后留一份完整回退点；卡死时退回到本次操作之前。
+   runEpoch 用于作废脱困后仍晚到的模型回复，避免回退后又被写回。 */
+let safePoint=null;
+let runEpoch=0;
+function cloneGameData(x){return x==null?null:JSON.parse(JSON.stringify(x))}
+function abortedError(){const e=new Error('已中止本次生成');e.name='AbortError';return e}
+function cancelInFlight(){
+  runEpoch++;
+  if(abortCtrl){try{abortCtrl.abort()}catch(e){}}
+  abortCtrl=null;
+}
+function markSafe(){
+  if(!state)return;
+  try{safePoint={state:cloneGameData(state),history:cloneGameData(history)||[],at:Date.now()}}catch(e){}
+}
+function refundSummary(from,to){
+  if(!from||!to)return[];
+  const out=[];
+  const num=v=>typeof v==='number'&&Number.isFinite(v)?v:null;
+  const add=(label,a,b)=>{
+    a=num(a);b=num(b);if(a==null||b==null||a===b)return;
+    const d=Math.round((b-a)*10)/10;
+    out.push(`${label} ${d>0?'+':''}${d}`);
+  };
+  const addMap=(label,a,b)=>{
+    const keys=new Set([...Object.keys(a||{}),...Object.keys(b||{})]);
+    for(const k of keys)add(`${label}·${k}`,(a||{})[k],(b||{})[k]);
+  };
+  add('精力',from.energy,to.energy);
+  const pf=from.protagonist||{},pt=to.protagonist||{};
+  add('银两',pf.silver,pt.silver);add('积分',pf.points,pt.points);
+  addMap('属性',pf.attributes,pt.attributes);
+  addMap('才艺',pf.skills,pt.skills);
+  const relVal=x=>x&&typeof x==='object'?x.value:x;
+  const rf={},rt={};
+  for(const k in (from.relationships||{}))rf[k]=relVal(from.relationships[k]);
+  for(const k in (to.relationships||{}))rt[k]=relVal(to.relationships[k]);
+  addMap('关系',rf,rt);
+  const invCounts=s=>{const o={};for(const it of (s&&s.inventory)||[]){if(!it||!it.name)continue;o[it.name]=(o[it.name]||0)+(Number(it.count)||0)}return o};
+  addMap('行囊',invCounts(from),invCounts(to));
+  return out;
+}
+
 /* ============================================================ 提示词 */
 function npcFocusIds(msg,s){ // 本场要演的人：只有他们给完整档案，其余 NPC 走一行花名册
   const focus=new Set();
@@ -2549,6 +2598,7 @@ function modelText(message){ // content 可能是字符串、分段数组（部�
   return '';
 }
 async function callModel(userMsg,opts){
+  const epoch=runEpoch;
   const s=loadSettings();
   if(!s.apiKey){const err=new Error('尚未填写 API Key');err.noKey=true;throw err}
   const baseMsgs=(opts&&opts.messages)||buildMessages(userMsg,opts&&opts.noHistory);
@@ -2655,9 +2705,11 @@ async function callModel(userMsg,opts){
   };
   let messages=baseMsgs,truncatedTried=false;
   for(let emptyTried=0,parseTried=0;;){
+    if(epoch!==runEpoch)throw abortedError();
     let raw;
     try{
       raw=await send(messages,allowStream);
+      if(epoch!==runEpoch)throw abortedError();
     }catch(e){
       if(e.truncated&&!truncatedTried&&!(opts&&opts.noRetry)){ // 截断：压缩篇幅后重试
         truncatedTried=true;
@@ -2914,6 +2966,7 @@ function xunSummaryHtml(){
     '</div>';
 }
 function finalize(payload,meta){
+  let ok=true;
   try{
     const tiBefore=state&&state.protagonist&&state.protagonist.attributes?Number(state.protagonist.attributes['体质']):null;
     const majors=applyPatch(payload.statePatch);
@@ -2942,17 +2995,26 @@ function finalize(payload,meta){
       acquiredThisTurn=[];
     }
   }catch(e){
+    ok=false;
     console.error('[结算] 失败',e);
     toast('本旬结算出错：'+(e.message||e),4000);
   }
   persistCurrent();
+  if(ok)markSafe();
 }
 
 /* ============================================================ UI */
 const UI={
-  show(id){document.querySelectorAll('.screen').forEach(e=>e.classList.remove('active'));$(id).classList.add('active');window.scrollTo(0,0)},
+  show(id){document.querySelectorAll('.screen').forEach(e=>e.classList.remove('active'));$(id).classList.add('active');window.scrollTo(0,0);this.syncGlobalSet()},
+  syncGlobalSet(){ // 全局设置入口：只在对局内的主界面上显示（对话/地图/弹窗层叠其上）
+    const el=$('#globalSet');if(!el)return;
+    const main=$('#screen-main');
+    const on=!!(state&&main&&main.classList.contains('active')&&phase!=='PROFILE');
+    el.classList.toggle('on',on);
+  },
   updateStatusbar(){this.updateHomebar()}, // 状态统一由住处顶栏呈现
   updateHomebar(){ // 住处顶栏 + 精力条（updateStatusbar 一并驱动）
+    this.syncGlobalSet();
     if(!state||!state.protagonist)return;
     const p=state.protagonist;
     const t=state.time||{};
@@ -3469,7 +3531,15 @@ const UI={
     return `<div class="setnav">
       <button class="${setPane==='存档'?'on':''}" onclick="Game.switchSetPane('存档')">存档</button>
       <button class="${setPane==='API'?'on':''}" onclick="Game.switchSetPane('API')">API 设置</button>
-    </div>${setPane==='存档'?this.paneSaves():this.paneApi()}`;
+      <button class="${setPane==='脱困'?'on':''}" onclick="Game.switchSetPane('脱困')">脱困</button>
+    </div>${setPane==='存档'?this.paneSaves():setPane==='脱困'?this.paneEscape():this.paneApi()}`;
+  },
+  paneEscape(){
+    const hasState=!!state;
+    return `<div class="sec"><div class="sec-cap">脱离卡死</div>
+      <div class="sheet-note" style="margin-top:0">生成卡住、对话界面点不动、或流程走不下去时，按下方按钮立即中止当前生成并回到住处。本次操作尚未落定的精力、银两、积分、属性、才艺、行囊与关系变化会一并退还；已经结算的旬不会回退。</div>
+      <div class="setbtns"><button class="btn btn-primary" onclick="Game.escapeStuck()" ${hasState?'':'disabled'}>脱离卡死</button></div>
+      <div class="sheet-note">${hasState?(safePoint?'已有可回的落定点：本次操作开始前的进度。':'进入对局后会记录落定点。'):'尚未开局，暂无可回的进度。'}</div></div>`;
   },
   paneApi(){
     const s=loadSettings();
@@ -4016,6 +4086,7 @@ function craftCommit(data,parsed,s){ // 校验通过且 API 返回成功后，�
   if(c.history.length>30)c.history=c.history.slice(-30);
   if(typeof logXunAction==='function')logXunAction('手作·'+item.name);
   if(typeof persistCurrent==='function')persistCurrent();
+  if(typeof markSafe==='function')markSafe();
   if(typeof UI!=='undefined'&&UI.updateStatusbar)UI.updateStatusbar();
   return item;
 }
@@ -4459,6 +4530,8 @@ const Game={
         persistCurrent();
         saveToSlot(0,true); // 新档立即入自动档
         phase='PROFILE';
+        markSafe();
+        UI.syncGlobalSet();
         document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
         $('#sheetTitle').textContent='主角档案';
         $('#sheetBody').innerHTML=UI.profileCard();
@@ -4489,6 +4562,8 @@ const Game={
     $('#tutBody').innerHTML=esc(st.text).replace(/\n/g,'<br>');
     $('#tutStep').textContent=`第 ${i+1} / ${steps.length} 步`;
     $('#tutBtn').textContent=(i>=steps.length-1)?'开始第一旬':'继续';
+    UI.syncGlobalSet();
+    markSafe();
   },
   tutorialNext(){
     const steps=Game._tutorialSteps||[];
@@ -4503,12 +4578,27 @@ const Game={
   },
   /* 进入主界面 */
   enterMain(){
+    UI.hideBusy();
+    ['errModal','incidentModal','restModal','actModal','tutorialModal','collapseModal'].forEach(id=>{
+      const el=document.getElementById(id);if(el)el.classList.remove('on');
+    });
+    $('#chatview').classList.remove('on');
+    $('#mapview').classList.remove('on');
+    $('#scrim').classList.remove('on');
+    $('#sheet').classList.remove('on');
+    const cb=$('#chatBody');if(cb)cb.innerHTML='';
+    const co=$('#chatOpts');if(co)co.innerHTML='';
+    const sc=$('.sheet-close');if(sc)sc.style.display='';
+    sceneCtx=null;sceneWhoHint=null;currentEvent=null;lastRequest=null;
+    Game._pendingEvent=null;
     UI.show('#screen-main');
     $('#stream').innerHTML='';cardCount=0;
     ensureXunBook(); // 本旬小结的起点快照
     UI.updateStatusbar();
     phase='FOCUS_SELECT'; // 住处即主界面：各热区与面板直接发起
     UI.goHome();
+    UI.syncGlobalSet();
+    markSafe();
   },
   openFocus(){if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}UI.openSheet('吩咐')}, // 吩咐：自拟本旬要做的事
   hsGoOut(){if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}$('#mapClock').textContent=fmtTime();$('#mapview').classList.add('on')}, // 出门＝宫城图选目的地
@@ -4600,6 +4690,7 @@ const Game={
     if(salary)toast(`月俸入账：${salary.rank} ＋${salary.amount} 两`,3200);
     phase='FOCUS_SELECT'; // 新的一旬从住处即可直接安排行事
     UI.goHome();
+    markSafe(); // 新旬落定：此后卡死只退回本旬开头
     this._xunStartPop(); // 旬首检查：已发酵事项直接弹出强制处理，不待命
   },
   _payMonthlySalary(prevTime){ // 月俸前端自结：每月下旬末按位份入账，同一月只发一次
@@ -4656,7 +4747,7 @@ const Game={
     state.mealCount=(Number(state.mealCount)||0)+1;
     if(d.attr){p.attributes=p.attributes||{};const old=Number(p.attributes[d.attr])||0;let nv=clamp01_100(old+1);if(d.attr==='体质'){const tb=Number(p.constitutionBase)||0;if(tb>0)nv=Math.min(nv,tb)}p.attributes[d.attr]=nv} // 滋补也不越根基
     logXunAction(`传膳·${d.name}`);
-    persistCurrent();UI.updateStatusbar();UI.renderSheet('传膳');
+    persistCurrent();markSafe();UI.updateStatusbar();UI.renderSheet('传膳');
     toast(`传膳「${d.name}」，本旬余 ${mealLeft()} 次，变化记入旬末小结`);
   },
   restFlow(){ // 歇下一旬：先汇总本旬行事与真实数值变化（只读，不新增），再渐暗
@@ -4716,7 +4807,7 @@ const Game={
       if(isMajorTurn(p.statePatch,p))meta.lastBigTurn=state.turn;
       if(adj.hit){meta.rollHit=false;meta.rollTargetId=null} // 本旬骰子已用毕，同旬后续行动不再重复强制
       state.energy=Math.max(0,Math.min(ENERGY_MAX,Math.round((typeof state.energy==='number'?state.energy:ENERGY_MAX)-(typeof cost==='number'?cost:focusEnergyCost(focus)))));
-      persistCurrent();UI.updateStatusbar();
+      persistCurrent();markSafe();UI.updateStatusbar();
       if(state.energy<=0){this.collapse();return}
       checkRestWarn();
       if(p.hasEvent&&(p.scene||(Array.isArray(p.options)&&p.options.length))){this.showIncident(p)} // 先弹"事发"简报，确认后进剧情对话
@@ -4768,7 +4859,7 @@ const Game={
   backHome(){ // 一旬事毕回本宫住处：免得上一场外出地点滞留成下一场的场景
     if(!state)return;
     const home=this.homeLocation();
-    if(home&&state.location!==home){state.location=home;persistCurrent()}
+    if(home&&state.location!==home){state.location=home;persistCurrent();markSafe()}
   },
   /* 事发弹窗底图：室外用御花园，他宫用宫室，本宫住处仍用 room.jpg */
   sceneBgKey(where){
@@ -5117,9 +5208,10 @@ const Game={
       this.renderSceneOpts(sopts);
       $('#chatBody').scrollTop=$('#chatBody').scrollHeight;
     }).catch(e=>{
-      this.chatBusy(false);phase='EVENT_CHOICE';
+      this.chatBusy(false);
+      if(e.name==='AbortError')return; // 脱困/取消已经复位界面，晚到的失败不再改状态
+      phase='EVENT_CHOICE';
       this.renderSceneOpts(sceneCtx?sceneCtx.lastOptions||[]:[]);
-      if(e.name==='AbortError'){toast('已取消');return}
       this.handleCallErr(e);
     });
   },
@@ -5210,6 +5302,52 @@ const Game={
     $('#chatview').classList.remove('on');$('#mapview').classList.remove('on');$('#chatOpts').innerHTML='';
     UI.hideBusy();UI.goHome();
   },
+  escapeStuck(){ // 脱离卡死：中止请求、清掉所有临时界面，退回本次操作前的落定点
+    const before=cloneGameData(state);
+    cancelInFlight(); // 晚到的模型回复一律作废
+    UI.hideBusy();
+    ['errModal','incidentModal','restModal','actModal','tutorialModal','collapseModal'].forEach(id=>{
+      const el=document.getElementById(id);if(el)el.classList.remove('on');
+    });
+    $('#chatview').classList.remove('on');
+    $('#mapview').classList.remove('on');
+    $('#dim').classList.remove('on');
+    $('#hotspots').classList.remove('sleeping');
+    $('#scrim').classList.remove('on');
+    $('#sheet').classList.remove('on');
+    const sc=$('.sheet-close');if(sc)sc.style.display='';
+    const cb=$('#chatBody');if(cb)cb.innerHTML='';
+    const co=$('#chatOpts');if(co)co.innerHTML='';
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+
+    let restored=null;
+    try{
+      if(safePoint&&safePoint.state){
+        state=normalizeState(cloneGameData(safePoint.state));
+        history=cloneGameData(safePoint.history)||[];
+        restored=state;
+      }else{
+        const cur=loadCurrent();
+        if(cur&&cur.state){state=normalizeState(cur.state);history=cur.history||[];restored=state}
+      }
+    }catch(e){console.error('[脱困] 回退失败',e)}
+
+    phase='FOCUS_SELECT';
+    currentEvent=null;sceneCtx=null;sceneWhoHint=null;lastRequest=null;lastUseIdx=null;
+    impView={};selSkill=null;acquiredThisTurn=[];soldNotes=[];
+    Game._pendingEvent=null;Game._lastAdj=null;Game._lastFocus=null;
+    if(state)persistCurrent();
+    markSafe();
+    cardCount=0;
+    const stream=$('#stream');if(stream)stream.innerHTML='';
+    UI.show('#screen-main');
+    UI.updateStatusbar();
+    UI.goHome();
+    UI.syncGlobalSet();
+    const diffs=restored?refundSummary(before,restored):[];
+    const brief=diffs.slice(0,4).join('、');
+    toast('已脱离卡死，回到住处'+(brief?`；数值已回退 ${brief}${diffs.length>4?' 等':''}`:''),4200);
+  },
   /* 商城 */
   openShop(){ // 顶栏积分按钮：点开即是商城
     if(!state||!state.protagonist){toast('尚未开局');return}
@@ -5229,12 +5367,12 @@ const Game={
     addToInventory([obj]);
     toast(`已购「${it.name}」，即刻入囊`);
     logXunAction(`商城·${it.name}`);
-    persistCurrent();UI.renderSheet('商品详情',i);UI.updateStatusbar();
+    persistCurrent();markSafe();UI.renderSheet('商品详情',i);UI.updateStatusbar();
   },
   toggleEquip(i){ // 长期之物：启用（随身佩戴）／收存（停用效用）；不耗件数、不占回合
     const it=(state.inventory||[])[i];if(!it||!it.durable)return;
     it.equipped=!(it.equipped!==false);
-    persistCurrent();
+    persistCurrent();markSafe();
     toast(it.equipped?`「${it.name}」已随身启用`:`「${it.name}」已收存，效用暂停`);
     UI.renderSheet('物品详情',i);
   },
@@ -5272,7 +5410,7 @@ const Game={
     ][Math.floor(Math.random()*3)];
     history.push({turn:state.turn,focus:`才艺修习·${k}`,choice:'',narrative:flavor,log:`${k} +${gain}`});
     logXunAction(`才艺修习·${k}`);
-    persistCurrent();UI.updateStatusbar();checkRestWarn();
+    persistCurrent();markSafe();UI.updateStatusbar();checkRestWarn();
     UI.actResult('才艺修习',flavor,[]);
     if(state.energy<=0)setTimeout(()=>this.collapse(),600);
   },
@@ -5312,7 +5450,7 @@ const Game={
       deltas=['未打听到新的能人'];
     }
     logXunAction(`侍女打听·${skillName}`);
-    persistCurrent();UI.updateStatusbar();checkRestWarn();
+    persistCurrent();markSafe();UI.updateStatusbar();checkRestWarn();
     UI.actResult('侍女打听',flavor,deltas);
     if(state.energy<=0)setTimeout(()=>this.collapse(),600);
   },
@@ -5360,7 +5498,7 @@ const Game={
     state.protagonist.silver=Number(state.protagonist.silver||0)+price;
     soldNotes.push(`「${it.name}」典卖得银 ${price} 两`);
     logXunAction(`典当·${it.name}`);
-    persistCurrent();UI.updateStatusbar();
+    persistCurrent();markSafe();UI.updateStatusbar();
     toast(`已典当「${it.name}」，银两变化记入旬末小结`);
     if(it.count<=0)UI.sheetBack();else UI.renderSheet('物品详情',i);
   },
@@ -5389,17 +5527,18 @@ const Game={
         try{const a=raw.indexOf('{'),b=raw.lastIndexOf('}');if(b>a)text=String((JSON.parse(raw.slice(a,b+1))||{}).impression||'').trim()}catch(e){}
         if(!text)throw new Error('模型未返回有效印象');
         impView[id]={text:text.slice(0,200),turn:state.turn};
-        persistCurrent();UI.renderSheet('NPC详情',id);
+        persistCurrent();markSafe();UI.renderSheet('NPC详情',id);
       })
       .catch(e=>{
         impView[id]=null;
+        if(e.name==='AbortError')return;
         addToInventory([{name:'读心笺',count:1,note:'系统道具：窥一人此刻对你的真实心意',usable:false,pawnable:false,src:'宫斗系统'}]); // 失败原数退回
-        persistCurrent();UI.renderSheet('NPC详情',id);
+        persistCurrent();markSafe();UI.renderSheet('NPC详情',id);
         toast('窥心失败：'+(e.message||e));
       });
   },
   /* 存档操作 */
-  loadSlot(key,auto){if(loadFromSlot(key)){UI.closeSheet();this.enterMain();toast('读档完成')}else toast('读取失败')},
+  loadSlot(key,auto){cancelInFlight();if(loadFromSlot(key)){UI.closeSheet();this.enterMain();toast('读档完成')}else toast('读取失败')},
   overwriteSlot(key){
     const i=key===SV.manual(1)?1:key===SV.manual(2)?2:3;
     const ok=state?saveToSlot(i,false):copyCurrentToSlot(key);
@@ -5419,6 +5558,7 @@ const Game={
       const p=JSON.parse(reader.result);
       const st=p.state||p;if(!st.protagonist)throw new Error('不是有效的存档');
       if(!confirm('导入将覆盖当前进度，确认？'))return;
+      cancelInFlight();
       state=normalizeState(st);history=p.history||[];
       persistCurrent();UI.closeSheet();this.enterMain();toast('导入完成');
     }catch(e){toast('导入失败：'+e.message)}};
@@ -5426,7 +5566,11 @@ const Game={
   },
   /* 设置 */
   switchSetPane(p){setPane=p;UI.renderSheet('设置')},
-  openSettings(p){if(p)setPane=p;UI.openSheet('设置')},
+  openSettings(p){
+    if(phase==='PROFILE'){toast('请先确认档案');return}
+    if(p)setPane=p;
+    UI.openSheet('设置');
+  },
   saveSettingsFromUI(){
     saveSettings({apiKey:$('#setKey').value.trim(),baseUrl:$('#setBase').value.trim()||'https://api.deepseek.com/v1',model:$('#setModel').value.trim()||'deepseek-chat',theme:$('#setTheme').value,stream:$('#setStream').value!=='0'});
     toast('设置已保存');
@@ -5486,6 +5630,8 @@ Game.confirmProfile=function(){
   phase='FOCUS_SELECT';
   const sc=$('.sheet-close');if(sc)sc.style.display='';
   UI.closeSheet();
+  markSafe();
+  UI.syncGlobalSet();
   currentEvent={options:(Game._openingOptions||[]).map(t=>({text:t}))};
   Game.showTutorial(); // 五步引导走完，再进首旬安排
 };
