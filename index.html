@@ -290,6 +290,36 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
 .mealrow .m-meta{margin-left:auto;text-align:right;font-size:12px;line-height:1.6;color:var(--ink-soft);flex:none}
 .mealrow .m-meta b{font-size:14px;font-weight:400;color:var(--cinnabar)}
 .mealrow:disabled{opacity:.42;box-shadow:none}
+/* 手作 */
+.craftgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.craftmat{position:relative;border:1px solid var(--line);border-radius:12px;background:var(--card);box-shadow:var(--shadow);padding:9px 10px;font-size:14px;text-align:left}
+.craftmat.sel{border-color:var(--cinnabar);background:rgba(166,58,46,.06)}
+.craftmat .cm-name{font-size:14px;letter-spacing:.02em;line-height:1.4}
+.craftmat .cm-kind{font-size:10px;color:var(--gold);border:1px solid var(--gold);border-radius:999px;padding:0 5px;margin-left:4px;vertical-align:1px;letter-spacing:.04em}
+.craftmat .cm-meta{font-size:11px;color:var(--ink-soft);margin-top:3px;line-height:1.5}
+.craftmat .cm-ops{display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-top:5px}
+.craftmat .cm-ops button{width:26px;height:26px;border-radius:50%;border:1px solid var(--line);background:var(--paper);font-size:15px;line-height:1;color:var(--ink);display:flex;align-items:center;justify-content:center}
+.craftmat .cm-ops button:disabled{opacity:.28}
+.craftmat .cm-ops b{min-width:18px;text-align:center;font-weight:400;font-size:13px;color:var(--cinnabar)}
+.craftchips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.craftchip{min-width:50px;min-height:38px;border:1px solid var(--line);border-radius:999px;background:var(--card);font-size:13px;color:var(--ink-soft);padding:0 12px}
+.craftchip.on{border-color:var(--cinnabar);color:var(--cinnabar);background:rgba(166,58,46,.06)}
+.craftchip:disabled{opacity:.32}
+.craftinsp{width:100%;min-height:82px;border:1px solid var(--line);border-radius:12px;background:var(--card);padding:10px 12px;font-size:14px;line-height:1.7;color:var(--ink);resize:vertical;outline:none;font-family:var(--serif)}
+.craftinsp:focus{border-color:var(--gold)}
+.craftcount{text-align:right;font-size:11px;color:var(--ink-soft);margin-top:3px}
+.craftsum{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:12px;line-height:1.7;color:var(--ink-soft)}
+.craftsum b{font-weight:400;color:var(--ink)}
+.craftresult .cr-name{font-size:20px;letter-spacing:.08em;line-height:1.4}
+.craftresult .cr-tags{margin:8px 0 10px}
+.craftresult .cr-desc{font-size:14px;line-height:1.8;color:var(--ink);margin-bottom:8px}
+.craftresult .cr-effect{font-size:13px;line-height:1.8;color:var(--ink-soft);border-left:2px solid var(--gold);padding-left:10px;margin-bottom:10px}
+.qbadge{display:inline-block;font-size:11px;border:1px solid currentColor;border-radius:999px;padding:1px 8px;letter-spacing:.08em;vertical-align:2px}
+.q-rough{color:var(--ink-soft)}
+.q-normal{color:var(--indigo)}
+.q-fine{color:var(--gold)}
+.q-rare{color:var(--cinnabar)}
+.q-epic{color:#7a4b9e}
 /* v2 弹窗：圆角14 · 阴影 Y10 B30 · 遮罩 #241F18 80% */
 .restmodal{background:rgba(36,31,24,.65)} /* 降低遮罩透明度，保留下层场景 */
 .rm-card{border-radius:14px;box-shadow:0 10px 30px rgba(46,36,21,.4)}
@@ -389,6 +419,7 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
   <div class="hotspots" id="hotspots">
     <button class="hs hs-up" data-x="0.20" data-y="0.92" onclick="Game.restFlow()"><i></i><span>歇下一旬</span></button>
     <button class="hs" data-x="0.12" data-y="0.50" onclick="Game.openFocus()"><i></i><span>吩咐</span><span class="hs-badge" id="hsBadge" style="display:none">有人扣门求见</span></button>
+    <button class="hs" data-x="0.33" data-y="0.70" onclick="Game.openCraft()"><i></i><span>手作</span></button>
     <button class="hs" data-x="0.52" data-y="0.40" onclick="Game.hsGoOut()"><i></i><span>出门</span></button>
     <button class="hs" data-x="0.90" data-y="0.60" onclick="Game.openSkills()"><i></i><span>才艺修习</span></button>
     <button class="hs" data-x="0.93" data-y="0.80" onclick="Game.openMeal()"><i></i><span>传膳</span></button>
@@ -1484,7 +1515,7 @@ const SKILL_MODULE = [
 const CRAFT_MODULE = [
 '## 十五、手作成品（新增玩法，优先级高于旧例）',
 '1. 主控可用材料、精力与灵感手作绣物、香料、丹丸等。成品由手作接口单独生成，含名称、类别、品质、特质、一句描述与使用效果；前端已完成扣料、扣精力与入囊，正文不得重复结算材料、精力或物品。',
-'2. 品质分五档：粗陋、寻常、精巧、珍品、绝品。品质影响表现、赠礼体面、献物评价与典卖价格，但不保证好感、宠爱或宫斗成功；人物反应仍按其性情、立场、关系与时机结算。',
+'2. 品质分五档：粗陋、寻常、精巧、珍品、绝品。品质上限由相关才艺硬性封顶：未习或低于20最多寻常，20—49最多精巧，50—79最多珍品，80以上才可能绝品。品质影响表现、赠礼体面、献物评价与典卖价格，但不保证好感、宠爱或宫斗成功；人物反应仍按其性情、立场、关系与时机结算。',
 '3. 成品 traits 可为风格（典雅、华丽、质朴、清冷等）或性质（安神、提神、活血、止血、剧毒、致幻等），使用效果以存档中的 effect 为准；正文写效用时不得超出 effect 的范围。',
 '4. 赠礼、献物、委托兑现走正常社交与剧情规则：品质与心意只提供更好的起点，收礼者可欣然、客气、推辞、起疑或转赠他人。',
 '5. 医药手作只作温和调理、缓解与救急，不得起死回生、保证怀孕或出现现代医学；剧毒、致幻、迷香类成品只在材料带毒性且灵感明确要求时存在，使用时须有前置、败露与追查风险。',
@@ -2333,6 +2364,8 @@ let impView={};              // 读心笺窥见缓存：{npcId:{text,turn}}；�
 let soldNotes=[];            // 典卖通报队列（并入下一次主持人请求）
 let setPane='存档';          // 设置面板当前栏：存档|API
 let selSkill=null;          // 才艺修习面板当前选中项
+let craftSel={mats:{},energy:20,inspiration:''}; // 手作面板当前选料/精力/灵感
+let craftResult=null;       // 最近一次手作成品（结果页展示）
 let abortCtrl=null;
 let lastUseIdx=null;          // 使用道具的件数回滚索引（调用失败时恢复）
 let sceneCtx=null;            // 剧情场景状态：{who,round,lastOptions,lines}
@@ -3179,7 +3212,8 @@ const UI={
     const notes=(state.protagonist&&state.protagonist.skillNotes)?`<div class="sheet-note" style="margin-bottom:10px">当前修习：${esc(state.protagonist.skillNotes)}</div>`:'';
     return `${notes}<div class="skillgrid">${cells}</div>
       <button class="btn btn-primary" style="border-radius:22px;letter-spacing:.12em;font-size:14px" ${selSkill?'':'disabled'} onclick="Game.confirmSkill()">${selSkill?`确认修习「${esc(selSkill)}」 · 精力 −${cost}`:`先择一门技艺`}</button>
-      <div class="sheet-note">开局所习才艺共四十点。未解锁的技艺，先得打听谁会——与相识之人交好，或问身边侍女；知道后，再登门当面求师。</div>`;
+      <div class="sheet-note">开局所习才艺共四十点。未解锁的技艺，先得打听谁会——与相识之人交好，或问身边侍女；知道后，再登门当面求师。</div>
+      <div class="setbtns"><button class="btn btn-line" onclick="Game.openCraft()">手作 · 用材料做一件东西</button></div>`;
   },
   pickSkill(k){selSkill=(selSkill===k)?null:k;UI.renderSheet('才艺修习')},
   /* 求艺：未习之艺——先打听“谁会”，再登门求师 */
@@ -3242,6 +3276,82 @@ const UI={
       ${rows}
       <div class="sheet-note">${hint}　精力 ${energy}／${ENERGY_MAX}　银两 ${silver} 两。菜色每三旬一换；最贵一味另有属性增益，余者只回精力。</div>`;
   },
+  /* 手作：选料、投精力、写灵感 → 调 API 生成成品 */
+  sheetCraft(){
+    const energy=Math.round(state.energy??0);
+    const restocked=!!(state.craft&&state.craft.restockTurn===state.turn);
+    const mats=Craft.materials();
+    const kindLabel={绣:'绣作',香:'香材',药:'药材',花:'花材',杂:'杂料'};
+    const groups=['绣','香','药','花','杂'].map(k=>{
+      const list=mats.filter(m=>m.kind===k);
+      if(!list.length)return '';
+      const cells=list.map(m=>{
+        const sel=Number(craftSel.mats[m.name])||0;
+        const total=Object.values(craftSel.mats).reduce((a,b)=>a+(Number(b)||0),0);
+        const canAdd=sel<m.count&&total<CRAFT_MAX_TOTAL&&(sel>0||Object.keys(craftSel.mats).length<CRAFT_MAX_KINDS);
+        const tier=['','一等','二等','三等','四等'][m.tier]||'一等';
+        return `<div class="craftmat${sel?' sel':''}">
+          <div class="cm-name">${esc(m.name)}<span class="cm-kind">${esc(m.kind)}</span></div>
+          <div class="cm-meta">存 ${m.count} 份 · ${tier}料</div>
+          <div class="cm-ops">
+            <button ${sel?'':'disabled'} onclick="Game.craftMat('${esc(m.name)}',-1)" aria-label="减少">−</button>
+            <b>${sel}</b>
+            <button ${canAdd?'':'disabled'} onclick="Game.craftMat('${esc(m.name)}',1)" aria-label="增加">＋</button>
+          </div></div>`;
+      }).join('');
+      return `<div class="sec"><div class="sec-cap">${kindLabel[k]||k}</div><div class="craftgrid">${cells}</div></div>`;
+    }).join('');
+    const matHtml=groups||'<div class="sheet-note">囊中暂无手作材料。内务府按月会发些，也可让宫人去采买；御赐、赏赐与园中花木也可能得料。</div>';
+    const selList=Object.keys(craftSel.mats).map(name=>({name,count:craftSel.mats[name]}));
+    const selText=selList.length?selList.map(x=>`${x.name}×${x.count}`).join('、'):'尚未放料';
+    const total=selList.reduce((a,b)=>a+b.count,0);
+    const chips=[10,20,30,40,50].map(v=>`<button class="craftchip${craftSel.energy===v?' on':''}" ${energy<v?'disabled':''} onclick="Game.craftEnergy(${v})">${v}</button>`).join('');
+    const v=Craft.validate({materials:selList,energy:craftSel.energy,inspiration:craftSel.inspiration});
+    const errs=v.errors.filter(e=>e!=='先写一句灵感');
+    const insp=String(craftSel.inspiration||'');
+    const canGo=selList.length>0&&!!insp.trim()&&energy>=CRAFT_ENERGY_MIN&&craftSel.energy<=energy;
+    const skills=(state.protagonist&&state.protagonist.skills)||{};
+    const skillLine=['女红','香道','医术','莳花'].map(k=>{const key=skillKeyIn(skills,k);return `${k} ${key?skills[key]:'未习'}`}).join(' · ');
+    return `<div class="sheet-note" style="margin-top:2px">以材料、精力与灵感做一件东西。材料与精力在开做时扣除；生成失败不扣。品质由材料品级、份数、精力、灵感与相关才艺共同决定。</div>
+      <div class="sec"><div class="sec-cap">相关才艺</div><div class="itemrow"><span>${esc(skillLine)}</span></div></div>
+      <div class="sec"><div class="sec-cap">一、放料</div>
+        <div class="sheet-note" style="margin:0 0 8px">内务府每旬可领一份常用料；稀有料仍须赏赐、采买或人情。</div>
+        <div class="setbtns" style="margin:0 0 10px"><button class="btn btn-line" ${restocked?'disabled style="opacity:.45"':''} onclick="Game.craftRestock()">${restocked?'本旬材料已领':'领本旬材料'}</button></div>
+        ${matHtml}</div>
+      <div class="sec"><div class="sec-cap">二、投入精力</div>
+        <div class="craftchips">${chips}</div>
+        <div class="sheet-note" style="margin-top:0">本旬余 ${energy}／${ENERGY_MAX}；开做后按所选数额扣除。</div></div>
+      <div class="sec"><div class="sec-cap">三、写一句灵感</div>
+        <textarea class="craftinsp" id="craftInsp" maxlength="${CRAFT_INSPIRATION_MAX}" placeholder="想做什么、给谁、要什么味道或样子？写得越具体，成品越容易合心意。" oninput="Game.craftInsp(this.value)">${esc(insp)}</textarea>
+        <div class="craftcount" id="craftInspCount">${insp.length}／${CRAFT_INSPIRATION_MAX}</div></div>
+      <div class="sec"><div class="sec-cap">本件用料</div>
+        <div class="craftsum"><b>${esc(selText)}</b>${total?`（${selList.length} 种 / ${total} 份）`:''}<br>投入精力 ${craftSel.energy}${errs.length?`<br><span style="color:var(--cinnabar)">${esc(errs[0])}</span>`:''}</div></div>
+      <button class="btn btn-primary" id="craftGo" style="border-radius:22px;letter-spacing:.14em;text-indent:.14em;font-size:15px;margin-top:14px" ${canGo?'':'disabled'} onclick="Game.craftSubmit()">开做 · 精力 −${craftSel.energy}</button>
+      <div class="sheet-note">材料至多 ${CRAFT_MAX_KINDS} 种、${CRAFT_MAX_TOTAL} 份。成品会带名称、品质、特质、一句描述与使用效果，入行囊后可自用、赠人、献物或典卖。</div>`;
+  },
+  qualityClass(q){return {'粗陋':'q-rough','寻常':'q-normal','精巧':'q-fine','珍品':'q-rare','绝品':'q-epic'}[q]||'q-normal'},
+  sheetCraftResult(){
+    const it=craftResult;
+    if(!it)return '<div class="sheet-note">暂无成品。</div>';
+    const q=this.qualityClass(it.quality);
+    const traits=(Array.isArray(it.traits)?it.traits:[]).map(t=>`<span class="tag">${esc(t)}</span>`).join('');
+    const canAgain=(state.energy??0)>=CRAFT_ENERGY_MIN;
+    return `<div class="sec"><div class="sec-cap">成品</div>
+      <div class="craftresult">
+        <div class="cr-name">${esc(it.name)} <span class="qbadge ${q}">${esc(it.quality)}</span></div>
+        <div class="cr-tags">${traits}<span class="tag">${esc(it.category||'手作')}</span></div>
+        <div class="cr-desc">${esc(it.description||'')}</div>
+        <div class="cr-effect"><b>效用</b>　${esc(it.effect||'')}</div>
+        <div class="itemrow"><span>耗料</span><span class="cnt">${esc((it.materials||[]).join('、'))}</span></div>
+        <div class="itemrow"><span>耗精力</span><span class="cnt num">${esc(it.energy??'—')}</span></div>
+        <div class="itemrow"><span>手作人</span><span class="cnt">${esc(it.maker||'')}</span></div>
+      </div></div>
+      <div class="setbtns">
+        <button class="btn btn-line" ${canAgain?'':'disabled style="opacity:.45"'} onclick="Game.craftAgain()">再做一个</button>
+        <button class="btn btn-primary" onclick="Game.closeCraftResult()">收好</button>
+      </div>
+      <div class="sheet-note">成品已入行囊，可在「行囊」查看详情、使用或典卖。赠人、献物按正常社交与剧情规则结算；品质与心意只提供更好的起点。</div>`;
+  },
   /* 事件选项（旧两轮制退路；主路径为剧情对话 scene） */
   showRestTip(){
     const title=$('#restTitle');if(title)title.textContent='歇下一旬';
@@ -3281,6 +3391,8 @@ const UI={
     else if(name==='求艺')B.innerHTML=this.sheetUnlock(param);
     else if(name==='藏书阁')B.innerHTML=this.sheetLibrary();
     else if(name==='传膳')B.innerHTML=this.sheetMeal();
+    else if(name==='手作')B.innerHTML=this.sheetCraft();
+    else if(name==='手作结果')B.innerHTML=this.sheetCraftResult();
     else if(name==='物品详情')B.innerHTML=this.sheetItemDetail(param);
     else if(name==='商城')B.innerHTML=this.sheetShop();
     else if(name==='商品详情')B.innerHTML=this.sheetShopDetail(param);
@@ -3381,7 +3493,8 @@ const UI={
           const tags=it.durable
             ?`<span class="itag on">长期</span><span class="itag${it.equipped!==false?' on':''}">${it.equipped!==false?'佩戴中':'已收存'}</span>`
             :`<span class="itag${it.usable?' on':''}">${it.usable?'可使用':'不可使用'}</span><span class="itag${it.pawnable?' on':''}">${it.pawnable?'可典当':'不可典当'}</span>`;
-          return `<button class="npcrow" onclick="UI.goSheet('物品详情',${i})"><span class="nr-name">${esc(it.name)}</span>${tags}<span class="nr-rel num">${it.durable?'':(it.count>0?'×'+esc(it.count):'已典出')}</span></button>`;
+          const qtag=it.crafted?`<span class="itag on">${esc(it.quality||'手作')}</span>`:'';
+          return `<button class="npcrow" onclick="UI.goSheet('物品详情',${i})"><span class="nr-name">${esc(it.name)}</span>${qtag}${tags}<span class="nr-rel num">${it.durable?'':(it.count>0?'×'+esc(it.count):'已典出')}</span></button>`;
         }).join('')+`</div>`;
     }
     return h||'<div class="sheet-note">囊中空空。</div>';
@@ -3397,8 +3510,19 @@ const UI={
       ?`<button class="btn btn-primary" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.toggleEquip(${i})">${it.equipped!==false?'收存（停用效用）':'启用（随身佩戴）'}</button>`
       :(it.usable!==false?`<button class="btn btn-primary" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.useItem(${i})">使用（耗精力 ${focusEnergyCost('使用道具')}）</button>`:`<button class="btn" disabled style="opacity:.45;letter-spacing:.1em;text-indent:.1em">不可使用</button>`);
     const wide=(k,v)=>`<div class="rowline" style="align-items:flex-start"><span style="flex:none">${k}</span><span class="cnt" style="white-space:normal;text-align:right;max-width:70%">${esc(v)}</span></div>`;
+    const crafted=!!it.crafted;
+    const craftedBlock=crafted?`<div class="itemrow"><span>类别</span><span class="cnt">${esc(it.category||'手作')} · 手作</span></div>
+      <div class="itemrow"><span>品质</span><span class="cnt"><span class="qbadge ${this.qualityClass(it.quality)}">${esc(it.quality||'—')}</span></span></div>
+      ${Array.isArray(it.traits)&&it.traits.length?`<div class="rowline" style="align-items:flex-start"><span style="flex:none">特质</span><span class="cnt" style="text-align:right;max-width:70%">${it.traits.map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</span></div>`:''}
+      ${it.description?wide('形貌',it.description):''}
+      ${it.effect?wide('效用',it.effect):''}
+      ${it.maker?`<div class="itemrow"><span>手作人</span><span class="cnt">${esc(it.maker)}</span></div>`:''}
+      ${Array.isArray(it.materials)&&it.materials.length?`<div class="itemrow"><span>耗料</span><span class="cnt">${esc(it.materials.join('、'))}</span></div>`:''}
+      ${it.energy!=null?`<div class="itemrow"><span>耗精力</span><span class="cnt num">${esc(it.energy)}</span></div>`:''}
+      ${it.inspiration?wide('灵感',it.inspiration):''}`:'';
     return `<div class="sec"><div class="sec-cap">${esc(it.name)}</div>
       ${cat.kind?`<div class="itemrow"><span>类别</span><span class="cnt">${cat.kind==='durable'?'长期之物 · 随身为用':'消耗品 · 用毕即无'}</span></div>`:''}
+      ${craftedBlock}
       ${it.durable?'':`<div class="itemrow"><span>件数</span><span class="cnt num">×${esc(it.count)}</span></div>`}
       ${it.src?`<div class="itemrow"><span>来历</span><span class="cnt">${esc(it.src)}</span></div>`:''}
       ${it.durable?`<div class="itemrow"><span>状态</span><span class="cnt">${it.equipped!==false?'佩戴中 · 效用生效':'已收存 · 效用暂停'}</span></div>`:''}
@@ -3832,6 +3956,7 @@ const CRAFT_STARTER_ON=true;   // 首次接入是否送入门材料；不想白�
 const CRAFT_STARTER=[          // 旧档/新档首次接入时的一次性入门材料：只够试做一两件
   ['素绢',2],['绣线',2],['檀香末',1],['黄芪',1],['当归',1],['蜂蜜',1]
 ];
+const CRAFT_RESTOCK_POOL=['素绢','绣线','檀香末','蜂蜜','黄芪','当归','白菊','艾草','榆皮粉']; // 每旬内务府可领的常用料
 const CRAFT_MATERIALS={
   /* 绣作 */
   '素绢':{kind:'绣',tier:1,tags:['布帛','素净']},
@@ -4020,6 +4145,19 @@ function craftNormalizeQuality(q){
   for(const k in CRAFT_QUALITY_ALIAS)if(s.includes(k))return CRAFT_QUALITY_ALIAS[k];
   return '寻常';
 }
+function craftSkillValue(category){ // 手作对应的才艺：绣看女红、香看香道、药看医术/药理、花看莳花、杂取最高
+  const sk=(state&&state.protagonist&&state.protagonist.skills)||{};
+  const keys=category==='绣'?['女红']:category==='香'?['香道']:category==='药'?['医术','药理']:category==='花'?['莳花']:['女红','香道','医术','药理','莳花'];
+  let v=0;
+  for(const k of keys){const key=skillKeyIn(sk,k);if(key)v=Math.max(v,Number(sk[key])||0)}
+  return v;
+}
+function craftCapQuality(q,category){ // 前端硬封顶：技艺未习最多寻常，20—49最多精巧，50—79最多珍品，80以上才可能绝品
+  const v=craftSkillValue(category);
+  const cap=v>=80?4:v>=50?3:v>=20?2:1;
+  const idx=Math.max(0,CRAFT_QUALITY.indexOf(q));
+  return CRAFT_QUALITY[Math.min(idx,cap)];
+}
 function craftNormalizeTraits(v){
   const raw=(Array.isArray(v)?v:String(v==null?'':v).split(/[、,，;；/|]+/)).map(x=>x&&typeof x==='object'?(x.name||x.trait||x.label||x.text||''):x);
   const out=[];
@@ -4054,7 +4192,7 @@ function craftParse(raw,data){
   const name=craftCleanText(obj.name,12);
   if(!name)throw new Error('手作结果缺少名字');
   const category=craftNormalizeCategory(obj.category,data);
-  const quality=craftNormalizeQuality(obj.quality);
+  const quality=craftCapQuality(craftNormalizeQuality(obj.quality),category);
   const traits=craftNormalizeTraits(obj.traits);
   const description=craftCleanText(obj.description,60)||craftFallbackDescription(category,traits);
   const effect=craftCleanText(obj.effect||obj.useEffect||obj.use,100)||craftFallbackEffect(traits);
@@ -5370,6 +5508,7 @@ const Game={
     else if(r.type==='sc')this.requestScene(r.msg,r.choice,r.maxTokens,r.noHistory,r.compact,r.endReq);
     else if(r.type==='r2'){UI.showBusy('铺排中','正在结算本旬应对……',true);phase='RESOLVING';
       callModel(r.msg).then(raw=>{UI.hideBusy();const p=parsePayload(raw);const last=history[history.length-1];finalize(p,{focus:last?last.focus:'',choice:r.choice,adj:Game._lastAdj});UI.actResult(last?last.focus:'本旬行事',filterText(p.narrative),[])}).catch(e=>{UI.hideBusy();this.handleCallErr(e)})}
+    else if(r.type==='craft')this.craftRun(r.input);
     else if(r.type==='newgame'){if(this._createdProtagonist)this.startWorldGen();else this.askNewGame()}
   },
   errRetry(){$('#errModal').classList.remove('on');this.retry()},
@@ -5452,6 +5591,114 @@ const Game={
     persistCurrent();markSafe();
     toast(it.equipped?`「${it.name}」已随身启用`:`「${it.name}」已收存，效用暂停`);
     UI.renderSheet('物品详情',i);
+  },
+  /* 手作面板 */
+  openCraft(reset){
+    if(!state||!state.protagonist){toast('尚未开局');return}
+    if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
+    if(reset!==false)craftSel={mats:{},energy:20,inspiration:''};
+    craftResult=null;
+    UI.openSheet('手作');
+  },
+  craftRestock(){ // 内务府每旬发一份常用料：保证手作不是一次性玩法
+    if(!state||!state.protagonist){toast('尚未开局');return}
+    if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
+    const c=state.craft=state.craft&&typeof state.craft==='object'?state.craft:{v:1,history:[]};
+    if(c.restockTurn===state.turn){toast('本旬材料已领过了');return}
+    ensureXunBook();
+    const pool=CRAFT_RESTOCK_POOL.slice(),picks=[];
+    for(let i=0;i<2&&pool.length;i++){const j=Math.floor(Math.random()*pool.length);picks.push(pool.splice(j,1)[0])}
+    const n=1+(Math.random()<0.35?1:0);
+    const got=[];
+    for(const name of picks){
+      const meta=CRAFT_MATERIALS[name];if(!meta)continue;
+      craftPushItemTo(state,{name,count:n,note:'手作材料',usable:false,pawnable:true,src:'内务府',mat:true,matKind:meta.kind,matTier:meta.tier,matTags:meta.tags});
+      got.push(name+'×'+n);
+    }
+    c.restockTurn=state.turn;
+    logXunAction('内务府领料');
+    persistCurrent();UI.updateStatusbar();UI.renderSheet('手作');
+    toast(got.length?`内务府送来：${got.join('、')}`:'内务府暂无余料');
+  },
+  craftMat(name,delta){
+    if(!state||!craftSel)return;
+    const meta=Craft.materials().find(m=>m.name===name);
+    if(!meta)return;
+    const cur=Number(craftSel.mats[name])||0;
+    const next=Math.max(0,Math.min(meta.count,cur+(Number(delta)||0)));
+    if(delta>0&&next>cur){
+      const kinds=Object.keys(craftSel.mats).length;
+      const total=Object.values(craftSel.mats).reduce((a,b)=>a+(Number(b)||0),0);
+      if(cur===0&&kinds>=CRAFT_MAX_KINDS){toast('材料至多 '+CRAFT_MAX_KINDS+' 种');return}
+      if(total>=CRAFT_MAX_TOTAL){toast('材料总数至多 '+CRAFT_MAX_TOTAL+' 份');return}
+    }
+    if(next<=0)delete craftSel.mats[name];else craftSel.mats[name]=next;
+    UI.renderSheet('手作');
+  },
+  craftEnergy(v){
+    if(!craftSel)return;
+    craftSel.energy=Math.max(CRAFT_ENERGY_MIN,Math.min(CRAFT_ENERGY_MAX,Math.round(Number(v)||CRAFT_ENERGY_MIN)));
+    UI.renderSheet('手作');
+  },
+  craftInsp(v){
+    if(!craftSel)return;
+    craftSel.inspiration=String(v||'').slice(0,CRAFT_INSPIRATION_MAX);
+    const c=$('#craftInspCount');if(c)c.textContent=craftSel.inspiration.length+'／'+CRAFT_INSPIRATION_MAX;
+    this.craftRefreshBtn();
+  },
+  craftRefreshBtn(){
+    const btn=$('#craftGo');if(!btn||!state)return;
+    const hasMats=Object.keys(craftSel.mats||{}).length>0;
+    const ok=hasMats&&!!String(craftSel.inspiration||'').trim()&&(state.energy??0)>=CRAFT_ENERGY_MIN&&craftSel.energy<=(state.energy??0);
+    btn.disabled=!ok;
+  },
+  craftSubmit(){
+    if(!state||!state.protagonist){toast('尚未开局');return}
+    if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
+    if((state.energy??0)<=0){this.collapse();return}
+    const materials=Object.keys(craftSel.mats).map(name=>({name,count:craftSel.mats[name]}));
+    const input={materials,energy:craftSel.energy,inspiration:craftSel.inspiration};
+    const v=Craft.validate(input);
+    if(!v.ok){toast(v.errors[0]||'手作条件不足',3200);return}
+    this.craftRun(input);
+  },
+  async craftRun(input){
+    if(!state||!state.protagonist)return;
+    ensureXunBook(); // 先记本旬起点，旬末小结才看得到扣料
+    UI.closeSheet();
+    phase='RESOLVING';
+    lastRequest={type:'craft',input};
+    UI.showBusy('手作中','正在裁料、起针、调香或合药……',true);
+    try{
+      const item=await Craft.make(input);
+      UI.hideBusy();
+      craftResult=item;
+      craftSel={mats:{},energy:20,inspiration:''};
+      phase='FOCUS_SELECT';
+      UI.updateStatusbar();
+      UI.openSheet('手作结果');
+    }catch(e){
+      UI.hideBusy();
+      phase='FOCUS_SELECT';
+      if(e&&e.name==='AbortError')return;
+      if(e&&e.craftErrors){toast(e.craftErrors[0]||'手作条件不足',3200);this.openCraft(false);return}
+      this.handleCallErr(e);
+    }
+  },
+  craftAgain(){
+    if(!state)return;
+    if((state.energy??0)<=0){this.closeCraftResult();return}
+    if((state.energy??0)<CRAFT_ENERGY_MIN){toast('精力不足以再开一炉，先歇一歇');return}
+    UI.closeSheet();
+    this.openCraft(true);
+  },
+  closeCraftResult(){
+    UI.closeSheet();
+    if(!state)return;
+    if((state.energy??0)<=0){this.collapse();return}
+    phase='FOCUS_SELECT';
+    UI.goHome();
+    checkRestWarn();
   },
   /* 才艺修习面板 */
   openSkills(){selSkill=null;UI.openSheet('才艺修习')},
