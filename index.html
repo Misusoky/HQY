@@ -2154,6 +2154,7 @@ let selSkill=null;          // 才艺修习面板当前选中项
 let abortCtrl=null;
 let lastUseIdx=null;          // 使用道具的件数回滚索引（调用失败时恢复）
 let sceneCtx=null;            // 剧情场景状态：{who,round,lastOptions,lines}
+let sceneWhoHint=null;        // 本轮剧情的说话人兜底：模型漏写 scene.who 时用拜访对象补上
 const CARD_CAP=20;let cardCount=0;
 const MAX_OUTPUT_TOKENS=4096;   // 单次输出上限：正文 + JSON 结算；取主流模型的通用上限，留足余量避免 JSON 被截断
 const JSON_RETRY_EMPTY=2;       // JSON 模式偶发返回空白（DeepSeek 等接口会吞掉非 JSON 内容）：自动重试次数
@@ -3651,7 +3652,8 @@ function sceneSpeaker(p,sc){ // 定对话对方：模型漏写 who 时，从台�
   const line=String((sc&&sc.line)||''); // 只认台词里点名的人：翻叙述猜人容易把传话太监错认成太后
   const npcs=(state&&state.npcs)||{};
   const hits=Object.keys(npcs).filter(id=>id&&id.length>=2&&line.includes(id));
-  return hits.length===1?hits[0]:(raw||'宫中来人');
+  if(hits.length===1)return hits[0];
+  return sceneWhoHint||raw||'宫中来人'; // 主动拜访时用拜访对象兜底，别让对白挂到"宫中来人"名下
 }
 
 /* ============================================================ 游戏流程 */
@@ -3794,8 +3796,8 @@ const Game={
     const phits=matchPending([who,npc]);
     const leadHint=hits.length?`\n【呼应引线】此人与在途引线相关：${hits.map(p=>`「${p.title}」（${p.line}）`).join('；')}。请借此次会面推进或了结它：能兑现的当旬兑现并回写台账；暂不能了结的，也要让会面与之产生实质关联（新信息、态度变化、埋下下一步），并更新 note。`:'';
     const pendHint=phits.length?`\n【呼应待续】此次行动与待续琐事相关：${phits.map(x=>pendText(x)).join('；')}。请在本旬演绎中顺手办理或问起此事，办妥的从 statePatch.pending 移除；未办妥的更新一句现状（回写即重置挂账计旬）。`:'';
-    const msg=`第${xunNo()}旬第一轮：玩家主动出门拜访「${npc}」。依双方关系、位份、情理与时机如实演接待结果——接见、婉拒、不在宫中都可能，吃闭门羹也是有效结果，见面与否顺其自然。若接见，用剧情对话 scene 结构呈现此次会面（对方说话、玩家接话，多轮后 resolve 收尾结算）；若未见到，安静结算本旬。${leadHint}${pendHint}`;
-    this.round1(msg,'拜访·'+npc,focusEnergyCost('社交拜访'),{skipDice:true,leadIds:hits.map(p=>p.id),pendTexts:phits.map(pendText)});
+    const msg=`第${xunNo()}旬第一轮：玩家主动出门拜访「${npc}」。依双方关系、位份、情理与时机如实演接待结果——接见、婉拒、不在宫中都可能，吃闭门羹也是有效结果，见面与否顺其自然。若接见，用剧情对话 scene 结构呈现此次会面（scene.who 填「${npc}」；对方说话、玩家接话，多轮后 resolve 收尾结算）；若未见到，安静结算本旬。${leadHint}${pendHint}`;
+    this.round1(msg,'拜访·'+npc,focusEnergyCost('社交拜访'),{skipDice:true,leadIds:hits.map(p=>p.id),pendTexts:phits.map(pendText),whoHint:npc});
   },
   maidTalk(name){ // 日常宫务：不预调 API、不弹"事发"，本地开场白直入对话；开口说话才扣精力（每次5）
     if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
@@ -3897,6 +3899,7 @@ const Game={
   },
   round1(msg,focus,cost,opts){
     ensureXunBook(); // 先记本旬起点，再发起行动
+    sceneWhoHint=(opts&&opts.whoHint)||null; // 每次行动重置：只有拜访类行动才带兜底说话人
     phase='NARRATING';UI.showBusy('铺排中','正在铺排本旬剧情……',true);
     if(soldNotes.length){msg+=`\n另：主控已将 ${soldNotes.join('、')} 典卖换银（银两已自行囊前端结算，请在世界后台与传闻中承接，勿重复发银）。`}
     const adj=adjudicatePlots(opts&&opts.skipDice); // 旬首剧情裁决：到期/超期剧情与冷却状态（主动触发时骰子让位）
@@ -3974,6 +3977,7 @@ const Game={
     const sc=p.scene||{};
     const plot=adj.target||[...(adj.overdue||[]),...(adj.due||[])][0]||(adj.stale||[])[0];
     const who=sceneSpeaker(p,sc);
+    if(!sc.who||/^(宫中来人|来人|某人|众人|宫人|宫女|太监|不详|事发)$/.test(sc.who))sc.who=who; // 回写兜底说话人，进入对话时不再丢
     const title=plot?plot.title:(who==='宫中来人'?'事发':who);
     const meta=[sc.when,sc.where].filter(Boolean).join('｜');
     const lead=sc.line?filterText(sc.line):this.chatLead(p);
@@ -4000,13 +4004,14 @@ const Game={
   openChat(p){
     phase='EVENT_CHOICE';
     const who=sceneSpeaker(p,p.scene);
+    sceneWhoHint=null;
     $('#chatTitle').textContent='剧情对话 · '+who;
     $('#chatAva').innerHTML=avatarHtml(who);
     $('#chatClock').textContent=fmtTime();
     const body=$('#chatBody');body.innerHTML='';
     // 开场：截取本轮叙事末段作为对方开场
     const lead=this.chatLead(p);
-    this.bubble('npc',who,lead);
+    this.sayLine(lead,who);
     $('#chatview').classList.add('on');
     this.renderChatOpts(p.options);
   },
@@ -4036,52 +4041,46 @@ const Game={
     body.scrollTop=body.scrollHeight;
     return wrap;
   },
-  sayNarrative(text){ // 旁白回显：独立气泡，不配头像姓名；智能识别对话
+  splitSpeech(text){ // 引号内=人物台词，引号外=旁白；无引号时整段按 plain 返回，由调用方决定算谁的
+    const out=[];const re=/([「『“"])([\s\S]*?)([」』”"])/g;let last=0,m;
+    while((m=re.exec(text))!==null){
+      const pre=text.slice(last,m.index).trim();
+      if(pre)out.push({type:'narr',text:pre});
+      const say=String(m[2]||'').trim();
+      if(say)out.push({type:'dialog',text:say});
+      last=re.lastIndex;
+    }
+    const tail=text.slice(last).trim();
+    if(tail)out.push({type:last===0?'plain':'narr',text:tail});
+    return out;
+  },
+  sayNarrative(text){ // 旁白回显：引号内配对方头像，引号外走无头像旁白
     const parts=filterText(text||'').split(/\n+/).map(x=>x.trim()).filter(Boolean);
     for(const line of parts){
-      // 检测是否包含对话引号（「」『』“”或 ""）
-      const hasDialog=/[「『“"]/.test(line);
-      if(hasDialog && sceneCtx){
-        const segments=[];
-        const regex=/([「『“"])(.*?)([」』”"])/g;
-        let lastIndex=0;
-        let match;
-        while((match=regex.exec(line))!==null){
-          // 对话前的旁白
-          if(match.index>lastIndex){
-            segments.push({type:'narr',text:line.slice(lastIndex,match.index).trim()});
-          }
-          // 对话内容
-          segments.push({type:'dialog',text:match[2].trim()});
-          lastIndex=regex.lastIndex;
+      for(const seg of this.splitSpeech(line)){
+        if(seg.type==='dialog'){
+          this.bubble('npc',sceneCtx?sceneCtx.who:'',seg.text);
+          if(sceneCtx)sceneCtx.lines.push({who:'npc',text:seg.text});
+        }else{
+          this.bubble('narr','',seg.text);
+          if(sceneCtx)sceneCtx.lines.push({who:'narr',text:seg.text});
         }
-        // 最后剩余的旁白
-        if(lastIndex<line.length){
-          segments.push({type:'narr',text:line.slice(lastIndex).trim()});
-        }
-        // 渲染各部分
-        for(const seg of segments){
-          if(!seg.text)continue;
-          if(seg.type==='dialog'){
-            this.bubble('npc',sceneCtx.who||'',seg.text);
-            sceneCtx.lines.push({who:'npc',text:seg.text});
-          }else{
-            this.bubble('narr','',seg.text);
-            sceneCtx.lines.push({who:'narr',text:seg.text});
-          }
-        }
-      }else{
-        // 无对话：整句作为旁白
-        this.bubble('narr','',line);
-        if(sceneCtx)sceneCtx.lines.push({who:'narr',text:line});
       }
     }
   },
-  sayLine(text){ // 对方本轮话语：配其头像与姓名
+  sayLine(text,who){ // 对方本轮话语：引号内进带头像的气泡，引号外的动作/神态走旁白
     const parts=filterText(text||'').split(/\n+/).map(x=>x.trim()).filter(Boolean);
+    const speaker=who||(sceneCtx?sceneCtx.who:'');
     for(const line of parts){
-      this.bubble('npc',sceneCtx?sceneCtx.who:'',line);
-      if(sceneCtx)sceneCtx.lines.push({who:'npc',text:line});
+      for(const seg of this.splitSpeech(line)){
+        if(seg.type==='narr'){
+          this.bubble('narr','',seg.text);
+          if(sceneCtx)sceneCtx.lines.push({who:'narr',text:seg.text});
+        }else{
+          this.bubble('npc',speaker,seg.text);
+          if(sceneCtx)sceneCtx.lines.push({who:'npc',text:seg.text});
+        }
+      }
     }
   },
   recordLine(who,text){if(sceneCtx&&text)sceneCtx.lines.push({who,text:String(text)})},
@@ -4145,6 +4144,7 @@ const Game={
     phase='EVENT_CHOICE';
     const sc=p.scene||{};
     sceneCtx={who:sceneSpeaker(p,sc),round:1,lastOptions:Array.isArray(p.options)?p.options:(Array.isArray(sc.options)?sc.options:[]),lines:[]};
+    sceneWhoHint=null; // 说话人已定，兜底提示不再外溢到下一场
     $('#chatTitle').textContent='剧情对话 · '+sceneCtx.who;
     $('#chatAva').innerHTML=avatarHtml(sceneCtx.who);
     $('#chatClock').textContent=fmtTime();
@@ -4152,8 +4152,7 @@ const Game={
     if(sc.when||sc.where)this.bubble('sys','',`${sc.when||''}${sc.when&&sc.where?'｜':''}${sc.where||''}`);
     if(p.narrative){this.sayNarrative(p.narrative);p._narrShown=true} // 触发剧情的当旬正文：先铺出在何处、如何遇上此人，再进第一句台词
     const opening=sc.line?filterText(sc.line):this.chatLead(p);
-    sceneCtx.lines.push({who:'npc',text:opening});
-    this.bubble('npc',sceneCtx.who,opening);
+    this.sayLine(opening); // 引号内进对方气泡，引号外的动作/神态走旁白
     $('#chatview').classList.add('on');
     if(sc.state==='resolve'){ // 一轮即收尾：直接结算，不给接话选项
       this._sceneResolve(p);
@@ -4242,7 +4241,7 @@ const Game={
     if(sceneCtx.local&&!said){
       const bye=['“奴婢省得，小主早些安置。”她福身退下，帘子轻轻一落，屋里静下来。','“那奴婢不打扰小主了。”她敛衽一礼，悄声退出去。','“小主若有事，再唤奴婢。”她放下帘子，退了出去。'][Math.floor(Math.random()*3)];
       phase='RESOLVING';
-      this.bubble('npc',sceneCtx.who,bye);
+      this.sayLine(bye); // 收尾台词同样拆开引号内外的旁白
       $('#chatOpts').innerHTML='<button class="btn btn-primary" style="letter-spacing:.2em;text-indent:.2em" onclick="Game.sceneDone()">继续</button>';
       return;
     }
