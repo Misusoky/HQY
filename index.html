@@ -296,7 +296,7 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
 .mealrow .m-meta b{font-size:14px;font-weight:400;color:var(--cinnabar)}
 .mealrow:disabled{opacity:.42;box-shadow:none}
 /* v2 弹窗：圆角14 · 阴影 Y10 B30 · 遮罩 #241F18 80% */
-.restmodal{background:rgba(36,31,24,.8)}
+.restmodal{background:rgba(36,31,24,.65)} /* 降低遮罩透明度，保留下层场景 */
 .rm-card{border-radius:14px;box-shadow:0 10px 30px rgba(46,36,21,.4)}
 .rm-ops .btn{border-radius:22px;letter-spacing:.1em}
 /* 生成中动画省略号 */
@@ -3162,7 +3162,6 @@ const Game={
     state=null;history=[];
     const stream=$('#stream');if(stream)stream.innerHTML='';cardCount=0;
     pendingBuys=[];soldNotes=[];lastUseIdx=null;sceneCtx=null;
-    UI.skeleton(true,true);
     UI.showBusy('正在生成初始时代背景与宫册名录','从世界书库中抽取时代、帝后、妃嫔与派系——不必等模型落笔。',false);
     lastRequest={type:'newgame'};
     setTimeout(()=>{
@@ -3172,7 +3171,7 @@ const Game={
         history=[{turn:0,focus:'入宫',choice:'',narrative:built.text,log:'选秀入宫，系统激活'}];
         Game._openingOptions=built.options;
         Game._tutorialSteps=built.tutorial;
-        UI.hideBusy();UI.clearSkeleton();
+        UI.hideBusy();
         UI.updateStatusbar();
         UI.renderTurnCard({narrative:built.text,haremNews:built.news,changes:built.changes,todo:built.todo,hasEvent:true},{focus:'入宫'});
         persistCurrent();
@@ -3184,7 +3183,7 @@ const Game={
         const sc=$('.sheet-close');if(sc)sc.style.display='none'; // 强制确认档案，不能收起
         $('#scrim').classList.add('on');$('#sheet').classList.add('on');
       }catch(e){
-        UI.hideBusy();UI.clearSkeleton();
+        UI.hideBusy();
         this.handleCallErr(e);
       }
     },600);
@@ -3368,7 +3367,7 @@ const Game={
   },
   round1(msg,focus,cost,opts){
     ensureXunBook(); // 先记本旬起点，再发起行动
-    phase='NARRATING';UI.skeleton(true,true);
+    phase='NARRATING';UI.showBusy('铺排中','正在铺排本旬剧情……',true);
     if(soldNotes.length){msg+=`\n另：主控已将 ${soldNotes.join('、')} 典卖换银（银两已自行囊前端结算，请在世界后台与传闻中承接，勿重复发银）。`}
     const adj=adjudicatePlots(opts&&opts.skipDice); // 旬首剧情裁决：到期/超期剧情与冷却状态（主动触发时骰子让位）
     Game._lastAdj=adj;Game._lastFocus=focus; // 供剧情场景收尾与纪事摘要
@@ -3376,7 +3375,6 @@ const Game={
     lastRequest={type:'r1',msg,focus,cost,opts};
     const settle=p=>{
       $('#mapview').classList.remove('on'); // 目的地行动落定即收起宫城图（加载层 z-60 本就叠在图上）
-      UI.clearSkeleton();
       UI.hideBusy();
       pendingBuys=[];soldNotes=[];lastUseIdx=null;
       finalize(p,{focus,adj});
@@ -3408,11 +3406,11 @@ const Game={
       if(noEvent){
         const fixMsg=msg+`\n【纠正】前端剧情裁决已裁定本旬必须触发剧情（${this._mandateText(adj)}），你却输出 hasEvent=false。请重新输出完整 JSON：hasEvent=true，用剧情对话 scene 结构呈现本轮剧情（scene.state="ongoing"、scene.line 为对方的话或动作、顶层 options 给 2—4 个接话选项），停下等待玩家应对、不结算后果；本旬养成过程简要并入 narrative。`;
         lastRequest={type:'r1',msg:fixMsg,focus,cost,opts};
-        UI.skeleton(true,true);
+        UI.showBusy('铺排中','正在重新生成剧情……',true);
         return callModel(fixMsg).then(raw2=>settle(parsePayload(raw2)));
       }
       settle(p0);
-    }).catch(e=>{UI.clearSkeleton();UI.hideBusy();this.handleCallErr(e)});
+    }).catch(e=>{UI.hideBusy();this.handleCallErr(e)});
   },
   /* 剧情触发判定辅助：裁决是否强制本旬出剧情（到期/超期/剧情骰命中） */
   _eventMandated(adj){return !!(adj&&(adj.due&&adj.due.length||adj.overdue&&adj.overdue.length||adj.hit))},
@@ -3734,7 +3732,7 @@ const Game={
     UI.closeSheet();
     this.round1(`第${xunNo()}旬第一轮：玩家消耗精力 ${focusEnergyCost(t)} 选定上旬生活重心「${t}」。按第一轮流程演绎本旬。`,t,focusEnergyCost(t));
   },
-  cancelCall(){if(abortCtrl)abortCtrl.abort();UI.clearSkeleton();UI.hideBusy();toast('已取消');
+  cancelCall(){if(abortCtrl)abortCtrl.abort();UI.hideBusy();toast('已取消');
     if(lastRequest&&lastRequest.type==='sc'&&sceneCtx){phase='EVENT_CHOICE';this.renderSceneOpts(sceneCtx.lastOptions||[]);return}
     if(lastRequest&&lastRequest.type==='r2'){phase='EVENT_CHOICE';this.renderChatOpts(currentEvent.options)}else if(state){phase='FOCUS_SELECT';UI.goHome()}},
   handleCallErr(e){
@@ -3749,8 +3747,8 @@ const Game={
     const r=lastRequest;
     if(r.type==='r1')this.round1(r.msg,r.focus,r.cost,r.opts);
     else if(r.type==='sc')this.requestScene(r.msg,r.choice,r.maxTokens,r.noHistory,r.compact);
-    else if(r.type==='r2'){UI.skeleton(true,true);phase='RESOLVING';
-      callModel(r.msg).then(raw=>{UI.clearSkeleton();const p=parsePayload(raw);const last=history[history.length-1];finalize(p,{focus:last?last.focus:'',choice:r.choice,adj:Game._lastAdj});UI.actResult(last?last.focus:'本旬行事',filterText(p.narrative),[])}).catch(e=>{UI.clearSkeleton();this.handleCallErr(e)})}
+    else if(r.type==='r2'){UI.showBusy('铺排中','正在结算本旬应对……',true);phase='RESOLVING';
+      callModel(r.msg).then(raw=>{UI.hideBusy();const p=parsePayload(raw);const last=history[history.length-1];finalize(p,{focus:last?last.focus:'',choice:r.choice,adj:Game._lastAdj});UI.actResult(last?last.focus:'本旬行事',filterText(p.narrative),[])}).catch(e=>{UI.hideBusy();this.handleCallErr(e)})}
     else if(r.type==='newgame'){if(this._createdProtagonist)this.startWorldGen();else this.askNewGame()}
   },
   errRetry(){$('#errModal').classList.remove('on');this.retry()},
@@ -3758,7 +3756,7 @@ const Game={
     $('#errModal').classList.remove('on');
     phase='FOCUS_SELECT';sceneCtx=null;currentEvent=null;
     $('#chatview').classList.remove('on');$('#mapview').classList.remove('on');$('#chatOpts').innerHTML='';
-    UI.clearSkeleton();UI.hideBusy();UI.goHome();
+    UI.hideBusy();UI.goHome();
   },
   /* 商城 */
   openShop(){ // 顶栏积分按钮：点开即是商城
