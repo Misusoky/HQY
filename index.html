@@ -1317,6 +1317,41 @@ function adjudicatePlots(skipDice){ // 旬首裁决：到期强制兑现 + 前�
   else if(hit)lines.push('剧情骰命中的触发同样每旬至多一条；进入 scene 对话后给 2—4 个接话选项，等待玩家应对。');
   else if(mainPub)lines.push('新主线发布每旬至多一条：scene 对话呈现，给 2—4 个接话选项，等待玩家应对；与发酵条目同场时 hasEvent 随那场处置戏；新主线条目必须随本轮 statePatch.plots 落账。');
   for(const l of emp.lines)lines.push(l);
+  { // 在途账目逐旬自查：把客观线索（手作记录、行囊、面板数值）摆出来，强制主持人逐条对照已发生事实，该兑现的当轮兑现
+    const activeNow=activePlots();
+    if(activeNow.length){
+      const persons=[...new Set([
+        ...Object.keys(state.relationships||{}),
+        ...(((state.world||{}).keyServants)||[]).map(s=>String(s).replace(/（[^）]*）|\([^)]*\)/g,'').trim())
+      ])].filter(n=>n&&n.length>=2);
+      const crafts=((state.craft&&state.craft.history)||[]).slice(-4);
+      const inv=Array.isArray(state.inventory)?state.inventory:[];
+      const stopCommon=['主线','任务','剧情','进行','完成','兑现','需要','送去','送到','做成','一件','此事','这件','当面','已有','目前','所托','约定','先皇后'];
+      const sharedKey=(hay,text,minLen)=>{ // 双方共有的、不含套话的最长公共子串；命中即视为该物品/手作与此账相关
+        if(!hay||!text)return null;
+        for(let len=Math.min(8,hay.length);len>=minLen;len--)
+          for(let i=0;i+len<=hay.length;i++){
+            const sub=hay.slice(i,i+len);
+            if(stopCommon.some(s=>sub.includes(s)))continue;
+            if(text.includes(sub))return sub;
+          }
+        return null;
+      };
+      const rows=activeNow.map(p=>{
+        const hay=`${p.title||''}｜${p.note||''}`;
+        const who=persons.filter(n=>hay.includes(n));
+        const ev=[];
+        for(const c of crafts){
+          const t=`${c.name||''} ${c.inspiration||''} ${(c.traits||[]).join('')}`;
+          if((who.length&&who.some(n=>t.includes(n)))||sharedKey(hay,t,4))ev.push(`手作「${c.name}」（${c.quality||''}·灵感："${String(c.inspiration||'').slice(0,40)}"）`);
+        }
+        for(const it of inv)if(it&&it.name&&sharedKey(hay,String(it.name),2))ev.push(`行囊「${it.name}」×${it.count||1}${it.crafted?'（手作成品）':''}`);
+        for(const n of who){const r=(state.relationships||{})[n];if(r&&typeof r.value==='number')ev.push(`${n}当前好感/宠爱 ${r.value}`)}
+        return `「${p.title}」(${p.line}，${p.dueText||(p.latest!=null?'有期限':'缓图')}）：${p.note||'—'}${ev.length?`；事实线索：${ev.join('；')}`:''}`;
+      });
+      lines.push(`【自查·在途账目】以下条目仍在账上（stage=进行中）。请逐条对照截至本旬已真实发生的剧情事实（含手作记录、行囊变动、人物相处、面板数值）自查：条件其实已经满足的——东西已做成并送出/被收下、事已办成、约定已履行、数值已达成——本轮必须兑现（stage 改"已兑现"，完成任务积分与"本旬变化"中的任务进度），不得继续挂账；确未发生的照实留账，可顺手在 note 写一句现状。客观线索仅供对照、不作裁决，以剧情事实为准：\n${rows.map((r,i)=>`${i+1}. ${r}`).join('\n')}`);
+    }
+  }
   lines.push('结算只经 statePatch.plots 回写【发生变化】的台账条目：兑现者 stage 改"已兑现"；改写期限者须在 note 说明理由并给出新 dueText；新埋引线新增条目（id 用 "p-" 加短标题，与现存 id 区分）；作废者 stage 改"已作废"并注明缘由。只回写变化的条目，前端按 id 合并。注意：条件已足的条目必须兑现（stage 改"已兑现"，可附积分与任务进度），只改写 note 不算办结；手作成品相赠、请托办妥皆可兑现任务，规则见系统提示词手作模块与剧情台账条。pending 只留非剧情琐事。');
   const before={};[...overdue,...due].forEach(p=>before[p.id]=p.dueText||'');
   return {due,overdue,stale,pendStale,target,hit,mainPub:!!mainPub,needMain:!!needMain,gardenMeet:'',empDue:emp.due,before,text:'【剧情裁决 · 本旬】（前端判定：到期/超期强制兑现＋搁置发酵强制处理＋主线断档强制发布＋剧情骰被动触发，覆盖"自行决定是否触发剧情"）\n'+lines.map((l,i)=>`${i+1}. ${l}`).join('\n')};
@@ -1469,6 +1504,7 @@ const PLOTS_MODULE = [
 '存档 plots 为结构化剧情账，是剧情触发与兑现的唯一依据；pending 只留非剧情琐事（当票、节令预备、回礼等），不再记剧情引线。',
 '条目字段：id（唯一，长期沿用）、line（主线/支线/引线/敌对/目标）、title、stage（进行中/已兑现/已作废）、earliest/latest（内部旬号由前端维护，到期与否以每旬请求中的【剧情裁决】块为准）、dueText（人类可读期限）、note（一句话现状，随推进更新）。',
 '每旬第一轮请求附有【剧情裁决】块：是否触发剧情由前端掷骰并写明（剧情骰命中/未命中、命中哪条线），到期/超期条目必须当旬兑现，模型不再自行决定是否触发。每旬至多一条主要剧情（世界书既有纪律仍有效）。',
+'每旬裁决块附【自查·在途账目】：列出全部在途条目并附客观线索（近期手作记录、行囊相关之物、相关人面板数值）。主持人须逐条对照截至本旬已真实发生的剧情事实：条件其实已经满足的，当轮必须兑现（stage 改"已兑现"，附积分与任务进度），不得继续挂账；线索仅供对照、不作裁决，以剧情事实为准，不得无中生有地兑现。',
 '主线不断档：进行中的主线兑现或作废后清零，裁决块会以【发布·新主线】要求本旬剧情额度空出的常规回合开立新主线；新主线与在途引线、发酵条目并行共存（可与发酵处置同场：了结旧事时引出新线头）；模型须经 statePatch.plots 新增 line="主线" 条目（id 用 "p-" 加短标题），正文埋入落账亦可，不强求单独成戏。',
 '无期限（缓图）条目并非永久挂账：悬置超过 4 旬未推进即"发酵"，会在裁决块以【须处理·搁置发酵】列出，当旬必须择一处理——兑现为剧情（旬首直接弹出，hasEvent=true）、改写期限（note 说明理由并给新 dueText）或作废（注明发酵后果）；连续 3 旬不回写前端自动作废。',
 '每轮结算（第一、二轮皆然）只经 statePatch.plots 回写【发生变化的条目】（新增、更新、兑现、作废）；只回写发生变化的条目，前端按 id 合并，漏写视为不变。',
