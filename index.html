@@ -1304,7 +1304,9 @@ function adjudicatePlots(skipDice){ // 旬首裁决：到期强制兑现 + 前�
   if(overdue.length)lines.push(`【须立即兑现·已超期】${overdue.map(describePlot).join('；')}。本轮必须触发，且正文须体现其搁置期间发酵的后果；原场景不成立时，改写为符合当前处境的兑现方式。`);
   if(due.length)lines.push(`【须兑现·本旬到期】${due.map(describePlot).join('；')}。本轮必须触发，嵌入主控所选重心场景自然发生。`);
   if(stale.length)lines.push(`【须处理·搁置发酵】${stale.map(describePlot).join('；')}。已悬置 ${STALE_PLOT_XUN} 旬以上无人推进，本旬须逐一处理：①仍活着的线——当旬兑现为剧情，旬首直接弹出（hasEvent=true，优先 scene 对话）；②情形已变——改写期限，在 note 说明理由并给出新 dueText；③机会已过——作废，注明搁置期间的发酵后果（对方态度、机会流失等）。连续 ${STALE_AUTO_EXPIRE} 旬列入此块仍不回写，前端将自动作废该线。`);
-  if(pendStale.length)lines.push(`【须处理·琐事发酵】${pendStale.map(x=>pendText(x)).join('；')}。挂账超 ${STALE_PLOT_XUN} 旬未办，同样须在本旬逐一处理：①本旬办掉——演绎中顺手办完，从 statePatch.pending 移除；②升级为剧情——移入 statePatch.plots 立为引线（从 pending 移除，按引线规则走）；③仍需时日——改写文本说明现状（回写即重置计旬）。连续 ${STALE_AUTO_EXPIRE} 旬列入仍无变动，前端自动清除。`);
+  const freshPend=(state.pending||[]).filter(x=>!pendStale.includes(x));
+  if(freshPend.length)lines.push(`【待续琐事·挂账中】${freshPend.map(x=>pendText(x)).join('；')}。这些已在账上（非剧情）：请在本旬演绎中自然兑现或交代一句进展——办妥的从 statePatch.pending 移除；确需时日的改写一句现状（回写重置计旬，不得以同一措辞反复拖延）。`);
+  if(pendStale.length)lines.push(`【须处理·琐事发酵】${pendStale.map(x=>pendText(x)).join('；')}。挂账超 ${STALE_PLOT_XUN} 旬未办，同样须在本旬逐一处理：①本旬办掉——演绎中顺手办完，从 statePatch.pending 移除；②升级为剧情——移入 statePatch.plots 立为引线（从 pending 移除，按引线规则走）；③仍需时日——改写文本说明现状（回写即重置计旬）。采买、传话、送物、回礼等举手之劳不得以"仍需时日"拖延，本旬办掉；连续 ${STALE_AUTO_EXPIRE} 旬列入仍无变动，前端自动清除。`);
   if(target)lines.push(`【触发·剧情骰命中】${describePlot(target)}。本轮必须触发该线的后续剧情，用剧情对话 scene 结构呈现（对方说话、玩家接话），让它推进或了结；本轮 hasEvent=true。`);
   else if(hit)lines.push('【触发·全新引子】剧情骰命中：本轮必须触发一条全新剧情引子，用 scene 对话结构呈现；引子须从主控本旬所选重心与当前处境自然长出（主控正在做的事、主控见过或将见的人）；事后为它立一条新引线写入 statePatch.plots（id 用 "p-" 加短标题）。');
   else if(mainPub)lines.push(`【发布·新主线】剧情账中已无进行中的主线（前主线已兑现或作废）。本旬必须开立新主线：从主控位份、处境、派系、恩宠与既有伏笔自然长出（晋升之途、子嗣、旧案、母族、新敌皆可），与在途引线、发酵条目并行不悖——若本旬同时列有须处置的发酵条目，可同一场戏处置：了结旧事时引出新线头；新主线以剧情对话 scene 结构呈现，给 2—4 个接话选项后停止，不结算应对后果；无论如何都须以 statePatch.plots 新增一条 line="主线" 的台账条目（id 用 "p-" 加短标题，note 一句话写清走向，可给 dueText 期限）。${meta._mainMissed?'此前已要求开立新主线仍未见台账回写，本轮务必落账。':''}`);
@@ -1511,7 +1513,8 @@ SCENE_PARTS_RULES,
 '- 事已说尽、应对已足或局面已变时：scene.state="resolve"，并一并输出完整结算——narrative（收尾旁白，不写台词）、changes、statePatch（含 statePatch.plots 的变动条目），规则同第二轮。',
 '- 收尾只收束本场对话中已发生的事；须呼应既往前情时，只写存档剧情账与待续事项里已有记载的内容。',
 '- 召宫人问话、临时差遣等旬中插话不是本旬养成：收尾只结算这场对话本身（关系、情报、交办差事、行囊），主角才艺与基础属性留到旬末小结。',
-'- 对话以 2—3 轮自然收束：事情说尽、该告退或对方乏了时，让人物主动收话（如"我要歇息了""改日再叙""还有什么要交代的"），scene.state 写 "wrap"——只写她这一句收话，不结算、不写道别旁白，由玩家自决「再追问一句」还是「就此告辞」。追问可能被婉拒：拒时 scene.state="resolve"，写一句拒绝收场的台词并照常结算；肯再答则回到 "ongoing" 或 "wrap"。',
+'- 对话以 2—3 轮自然收束：事情说尽、该告退或对方乏了时，让人物主动收话（如"我要歇息了""改日再叙""还有什么要交代的"），scene.state 写 "wrap"——只写她这一句收话，不结算、不写道别旁白，由玩家自决「再追问一句」还是「就此告辞」。追问可能被婉拒：拒时 scene.state="resolve"，写一句拒绝收场的台词并照常结算；肯再答则回到 "ongoing" 或 "wrap"。'
+,'每轮必须让事情实质推进：对方要么给出实质答复、承诺或行动，要么主动收话；不得连续两轮以上只用反问、客套或重复已有顾虑来拖延。主控意图已明时（要办什么、问什么已说清楚），直接照办、照答或婉拒，不再层层请示追问。',
 '- 玩家每轮可点选项，也可自定义输入一句话或一个动作；接话不扣精力，玩家随时可选"结束对话"，你应声简短收尾（narrative 一两句即可）。自定义内容符合世界规则即认真承接。',
 '- 若不适合对话形式（突发事态、文书、独自发现等），可不用 scene，按原有 hasEvent+options 两轮制输出。'
 ].join('\n');
@@ -1604,6 +1607,7 @@ function mealLeft(){return Math.max(0,MEAL_LIMIT_PER_XUN-(Number(state&&state.me
 const REST_THRESHOLD=20;     // 低于等于此值弹窗建议休息
 const COLLAPSE_PENALTY=5;    // 昏迷扣体质
 const SCENE_MAX_ROUNDS=6;    // 剧情对话软上限：达到后下一轮必须收尾结算（3 轮常在剧情刚起势时硬收，对话"莫名其妙断掉"）
+const MAID_MAX_ROUNDS=8;     // 宫女问话软上限：比剧情对话宽，但到顶同样强制收尾，防 endless 请示兜圈
 const PLOT_TRIGGER_BASE=0.55; // 剧情骰基础触发概率：一旬一次，冷却期自动不触发；到期/超期/发酵不受骰子限制
 const PLOT_NEW_LEAD_CHANCE=0.3; // 骰中后开全新引子的概率（其余为在途剧情线的后续）；无在途线时必为新引子
 const STALE_PLOT_XUN=4;      // 无期限在途线悬置 N 旬未推进即"发酵"：旬首强制处理（兑现/改写/作废），不许干挂
@@ -4858,7 +4862,7 @@ const Game={
       {id:'c',text:'问话：之前交代的事办得如何'},
       {id:'d',text:'闲聊几句，看看她的心思'}
     ],scene:{state:'ongoing',line:greet,when:fmtTime(),where:home}});
-    if(sceneCtx){sceneCtx.local=true;sceneCtx.standalone=true;sceneCtx.maid=true} // 本地开场：一言未发即结束不结算；maid：问话不设轮数上限，可由她主动收话（wrap）或主控点「结束对话/就此告辞」收场
+    if(sceneCtx){sceneCtx.local=true;sceneCtx.standalone=true;sceneCtx.maid=true} // 本地开场：一言未发即结束不结算；maid：问话轮数上限更宽（MAID_MAX_ROUNDS），可由她主动收话（wrap）或主控点「结束对话/就此告辞」收场
   },
   nextTurn(){ // 休息，进入下一旬：旬数+1，精力回满，日历按两旬制推进
     const prevTime=Object.assign({},state.time);
@@ -5439,11 +5443,13 @@ const Game={
     if(sceneCtx.standalone&&!sceneCtx.logged){logXunAction('问话·'+sceneCtx.who);sceneCtx.logged=true}
     this.recordLine('me',choice);
     sceneCtx.round++;
-    const r=sceneCtx.round,cap=!sceneCtx.maid&&r>=SCENE_MAX_ROUNDS; // 宫女问话不设自动收尾上限
+    const r=sceneCtx.round,cap=sceneCtx.maid?(r>=MAID_MAX_ROUNDS):(r>=SCENE_MAX_ROUNDS); // 宫女问话上限更宽，但到顶同样强制收尾
     const settlement=sceneCtx.standalone
       ?'并收束这场问话：只结算它实际带来的关系、情报、差事与行囊变化；主角才艺与属性成长留到旬末小结，修习、散步等与问话无关的收益也留到那时。没有变化就不写 changes。'
       :'并一并完整结算本旬养成与剧情（narrative 收尾、changes、statePatch，含 statePatch.plots 的变动条目）。';
-    const maidNote=sceneCtx.maid?'本场是主控在住处吩咐宫女：scene.state 只可写 "ongoing" 或 "wrap"，不得自行 resolve 收场结算；她还要当差或话已说尽时可用 "wrap" 收一句（如"奴婢还要去当值，小主若无别的吩咐……"），不结算；主控点「结束对话」或「就此告辞」时才收尾结算。':'';
+    const maidPend=sceneCtx.maid?matchPending([sceneCtx.who]):[]; // 她名下挂账的差事/琐事：每轮提醒模型回话
+    const maidPendNote=maidPend.length?`她名下还挂着这些待办：${maidPend.map(x=>pendText(x)).join('；')}。主控问起办差时她须逐条回进度——办妥的交货、回话并从 statePatch.pending 移除；未妥的说清缘由与预计何时能成；不得反问一堆或佯装忘记。`:'';
+    const maidNote=sceneCtx.maid?'本场是主控在住处吩咐宫女：scene.state 只可写 "ongoing" 或 "wrap"，不得自行 resolve 收场结算（已达对话上限轮的除外，见下）；她还要当差或话已说尽时可用 "wrap" 收一句（如"奴婢还要去当值，小主若无别的吩咐……"），不结算；主控点「结束对话」或「就此告辞」时才收尾结算。'+maidPendNote+'主控交代具体差事（采买、传话、留意动静等）时：她至多提一句现实顾虑，随即领命应下、复述要领，不得反复追问请示；主控已解答她的顾虑后，她应领命，不得再抛新问题。':'';
     const msg=`第${xunNo()}旬剧情对话第${r}轮：玩家应对「${choice}」。只演绎${sceneCtx.who}的当即反应与场面变化：输出 scene.parts（2—5 段，act 写对方动作神态并会并入她的对话气泡，say 写对方台词，quote 写转述他人原话，narr 只写其他人物与客观场面，台词都不带引号，按语义分段而非按标点硬切；总长 ≤70 字）、scene.where/when（有变化才写）、scene.state 与 2—3 个接话选项；此阶段不结算数值。${cap?`本场对话已达上限，本轮 scene.state 必须为"resolve"，${settlement}`:'本轮 scene.state 写 "ongoing"（继续对谈）或 "wrap"（对方主动收话：事情说尽、乏了或有事欲别时，只写她一句收话，如"我要歇息了""改日再叙"，不结算、不写道别旁白），玩家会自决再追问还是就此告辞。对话对象当场换手（被传入阁面圣、正主登场等）：把 scene.who 改写为新对象，过渡写进 parts 的 narr 段，新对象的言行照常写 act/say，scene.state 用 "ongoing" 继续对谈，不得就此 resolve。'}${maidNote}`+this.sceneContextBlock();
     this.requestScene(msg,choice,MAX_OUTPUT_TOKENS,!cap,!cap); // 未到上限：精简提示词 + 不带历史；到上限：完整提示词收尾结算
   },
@@ -5453,7 +5459,7 @@ const Game={
     this.bubble('me','',press);
     this.recordLine('me',press);
     sceneCtx.round++;
-    const r=sceneCtx.round,cap=!sceneCtx.maid&&r>=SCENE_MAX_ROUNDS; // 追问同样吃轮数上限，不能无限纠缠
+    const r=sceneCtx.round,cap=sceneCtx.maid?(r>=MAID_MAX_ROUNDS):(r>=SCENE_MAX_ROUNDS); // 追问同样吃轮数上限，不能无限纠缠
     const settlement=sceneCtx.standalone
       ?'并收束这场问话：只结算它实际带来的关系、情报、差事与行囊变化；主角才艺与属性成长留到旬末小结，修习、散步等与问话无关的收益也留到那时。没有变化就不写 changes。'
       :'并一并完整结算本旬养成与剧情（narrative 收尾、changes、statePatch，含 statePatch.plots 的变动条目）。';
