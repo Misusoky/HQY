@@ -2334,56 +2334,38 @@ function saveSettings(s){localStorage.setItem(SET_KEY,JSON.stringify(s));applyTh
 function applyTheme(){const t=loadSettings().theme;document.documentElement.dataset.theme=t==='auto'?'':t}
 applyTheme();
 
-/* ============================================================ BGM（WebAudio 程序生成，无音频文件）
-   C 宫五声音阶拨弦旋律＋低缓铺底；默认开启，受浏览器自动播放限制，首次点击页面后启动。 */
+/* ============================================================ BGM
+   音频源：assets/bgm.m4a（《古宫清音》Suno 生成，头尾已做淡入淡出处理便于循环）。
+   默认开启，受浏览器自动播放限制，首次点击页面后启动；设置里可随时开关、变速率。 */
 const BGM=(()=>{
-  const PENTA=[261.63,293.66,329.63,392.00,440.00,523.25,587.33,659.25,783.99,1046.50];
-  let ctx=null,master=null,drone=null,timer=null,idx=3,playing=false,rate=1;
+  const FADE_MS=800,VOL=0.6;
+  let audio=null,timer=null,playing=false,rate=1;
   function ensure(){
-    if(ctx)return true;
-    const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return false;
-    ctx=new AC();
-    master=ctx.createGain();master.gain.value=0;master.connect(ctx.destination);
-    drone=ctx.createGain();drone.gain.value=0;drone.connect(master);
-    [130.81,196.00].forEach((f,i)=>{ // 根音＋五度长音，慢起伏
-      const o=ctx.createOscillator();o.type='sine';o.frequency.value=f;
-      const g=ctx.createGain();g.gain.value=i?0.35:0.5;o.connect(g);g.connect(drone);o.start();
-      const lfo=ctx.createOscillator();lfo.frequency.value=0.05+i*0.023;
-      const lg=ctx.createGain();lg.gain.value=0.15;lfo.connect(lg);lg.connect(g.gain);lfo.start();});
+    if(audio)return true;
+    audio=new Audio('assets/bgm.m4a');
+    audio.loop=true;audio.volume=0;audio.playbackRate=rate;
     return true;
   }
-  function pluck(f,when,vol){
-    const o=ctx.createOscillator();o.type='triangle';o.frequency.value=f;
-    const flt=ctx.createBiquadFilter();flt.type='lowpass';flt.frequency.value=1800;
-    const g=ctx.createGain();g.gain.setValueAtTime(0,when);
-    g.gain.linearRampToValueAtTime(vol,when+0.015);
-    g.gain.exponentialRampToValueAtTime(0.0001,when+2.6);
-    o.connect(flt);flt.connect(g);g.connect(master);o.start(when);o.stop(when+2.8);
-    const o2=ctx.createOscillator();o2.type='sine';o2.frequency.value=f*2; // 轻泛音
-    const g2=ctx.createGain();g2.gain.setValueAtTime(vol*0.25,when);
-    g2.gain.exponentialRampToValueAtTime(0.0001,when+1.2);
-    o2.connect(g2);g2.connect(master);o2.start(when);o2.stop(when+1.4);
-  }
-  function step(){
-    if(!playing)return;
-    if(Math.random()<0.78){ // 偶尔留白，像琴声断句
-      idx=Math.max(0,Math.min(PENTA.length-1,idx+[-2,-1,-1,0,1,1,2][Math.floor(Math.random()*7)]));
-      pluck(PENTA[idx],ctx.currentTime+0.05,0.16+Math.random()*0.06);
-      if(Math.random()<0.22)pluck(PENTA[Math.max(0,idx-2)]/2,ctx.currentTime+0.05,0.10); // 低八度应和
-    }
-    timer=setTimeout(step,(1700+Math.random()*2200)/rate);
+  function fadeTo(v){
+    clearInterval(timer);
+    timer=setInterval(()=>{
+      const d=1/(FADE_MS/100); // 每 100ms 一步，FADE_MS 内线性淡完
+      let nv=audio.volume+(v>audio.volume?d:-d);
+      if(Math.abs(nv-v)<=d){nv=v;clearInterval(timer)}
+      audio.volume=Math.max(0,Math.min(1,nv));
+    },100);
   }
   function start(){if(playing)return;if(!ensure())return;playing=true;
-    rate=loadSettings().bgmRate||1;
-    ctx.resume();
-    drone.gain.setTargetAtTime(0.10,ctx.currentTime,1.2);
-    master.gain.setTargetAtTime(0.5,ctx.currentTime,0.8);step();}
-  function stop(){if(!playing)return;playing=false;clearTimeout(timer);
-    if(ctx){master.gain.setTargetAtTime(0,ctx.currentTime,0.4);drone.gain.setTargetAtTime(0,ctx.currentTime,0.4);}}
+    audio.playbackRate=rate;
+    audio.play().then(()=>fadeTo(VOL)).catch(()=>{playing=false});}
+  function stop(){if(!playing)return;playing=false;
+    fadeTo(0);setTimeout(()=>{if(!playing&&audio)audio.pause()},FADE_MS+100);}
   document.addEventListener('visibilitychange',()=>{ // 切后台暂停，回来自动续
-    if(!ctx)return;
-    if(document.hidden)ctx.suspend();else if(playing)ctx.resume();});
-  return{start,stop,setRate(v){rate=Math.max(0.5,Math.min(1.5,v||1));},get playing(){return playing}};
+    if(!audio)return;
+    if(document.hidden)audio.pause();else if(playing)audio.play().catch(()=>{});});
+  return{start,stop,
+    setRate(v){rate=Math.max(0.5,Math.min(1.5,v||1));if(audio)audio.playbackRate=rate;},
+    get playing(){return playing}};
 })();
 function applyBgm(){if(loadSettings().bgm!==false)BGM.start();else BGM.stop()}
 document.addEventListener('pointerdown',()=>applyBgm(),{once:true}); // 首次点击后按设置启动（绕开自动播放限制）
