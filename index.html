@@ -35,6 +35,7 @@
   --cinnabar:#a63a2e; --cinnabar-deep:#8e2f24;
   --indigo:#2f4858; --gold:#b08d4a;
   --line:rgba(43,38,32,.14); --shadow:0 2px 12px rgba(43,38,32,.08);
+  --line-strong:rgba(43,38,32,.28); --line-gold:rgba(176,141,74,.55);
   --scrim:rgba(43,38,32,.45);
   --delta-up:#f6e8e4; --delta-down:#e9edf0;
   --sans:"Zhuque Fangsong","STFangsong","FangSong","仿宋","Songti SC","STSong","宋体","SimSun",serif;
@@ -48,6 +49,7 @@
   --cinnabar:#c85a4b; --cinnabar-deep:#b04a3c; --indigo:#7d99ab; --gold:#c8a869;
   --line:rgba(239,231,215,.16); --shadow:0 2px 12px rgba(0,0,0,.4);
   --scrim:rgba(0,0,0,.55); --delta-up:#3a2b27; --delta-down:#26303a;
+  --line-strong:rgba(239,231,215,.3); --line-gold:rgba(200,163,92,.5);
 }}
 :root[data-theme="dark"]{
   --paper:#1c1915; --paper-deep:#262119; --card:#2a241c;
@@ -55,6 +57,7 @@
   --cinnabar:#c85a4b; --cinnabar-deep:#b04a3c; --indigo:#7d99ab; --gold:#c8a869;
   --line:rgba(239,231,215,.16); --shadow:0 2px 12px rgba(0,0,0,.4);
   --scrim:rgba(0,0,0,.55); --delta-up:#3a2b27; --delta-down:#26303a;
+  --line-strong:rgba(239,231,215,.3); --line-gold:rgba(200,163,92,.5);
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html{-webkit-text-size-adjust:100%}
@@ -133,12 +136,26 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
 /* ---------- 旬首安排 ---------- */
 .focus-cap{font-size:13px;color:var(--gold);letter-spacing:.15em;margin:2px 0 8px}
 
-/* ---------- 底部操作栏 ---------- */
-.tabbar{position:sticky;bottom:0;z-index:10;display:flex;background:var(--card);border-top:1px solid var(--line);padding:6px 4px calc(6px + var(--sab))}
-.tab{flex:1;min-height:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:12px;color:var(--ink-soft);letter-spacing:.1em}
-.tab::before{content:"";width:4px;height:4px;border-radius:50%;background:transparent}
-.tab.active{color:var(--cinnabar)}
-.tab.active::before{background:var(--cinnabar)}
+/* ---------- 底部操作栏（设计来源：shengongci-bottom-nav） ---------- */
+.tabbar{position:sticky;bottom:0;z-index:10;display:flex;background:var(--card);border-top:1px solid var(--line-strong);height:calc(66px + var(--sab));padding:0 0 var(--sab)}
+/* 金细线：贴顶边内侧，呼应诗题金线 */
+.tabbar::after{content:"";position:absolute;top:3px;left:0;right:0;height:1px;background:var(--line-gold);pointer-events:none}
+/* 装裱式内框细线 */
+.tabbar::before{content:"";position:absolute;left:7px;right:7px;top:6px;bottom:calc(5px + var(--sab));border:1px solid var(--line);pointer-events:none}
+/* 四角金色角线，如装裱角 */
+.nav-corners{position:absolute;left:7px;right:7px;top:6px;bottom:calc(5px + var(--sab));pointer-events:none;background-repeat:no-repeat;
+  background-image:linear-gradient(var(--line-gold),var(--line-gold)),linear-gradient(var(--line-gold),var(--line-gold)),linear-gradient(var(--line-gold),var(--line-gold)),linear-gradient(var(--line-gold),var(--line-gold)),linear-gradient(var(--line-gold),var(--line-gold)),linear-gradient(var(--line-gold),var(--line-gold)),linear-gradient(var(--line-gold),var(--line-gold)),linear-gradient(var(--line-gold),var(--line-gold));
+  background-size:9px 1px,1px 9px,9px 1px,1px 9px,9px 1px,1px 9px,9px 1px,1px 9px;
+  background-position:left top,left top,right top,right top,left bottom,left bottom,right bottom,right bottom}
+.tab{flex:1;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:12px;color:var(--ink);opacity:.72;transition:color .25s,opacity .25s}
+.tab svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
+.tab-label{letter-spacing:.28em;padding-left:.28em;line-height:1}
+/* 入口之间的界行细线 */
+.tab + .tab::before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:1px;height:32px;background:var(--line)}
+/* 朱砂小印点：选中标记 */
+.tab::after{content:"";width:4px;height:4px;background:var(--cinnabar);transform:rotate(45deg) scale(0);transition:transform .28s}
+.tab.active{color:var(--cinnabar);opacity:1}
+.tab.active::after{transform:rotate(45deg) scale(1)}
 .tab:active{opacity:.6}
 
 /* ---------- 查询面板（bottom sheet） ---------- */
@@ -267,7 +284,7 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
 .hs:active>span{background:var(--paper-deep)}
 .hs-badge{margin-top:1px;background:#fdfbf5;border:1px solid #b0442f;color:#b0442f;border-radius:999px;padding:4px 12px;font-size:13px;white-space:nowrap;box-shadow:0 2px 8px rgba(46,36,21,.2)}
 /* 精力条（三色，底部横条） */
-.energyrow{position:absolute;left:0;right:0;bottom:calc(50px + var(--sab));z-index:5;display:flex;align-items:center;gap:12px;padding:12px 18px;background:transparent;border-top:none}
+.energyrow{position:absolute;left:0;right:0;bottom:calc(66px + var(--sab));z-index:5;display:flex;align-items:center;gap:12px;padding:12px 18px;background:transparent;border-top:none}
 .energyrow .elabel{font-size:15px;color:#33302A;flex:none;text-shadow:0 1px 3px rgba(245,239,227,.9),0 0 6px rgba(245,239,227,.7)}
 .etrack{flex:1;height:12px;border-radius:999px;background:#e6dccb;border:1px solid rgba(43,38,32,.18);overflow:hidden}
 .etrack>i{display:block;height:100%;border-radius:999px;transition:width .35s,background .35s}
@@ -435,10 +452,23 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
   <div id="dim"></div>
   <div class="energyrow num"><span class="elabel">精力</span><div class="etrack"><i id="eFill" style="width:100%;background:#33302A"></i></div><b id="eNum">100/100</b></div>
   <nav class="tabbar">
-    <button class="tab" data-tab="状态" onclick="UI.openSheet('状态',this)">状态</button>
-    <button class="tab" data-tab="行囊" onclick="UI.openSheet('行囊',this)">行囊</button>
-    <button class="tab" data-tab="人物" onclick="UI.openSheet('人物',this)">人物</button>
-    <button class="tab" data-tab="设置" onclick="UI.openSheet('设置',this)">设置</button>
+    <i class="nav-corners"></i>
+    <button class="tab" data-tab="状态" onclick="UI.openSheet('状态',this)" aria-label="状态">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="4.9" r="1.7"/><path d="M12 6.6v1.2"/><rect x="7.4" y="7.8" width="9.2" height="11.6" rx="2.6"/><path d="M10 11.7h4M10 14.3h4"/><path d="M10.5 19.4v1.9M12 19.4v2.3M13.5 19.4v1.9"/></svg>
+      <span class="tab-label">状态</span>
+    </button>
+    <button class="tab" data-tab="行囊" onclick="UI.openSheet('行囊',this)" aria-label="行囊">
+      <svg viewBox="0 0 24 24"><path d="M12 7.6C10.3 5.4 8.3 5.8 8.6 7.9"/><path d="M12 7.6c1.7-2.2 3.7-1.8 3.4.3"/><path d="M12 8.6c-3.8 0-6.6 2-6.6 4.6 0 3.9 3 6.2 6.6 6.2s6.6-2.3 6.6-6.2c0-2.6-2.8-4.6-6.6-4.6Z"/><path d="M12 8.8 6.6 18.4M12 8.8l5.4 9.6"/></svg>
+      <span class="tab-label">行囊</span>
+    </button>
+    <button class="tab" data-tab="人物" onclick="UI.openSheet('人物',this)" aria-label="人物">
+      <svg viewBox="0 0 24 24"><rect x="6.6" y="4.6" width="10.8" height="14.8" rx="1.1"/><path d="M15.4 4.6v14.8"/><path d="M14.3 8.4h2.2M14.3 15.6h2.2"/><rect x="8.7" y="7" width="3.3" height="5.6" rx=".5"/></svg>
+      <span class="tab-label">人物</span>
+    </button>
+    <button class="tab" data-tab="设置" onclick="UI.openSheet('设置',this)" aria-label="设置">
+      <svg viewBox="0 0 24 24"><rect x="5.2" y="5.2" width="13.6" height="13.6" rx="1.4"/><path d="M12 5.2v13.6M5.2 12h13.6"/><rect x="9.9" y="9.9" width="4.2" height="4.2" rx=".6"/></svg>
+      <span class="tab-label">设置</span>
+    </button>
   </nav>
   <!-- 隐藏叙事流：结算卡片仍写入（历史/导出用），不再作为界面呈现 -->
   <div class="stream" id="stream" style="display:none"></div>
