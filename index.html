@@ -1612,7 +1612,7 @@ const CRAFT_MODULE = [
 /* ============================================================ 工具 */
 const $=s=>document.querySelector(s);
 const MONTHS=['','正月','二月','三月','四月','五月','六月','七月','八月','九月','十月','冬月','腊月'];
-const BUILD='2026-11-10·藏书阁V2'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
+const BUILD='2026-11-10·藏书阁V3'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
 /* 月俸：按位份每月下旬末由前端自动入账（单位：两） */
 const SALARY_BY_GRADE={'正一品':220,'从一品':150,'正二品':110,'从二品':80,'正三品':60,'从三品':45,'正四品':36,'从四品':28,'正五品':20,'从五品':15,'正六品':12,'从六品':10,'正七品':8,'从七品':6,'正八品':5,'从八品':4,'正九品':3,'从九品':2};
 const SALARY_TITLES=[[/皇后/,220],[/皇贵妃/,150],[/贵妃/,110],[/贤妃|良妃|淑妃|德妃/,80],[/昭仪|昭容|昭媛|修仪|修容|修媛|充仪|充容|充媛/,45],[/贵嫔/,36],[/嫔/,28],[/贵人/,20],[/才人/,15],[/美人/,12],[/宝林/,10],[/常在/,8],[/答应/,6],[/选侍/,5],[/更衣/,4],[/采女/,3],[/官女子/,2],[/妃/,60]];
@@ -3377,13 +3377,14 @@ const UI={
       const key=skillKeyIn(sk,k),v=key?Number(sk[key])||0:0;
       if(!key)return `<button class="skillcell lock" onclick="UI.goSheet('求艺','${k}')"><span>${k}</span><span class="slv">未解锁 · 求师／寻书</span></button>`;
       const sel=selSkill===k?' sel':'';
-      const bk=libHeldBook(state,k)?' · 有谱':'';
-      return `<button class="skillcell${sel}" onclick="UI.pickSkill('${k}')"><span>${k}</span><span class="slv">${v>0?SKILL_LEVEL(v)+' '+v:'未学'}${bk}</span></button>`;
+      return `<button class="skillcell${sel}" onclick="UI.pickSkill('${k}')"><span>${k}</span><span class="slv">${v>0?SKILL_LEVEL(v)+' '+v:'未学'}</span></button>`;
     }).join('');
     const cost=focusEnergyCost('才艺修习');
+    const heldBk=selSkill&&libHeldBook(state,selSkill)?`<div class="sheet-note" style="margin:10px 0 0">手边${libHeldBook(state,selSkill).name}在案：本旬修习「${esc(selSkill)}」进益取高档。</div>`:'';
     const notes=(state.protagonist&&state.protagonist.skillNotes)?`<div class="sheet-note" style="margin-bottom:10px">当前修习：${esc(state.protagonist.skillNotes)}</div>`:'';
     return `${notes}<div class="skillgrid">${cells}</div>
       <button class="btn btn-primary" style="border-radius:22px;letter-spacing:.12em;font-size:14px" ${selSkill?'':'disabled'} onclick="Game.confirmSkill()">${selSkill?`确认修习「${esc(selSkill)}」 · 精力 −${cost}`:`先择一门技艺`}</button>
+      ${heldBk}
       <div class="sheet-note">开局所习才艺共四十点。未解锁的技艺，先得打听谁会——与相识之人交好，或问身边侍女；知道后，再登门当面求师。</div>
       <div class="setbtns"><button class="btn btn-line" onclick="Game.openCraft()">手作 · 用材料做一件东西</button></div>`;
   },
@@ -6229,7 +6230,7 @@ const Game={
     p.skills[key]=Math.min(SKILL_MAX,before+gain);
     state.energy=Math.max(0,Math.round(state.energy-cost));
     const level=SKILL_LEVEL(before);
-    const flavor=gain>0?[
+    let flavor=gain>0?[
       `你敛息凝神，一味苦修${k}，收势时指节微酸——但${k}确有进益。`,
       `这一旬心无旁骛，${k}进益${gain}点，${before<30?'虽仍生疏，倒也像了个样子':before<70?'日渐娴熟':before<100?'愈发精纯':`${level}之境又稳了一分`}。`,
       `反复打磨之下，${k}又精进了${gain}点。宫人路过，都夸你勤勉。`,
