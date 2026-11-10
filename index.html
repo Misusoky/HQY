@@ -6260,7 +6260,6 @@ const Game={
     const pool=L.present.filter(id=>!L.revealed.includes(id));
     if(!pool.length){toast('阁中书目你已尽数翻见');return}
     if((state.energy??0)<5){toast('精力不足，先歇一歇');return}
-    UI.closeSheet();
     state.energy=Math.max(0,Math.round(state.energy-5));
     L.lastSearchTurn=state.turn;
     const b=libBook(pool[Math.floor(Math.random()*pool.length)]);
@@ -6269,11 +6268,12 @@ const Game={
       `你在书架间翻检良久，尘灰簌簌，终于抽出一册${b.name}——${b.desc}`,
       `管书的女官捧来一函，解开缠绳，是${b.name}。${b.desc}`,
       `你从架顶够下一册${b.name}，扉页有前人圈点。${b.desc}`
-    ][Math.floor(Math.random()*3)];
+    ][Math.floor(Math.random()*3)]+' 书仍留在阁中：可借阅持归、花银抄录，或在阁内研读。';
     history.push({turn:state.turn,focus:'藏书阁寻书',choice:'',narrative:flavor,log:`寻得${b.name}`});
     logXunAction('藏书阁寻书');
     persistCurrent();markSafe();UI.updateStatusbar();checkRestWarn();
-    UI.actResult('藏书阁寻书',flavor,[`寻得 ${b.name}（${b.cat}·${LIB_TIERS[b.tier]}）`]);
+    UI.renderSheet('藏书阁'); // 面板留在身后，弹窗关掉即见新书与借阅/抄录/研读按钮
+    UI.actResult('藏书阁寻书',flavor,[`寻得 ${b.name}（${b.cat}·${LIB_TIERS[b.tier]}）`,'书在阁中：下一步可借阅／抄录／研读']);
     if(state.energy<=0)setTimeout(()=>this.collapse(),600);
   },
   libBorrow(id){ // 借阅：蒙学、进阶可借一册，旬末自动归还
@@ -6308,7 +6308,6 @@ const Game={
     const p=state.protagonist,cost=b.copy||0;
     if((Number(p.silver)||0)<cost){toast('银两不够抄录之资');return}
     if((state.energy??0)<10){toast('精力不足，抄不动了');return}
-    UI.closeSheet();
     p.silver=Math.max(0,Math.round((Number(p.silver)||0)-cost));
     state.energy=Math.max(0,Math.round(state.energy-10));
     L.owned.push(id);
@@ -6316,6 +6315,7 @@ const Game={
     history.push({turn:state.turn,focus:`抄录${b.name}`,choice:'',narrative:flavor,log:`抄录${b.name} · ${cost}两`});
     logXunAction(`抄录${b.name}`);
     persistCurrent();markSafe();UI.updateStatusbar();checkRestWarn();
+    UI.renderSheet('藏书阁');
     UI.actResult('抄录书册',flavor,[`${b.name} 已入藏书`,`银两 −${cost}`]);
     if(state.energy<=0)setTimeout(()=>this.collapse(),600);
   },
@@ -6333,7 +6333,6 @@ const Game={
     if(key&&v>0&&v<100){toast('此艺你已入门，进益在修习——持此谱册修习，进益取高档');return}
     if(key&&v>=100&&b.tier!==3){toast('寻常书册已教不了你什么；过百之后，只有孤本值得一读');return}
     if((state.energy??0)<10){toast('精力不足，读不进去');return}
-    UI.closeSheet();
     state.energy=Math.max(0,Math.round(state.energy-10));
     L.lastReadTurn=state.turn;
     const skillName=CR_SKILLNAME[b.skill]||b.skill;
@@ -6354,6 +6353,7 @@ const Game={
     }
     logXunAction(`研读${b.name}`);
     persistCurrent();markSafe();UI.updateStatusbar();checkRestWarn();
+    UI.renderSheet('藏书阁');
     UI.actResult('研读',flavor,deltas);
     if(state.energy<=0)setTimeout(()=>this.collapse(),600);
   },
