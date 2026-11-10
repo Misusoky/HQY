@@ -1586,14 +1586,14 @@ SCENE_PARTS_RULES,
 '- 若不适合对话形式（突发事态、文书、独自发现等），可不用 scene，按原有 hasEvent+options 两轮制输出。'
 ].join('\n');
 
-/* 才艺解锁：开局配点、知情边界与求师门槛（前端已实现侍女打听与求师入口，藏书阁暂只留入口） */
+/* 才艺解锁：开局配点、知情边界与求师门槛（前端已实现侍女打听、求师与藏书阁书册） */
 const SKILL_MODULE = [
 '## 十、才艺、见闻与求师（本条覆盖世界书才艺生成的默认表述）',
 '1. 新档开局时主控只习 1—2 门才艺，合计 40 点；存档 protagonist.skills 中未列出的技艺，一律视为未习，正文按未习处理。',
 '2. 主控不知道宫中诸人各擅何艺。她只知道自己已听说的才艺（存档 npcs.<名>.skillIntel）；获知途径有两条：与对方交好到好感 30 自然知晓；或问身边侍女打听（前端结算并写入 skillIntel）。',
 '3. 新才艺只能来自向已知的能人求师，或藏书阁书册。求师必须由主控与该 NPC 当面会面时提起；双方好感达 50、对方此艺高于 50，她才可能应允（可先考较或提条件）；满足这些条件方可学成。',
 '4. 应允时本旬只是入门：statePatch 写 protagonist.skills.<技艺名> 为 5—10，并同步更新 protagonist.skillNotes；未学成时不写新技艺。',
-'5. 藏书阁前端暂未开放；相关内容留待其开放后。'
+'5. 藏书阁书册：寻书、借阅、抄录、案头、研读的点数与进益前端均已自结，正文只按既成事实演绎，不得重复结算。书册与修习的分工——未习之艺，研读书册可依书入门（蒙学3—5、进阶4—7、孤本5—8）；已习而未过百，读书不直接长进益，但本旬借阅中或案头置有该艺谱册时，前端修习进益已按高档结算，正文按"谱册在旁、章法可循"演绎；才艺过百后寻常书册教无可教，唯孤本研读可稳定进益（前端+1）。孤本不可外借、不可抄录，只可在阁内研读。'
 ].join('\n');
 
 /* 手作成品：前端已生成并入库，主模型只承接，不重复结算 */
@@ -1706,6 +1706,69 @@ function skillGainAt(v){ // 本地修习进益：100以下1—3点；过100后�
   const p=Math.max(0.12,1-(v-100)/220); // 100→必得；150→约0.77；200→约0.55；300以后仍有约一成
   if(Math.random()>=p)return 0;
   return (v<130&&Math.random()<0.2)?2:1;
+}
+/* 藏书阁书册：前端自结。书不占中段的修习轨道——未习→研读入门；已习未过百→持谱修习取高档；过百→唯孤本研读+1 */
+const LIB_TIERS=['','蒙学','进阶','孤本'];
+const LIB_BOOKS=[
+  {id:'q1',name:'《琴学入门》',cat:'琴谱',skill:'琴',tier:1,copy:6,desc:'右手八法、左手吟猱，先正指法。'},
+  {id:'q2',name:'《弈理指归》',cat:'棋谱',skill:'棋',tier:1,copy:6,desc:'布局定势，先学算路。'},
+  {id:'s1',name:'《笔阵图说》',cat:'字帖',skill:'书',tier:1,copy:6,desc:'执笔五字、点画八法，入门津梁。'},
+  {id:'h1',name:'《写形浅说》',cat:'画谱',skill:'画',tier:1,copy:6,desc:'六法之要，先习传移摹写。'},
+  {id:'g1',name:'《乐府声律启蒙》',cat:'曲谱',skill:'歌',tier:1,copy:6,desc:'五音吐纳，板眼先行。'},
+  {id:'w1',name:'《习舞初阶》',cat:'舞谱',skill:'舞',tier:1,copy:6,desc:'软开身形，从云手起步。'},
+  {id:'n1',name:'《针黹入门》',cat:'绣谱',skill:'女红',tier:1,copy:6,desc:'劈丝配色，先平针而后抢针。'},
+  {id:'y1',name:'《本草蒙求》',cat:'医书',skill:'医术',tier:1,copy:6,desc:'辨性味归经，识常见百药。'},
+  {id:'z1',name:'《花月令》',cat:'花谱',skill:'莳花',tier:1,copy:6,desc:'十二月令花事，浇水施肥皆有度。'},
+  {id:'x1',name:'《名香小识》',cat:'香谱',skill:'香道',tier:1,copy:6,desc:'辨沉檀龙麝，合香先识底料。'},
+  {id:'q3',name:'《溪山琴况》',cat:'琴谱',skill:'琴',tier:2,copy:16,desc:'二十四况，和静清远。'},
+  {id:'q4',name:'《弈括》',cat:'棋谱',skill:'棋',tier:2,copy:16,desc:'虚实弃取，棋路须算深一层。'},
+  {id:'s3',name:'《九成宫醴泉铭拓本》',cat:'字帖',skill:'书',tier:2,copy:16,desc:'欧体险峻，间架森严。'},
+  {id:'h3',name:'《林泉高致》',cat:'画谱',skill:'画',tier:2,copy:16,desc:'三远之法，山水的眼睛。'},
+  {id:'g3',name:'《唱论摘》',cat:'曲谱',skill:'歌',tier:2,copy:16,desc:'字正腔圆，气息为根。'},
+  {id:'n3',name:'《绣谱》',cat:'绣谱',skill:'女红',tier:2,copy:16,desc:'齐光直匀，绣理从画理中来。'},
+  {id:'y3',name:'《伤寒论摘》',cat:'医书',skill:'医术',tier:2,copy:16,desc:'六经辨证，方随证转。'},
+  {id:'z3',name:'《菊谱》',cat:'花谱',skill:'莳花',tier:2,copy:16,desc:'嫁接扦插，品类渐繁。'},
+  {id:'q5',name:'《幽兰残谱》',cat:'琴谱',skill:'琴',tier:3,copy:0,desc:'古谱残卷，指法古奥，只许在阁内研读。'},
+  {id:'q6',name:'《玄玄棋经古本》',cat:'棋谱',skill:'棋',tier:3,copy:0,desc:'死活三百六十式，宫外已无传本。'},
+  {id:'s5',name:'《快雪残帖》',cat:'字帖',skill:'书',tier:3,copy:0,desc:'前人手泽，只剩半卷。'},
+  {id:'n5',name:'《顾氏绣谱真本》',cat:'绣谱',skill:'女红',tier:3,copy:0,desc:'劈丝细过发，配色暗有光。'},
+  {id:'h5',name:'《雪江归棹图卷》',cat:'画谱',skill:'画',tier:3,copy:0,desc:'禁中旧藏，摹本难求。'},
+  {id:'x5',name:'《北苑名芳香谱》',cat:'香谱',skill:'香道',tier:3,copy:0,desc:'宫中旧香方，大半已经失传。'}
+];
+function libBook(id){return LIB_BOOKS.find(b=>b.id===id)||null}
+function libState(s){ // 藏书阁账目：幂等建账，旧档首次进入时编目上架
+  s=s||state;
+  s.library=s.library&&typeof s.library==='object'&&!Array.isArray(s.library)?s.library:{};
+  const L=s.library;
+  L.present=Array.isArray(L.present)?L.present:[];
+  if(!L.present.length){
+    const pick=(arr,n)=>arr.slice().sort(()=>Math.random()-.5).slice(0,n).map(b=>b.id);
+    L.present=LIB_BOOKS.filter(b=>b.tier===1).map(b=>b.id)
+      .concat(pick(LIB_BOOKS.filter(b=>b.tier===2),6),pick(LIB_BOOKS.filter(b=>b.tier===3),2));
+  }
+  L.revealed=Array.isArray(L.revealed)?L.revealed:[];
+  L.owned=Array.isArray(L.owned)?L.owned:[];
+  if(typeof L.borrowed!=='string')L.borrowed=null;
+  if(L.borrowed&&!L.present.includes(L.borrowed))L.borrowed=null;
+  if(typeof L.desk!=='string')L.desk=null;
+  if(L.desk&&!L.owned.includes(L.desk))L.desk=null;
+  if(typeof L.lastSearchTurn!=='number')L.lastSearchTurn=-1;
+  if(typeof L.lastReadTurn!=='number')L.lastReadTurn=-1;
+  return L;
+}
+function libHeldBook(s,k){ // 手头（借阅中或案头）有 k 艺谱册 → 返回该书册
+  const L=libState(s);if(!L)return null;
+  for(const id of [L.borrowed,L.desk]){
+    const b=id&&libBook(id);
+    if(b&&b.skill===k)return b;
+  }
+  return null;
+}
+function skillGainAtBook(v){ // 有谱册在旁：修习取高档——未满100时2—3点；过百后得点概率上调
+  if(v<100)return 2+Math.floor(Math.random()*2);
+  const p=Math.min(1,Math.max(0.12,1-(v-100)/220)*1.5);
+  if(Math.random()>=p)return 0;
+  return (v<130&&Math.random()<0.35)?2:1;
 }
 function bondValue(s,who){ // 可作交情的数值：仇恨不算；帝的宠爱视同好感
   const rel=(s&&s.relationships||{})[who];
@@ -2300,6 +2363,7 @@ function normalizeState(s){
   }
   s.energy=Math.min(ENERGY_MAX,Math.round(s.energy));
   if(typeof s.mealCount!=='number'||!(s.mealCount>=0))s.mealCount=0; // 本旬已传膳次数（每旬至多三次）
+  libState(s); // 藏书阁账目：旧档首次编目上架，缺项补齐
   for(const id in s.npcs){ // 人物档案补全：旧档或模型新建的人物缺字段时人物谱会直接报错
     const n=s.npcs[id];if(!n||typeof n!=='object')continue;
     ensureNpcSkills(n,id); // 补才艺：求师名单据此生成
@@ -3301,7 +3365,8 @@ const UI={
       const key=skillKeyIn(sk,k),v=key?Number(sk[key])||0:0;
       if(!key)return `<button class="skillcell lock" onclick="UI.goSheet('求艺','${k}')"><span>${k}</span><span class="slv">未解锁 · 求师／寻书</span></button>`;
       const sel=selSkill===k?' sel':'';
-      return `<button class="skillcell${sel}" onclick="UI.pickSkill('${k}')"><span>${k}</span><span class="slv">${v>0?SKILL_LEVEL(v)+' '+v:'未学'}</span></button>`;
+      const bk=libHeldBook(state,k)?' · 有谱':'';
+      return `<button class="skillcell${sel}" onclick="UI.pickSkill('${k}')"><span>${k}</span><span class="slv">${v>0?SKILL_LEVEL(v)+' '+v:'未学'}${bk}</span></button>`;
     }).join('');
     const cost=focusEnergyCost('才艺修习');
     const notes=(state.protagonist&&state.protagonist.skillNotes)?`<div class="sheet-note" style="margin-bottom:10px">当前修习：${esc(state.protagonist.skillNotes)}</div>`:'';
@@ -3339,15 +3404,52 @@ const UI={
       <div class="sec"><div class="sec-cap">求师之礼</div>
         <div class="sheet-note">当面提起想学此艺，且双方好感达 ${SKILL_TEACH_BOND}、对方此艺高于 ${SKILL_TEACH_MIN}，她才肯教。条件不足，多半婉拒。</div></div>
       <div class="sec"><div class="sec-cap">三、藏书阁寻书</div>
-        <div class="sheet-note">藏书阁正在整理书目，暂未开放。往后可去翻找与「${esc(k)}」相关的书册，依书自学。</div>
-        <div class="setbtns"><button class="btn btn-line" onclick="UI.goSheet('藏书阁')">看看藏书阁</button></div></div>`;
+        <div class="sheet-note">往藏书阁翻阅书目，寻得谱册可借、可抄：持谱修习此艺，进益取高档；未习之艺，研读书册也能依书入门，不必求人。</div>
+        <div class="setbtns"><button class="btn btn-line" onclick="UI.goSheet('藏书阁')">往藏书阁寻书</button></div></div>`;
   },
   sheetLibrary(){
-    return `<button class="backbtn" onclick="UI.sheetBack()">◀ 返回</button>
-      <div class="sec"><div class="sec-cap">藏书阁</div>
-      <div class="sheet-note">阁中书册尚在整理，未及编目。管书的女官只应了一句：等理清了，再来。</div>
-      <div class="itemrow"><span>琴谱 · 棋谱 · 字帖 · 画谱 · 医书 · 花谱 · 香谱</span><span class="cnt">待开放</span></div></div>
-      <div class="sheet-note">往后可在此寻得与某项才艺相关的书册，依书自学，解锁新艺。</div>`;
+    const L=libState();
+    const energy=Math.round(state.energy??0);
+    const silver=Number(state.protagonist&&state.protagonist.silver)||0;
+    const skills=(state.protagonist&&state.protagonist.skills)||{};
+    const searched=L.lastSearchTurn===state.turn;
+    const readDone=L.lastReadTurn===state.turn;
+    const unseen=L.present.length-L.revealed.length;
+    const tierQ=t=>['','q-rough','q-fine','q-rare'][t]||'q-normal';
+    const heldHtml=[['borrowed','借阅中 · 旬末归还'],['desk','案头']].map(([slot,tag])=>{
+      const b=L[slot]&&libBook(L[slot]);if(!b)return'';
+      return `<div class="itemrow"><span>${esc(b.name)}（${esc(b.cat)}·${LIB_TIERS[b.tier]}）<span class="tag">${tag}</span></span><span class="cnt">修习「${esc(b.skill)}」取高档</span></div>`;
+    }).join('');
+    const rows=L.revealed.map(id=>{
+      const b=libBook(id);if(!b)return'';
+      const owned=L.owned.includes(id);
+      const learned=skillKeyIn(skills,b.skill),lv=learned?Number(skills[learned])||0:0;
+      const readable=b.tier===3||owned||L.borrowed===id;
+      const readGain=!learned?`入门 ${['','3—5','4—7','5—8'][b.tier]}`:(lv>=100&&b.tier===3?'过百 +1':null);
+      let btns='';
+      if(b.tier<3&&!owned){
+        if(L.borrowed===id)btns+=`<button class="btn btn-line" onclick="Game.libReturn()">提前归还</button>`;
+        else{
+          btns+=`<button class="btn btn-line" ${L.borrowed?'disabled style="opacity:.45"':''} onclick="Game.libBorrow('${b.id}')">借阅</button>`;
+          btns+=`<button class="btn btn-line" ${silver<(b.copy||0)?'disabled style="opacity:.45"':''} onclick="Game.libCopy('${b.id}')">抄录 · ${b.copy}两</button>`;
+        }
+      }
+      if(owned)btns+=`<button class="btn btn-line" onclick="Game.libDesk('${b.id}')">${L.desk===id?'撤下案头':'置为案头'}</button>`;
+      if(readGain)btns+=`<button class="btn btn-line" ${(readDone||energy<10||!readable)?'disabled style="opacity:.45"':''} onclick="Game.libRead('${b.id}')">研读 · 精力 −10（${readGain}）</button>`;
+      else if(b.tier===3&&learned&&lv>0&&lv<100)btns+=`<span class="sheet-note" style="margin:0">已入门：持谱修习取高档；过百后阁内研读可再进益</span>`;
+      else if(learned&&lv>0&&lv<100)btns+=`<span class="sheet-note" style="margin:0">此艺已入门：持谱修习取高档，进益在修习</span>`;
+      const status=b.tier===3?'孤本 · 只许阁内研读':owned?'已抄录':L.borrowed===id?'在你手中':'在架';
+      return `<div class="sec"><div class="sec-cap">${esc(b.name)} <span class="qbadge ${tierQ(b.tier)}">${LIB_TIERS[b.tier]}</span></div>
+        <div class="itemrow"><span>${esc(b.cat)} · 涉「${esc(b.skill)}」 · ${esc(status)}</span></div>
+        <div class="sheet-note" style="margin:0 0 8px">${esc(b.desc)}</div>
+        <div class="setbtns" style="margin:0">${btns||'<span class="sheet-note" style="margin:0">借阅中，旬末归还</span>'}</div></div>`;
+    }).join('');
+    return `<div class="sheet-note" style="margin-top:2px">藏书阁分架陈列谱册。寻书每旬一次；蒙学、进阶之书可借阅（一册，旬末归还）或花银抄录永为已有，抄得者可择一册置案头——手头有谱，修习该艺进益取高档；孤本不可外借、不可抄录，只可在阁内研读。</div>
+      <div class="sec"><div class="sec-cap">寻书</div>
+        <div class="setbtns"><button class="btn btn-line" ${searched||energy<5?'disabled style="opacity:.45"':''} onclick="Game.libSearch()">${searched?'本旬已寻过':'翻阅书目 · 精力 −5'}</button></div>
+        <div class="sheet-note" style="margin:0">${unseen>0?`尚有 ${unseen} 部未曾翻见，慢慢寻来。`:'阁中书目你已尽数翻见。'}　研读每旬一次 · 精力 −10</div></div>
+      ${heldHtml?`<div class="sec"><div class="sec-cap">手头谱册</div>${heldHtml}</div>`:''}
+      ${rows||'<div class="sheet-note">翻一翻书目，看看阁里有什么。</div>'}`;
   },
   /* 传膳菜单：本旬膳单 + 剩余次数（前端自结，不调 API） */
   sheetMeal(){
@@ -4970,6 +5072,7 @@ const Game={
   nextTurn(){ // 休息，进入下一旬：旬数+1，精力回满，日历按两旬制推进
     const prevTime=Object.assign({},state.time);
     state.turn=(state.turn||0)+1;state.energy=ENERGY_MAX;state.energyWarned=false;state.mealCount=0;state.walkCount=0;state.time=advanceTime(state.time);
+    {const L=state.library;if(L&&L.borrowed){const b=libBook(L.borrowed);L.borrowed=null;toast(`借期已满，${b?b.name:'书册'}已归还藏书阁`,2800)}}
     const salary=this._payMonthlySalary(prevTime); // 下旬→次月上旬：结算刚过完这个月的月俸
     { // 体质（气血）高出根基的部分，每旬自然回落 1 点
       const at=state.protagonist&&state.protagonist.attributes;
@@ -5864,7 +5967,8 @@ const Game={
     const key=Object.keys(p.skills).find(x=>x.indexOf(k)>-1)||k;
     const before=Number(p.skills[key])||0;
     const cost=focusEnergyCost('才艺修习');
-    const gain=skillGainAt(before); // 100以下1—3点；过100后递减，但不封顶
+    const book=libHeldBook(state,k); // 手头有该艺谱册（借阅中或案头）→ 修习取高档
+    const gain=book?skillGainAtBook(before):skillGainAt(before); // 100以下1—3点；过100后递减，但不封顶
     p.skills[key]=Math.min(SKILL_MAX,before+gain);
     state.energy=Math.max(0,Math.round(state.energy-cost));
     const level=SKILL_LEVEL(before);
@@ -5879,6 +5983,7 @@ const Game={
       `练到收势，${k}只觉比往日更艰涩，进益微乎其微。`,
       `你把旧谱翻来覆去地磨，${k}依旧停在原处——火候未到，急不得。`
     ][Math.floor(Math.random()*3)];
+    if(book)flavor+=` 手边${book.name}翻在膝上，章法可循，这一旬进益比平日扎实。`;
     history.push({turn:state.turn,focus:`才艺修习·${k}`,choice:'',narrative:flavor,log:`${k} +${gain}`});
     logXunAction(`才艺修习·${k}`);
     persistCurrent();markSafe();UI.updateStatusbar();checkRestWarn();
@@ -5923,6 +6028,111 @@ const Game={
     logXunAction(`侍女打听·${skillName}`);
     persistCurrent();markSafe();UI.updateStatusbar();checkRestWarn();
     UI.actResult('侍女打听',flavor,deltas);
+    if(state.energy<=0)setTimeout(()=>this.collapse(),600);
+  },
+  libSearch(){ // 藏书阁寻书：耗5精力，每旬一次，从在架未见的谱册里翻出一部
+    if(!state||!state.protagonist){toast('尚未开局');return}
+    if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
+    const L=libState();
+    if(L.lastSearchTurn===state.turn){toast('本旬已翻过书目了，下旬再来');return}
+    const pool=L.present.filter(id=>!L.revealed.includes(id));
+    if(!pool.length){toast('阁中书目你已尽数翻见');return}
+    if((state.energy??0)<5){toast('精力不足，先歇一歇');return}
+    UI.closeSheet();
+    state.energy=Math.max(0,Math.round(state.energy-5));
+    L.lastSearchTurn=state.turn;
+    const b=libBook(pool[Math.floor(Math.random()*pool.length)]);
+    L.revealed.push(b.id);
+    const flavor=[
+      `你在书架间翻检良久，尘灰簌簌，终于抽出一册${b.name}——${b.desc}`,
+      `管书的女官捧来一函，解开缠绳，是${b.name}。${b.desc}`,
+      `你从架顶够下一册${b.name}，扉页有前人圈点。${b.desc}`
+    ][Math.floor(Math.random()*3)];
+    history.push({turn:state.turn,focus:'藏书阁寻书',choice:'',narrative:flavor,log:`寻得${b.name}`});
+    logXunAction('藏书阁寻书');
+    persistCurrent();markSafe();UI.updateStatusbar();checkRestWarn();
+    UI.actResult('藏书阁寻书',flavor,[`寻得 ${b.name}（${b.cat}·${LIB_TIERS[b.tier]}）`]);
+    if(state.energy<=0)setTimeout(()=>this.collapse(),600);
+  },
+  libBorrow(id){ // 借阅：蒙学、进阶可借一册，旬末自动归还
+    if(!state||!state.protagonist){toast('尚未开局');return}
+    const L=libState(),b=libBook(id);
+    if(!b)return;
+    if(b.tier===3){toast('孤本珍贵，不可外借，只可在阁内研读');return}
+    if(L.owned.includes(id)){toast('此册你已抄得，不必再借');return}
+    if(L.borrowed===id){toast('此册正在你手中');return}
+    if(L.borrowed){const c=libBook(L.borrowed);toast(`先还了${c?c.name:'书'}再借别的`);return}
+    if(!L.revealed.includes(id)||!L.present.includes(id)){toast('先寻到此书');return}
+    L.borrowed=id;persistCurrent();UI.renderSheet('藏书阁');
+  },
+  libReturn(){ // 提前归还
+    const L=libState();if(!L.borrowed)return;
+    const b=libBook(L.borrowed);L.borrowed=null;
+    persistCurrent();toast(`${b?b.name:'书册'}已归还藏书阁`);UI.renderSheet('藏书阁');
+  },
+  libDesk(id){ // 案头书：抄录所得中择一册常备案头（与借阅同效：修习该艺取高档）
+    const L=libState();
+    if(!L.owned.includes(id)){toast('先抄录到手，方能备案头');return}
+    L.desk=(L.desk===id)?null:id;
+    persistCurrent();UI.renderSheet('藏书阁');
+  },
+  libCopy(id){ // 抄录：花银两与10精力，把借阅中或在架的谱册抄成自己的
+    if(!state||!state.protagonist){toast('尚未开局');return}
+    if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
+    const L=libState(),b=libBook(id);
+    if(!b||b.tier===3)return;
+    if(L.owned.includes(id)){toast('此册已在你藏书中');return}
+    if(!L.revealed.includes(id)){toast('先寻到此书');return}
+    const p=state.protagonist,cost=b.copy||0;
+    if((Number(p.silver)||0)<cost){toast('银两不够抄录之资');return}
+    if((state.energy??0)<10){toast('精力不足，抄不动了');return}
+    UI.closeSheet();
+    p.silver=Math.max(0,Math.round((Number(p.silver)||0)-cost));
+    state.energy=Math.max(0,Math.round(state.energy-10));
+    L.owned.push(id);
+    const flavor=`你研墨铺纸，把${b.name}逐字逐页抄了下来。灯花爆了又剪，抄毕甩甩手腕——这册书往后就是你的了。`;
+    history.push({turn:state.turn,focus:`抄录${b.name}`,choice:'',narrative:flavor,log:`抄录${b.name} · ${cost}两`});
+    logXunAction(`抄录${b.name}`);
+    persistCurrent();markSafe();UI.updateStatusbar();checkRestWarn();
+    UI.actResult('抄录书册',flavor,[`${b.name} 已入藏书`,`银两 −${cost}`]);
+    if(state.energy<=0)setTimeout(()=>this.collapse(),600);
+  },
+  libRead(id){ // 研读：耗10精力，每旬一次。未习→依书册入门；过百→唯孤本研读+1；已习未过百→书只助修习
+    if(!state||!state.protagonist){toast('尚未开局');return}
+    if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
+    const L=libState(),b=libBook(id);
+    if(!b)return;
+    if(L.lastReadTurn===state.turn){toast('本旬已研读过了');return}
+    const held=b.tier===3?L.present.includes(id):(L.owned.includes(id)||L.borrowed===id);
+    if(!held){toast(b.tier===3?'孤本只在阁中，须亲临研读':'先把书借到手或抄录下来');return}
+    const p=state.protagonist;
+    p.skills=p.skills||{};
+    const key=skillKeyIn(p.skills,b.skill),v=key?Number(p.skills[key])||0:0;
+    if(key&&v>0&&v<100){toast('此艺你已入门，进益在修习——持此谱册修习，进益取高档');return}
+    if(key&&v>=100&&b.tier!==3){toast('寻常书册已教不了你什么；过百之后，只有孤本值得一读');return}
+    if((state.energy??0)<10){toast('精力不足，读不进去');return}
+    UI.closeSheet();
+    state.energy=Math.max(0,Math.round(state.energy-10));
+    L.lastReadTurn=state.turn;
+    const skillName=CR_SKILLNAME[b.skill]||b.skill;
+    let flavor,deltas;
+    if(!key){ // 依书入门：蒙学3—5、进阶4—7、孤本5—8
+      const lo=b.tier===1?3:b.tier===2?4:5,hi=b.tier===1?5:b.tier===2?7:8;
+      const val=lo+Math.floor(Math.random()*(hi-lo+1));
+      p.skills[skillName]=val;
+      p.skillNotes=((p.skillNotes||'')+`${p.skillNotes?'；':''}${skillName}依${b.name}入门`).slice(0,120);
+      flavor=`你伏案读${b.name}，从最浅的章法读起，读到月色移窗，心里渐渐有了谱。${skillName}算是入了门。`;
+      deltas=[`${skillName} 入门 ${val}`];
+      history.push({turn:state.turn,focus:`研读${b.name}`,choice:'',narrative:flavor,log:`${skillName} 入门 ${val}`});
+    }else{ // ≥100 孤本：稳定 +1
+      p.skills[key]=Math.min(SKILL_MAX,v+1);
+      flavor=`你把${b.name}摊在案上，一字一句与自家功夫相印证。合上书时，${skillName}那层窗户纸，又薄了一分。`;
+      deltas=[`${skillName} +1（孤本研读）`];
+      history.push({turn:state.turn,focus:`研读${b.name}`,choice:'',narrative:flavor,log:`${skillName} +1`});
+    }
+    logXunAction(`研读${b.name}`);
+    persistCurrent();markSafe();UI.updateStatusbar();checkRestWarn();
+    UI.actResult('研读',flavor,deltas);
     if(state.energy<=0)setTimeout(()=>this.collapse(),600);
   },
   askTeach(who,k){ // 登门求师：须已知其才艺、好感达标、对方此艺精熟
