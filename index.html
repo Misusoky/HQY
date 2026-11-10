@@ -445,7 +445,7 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
     <button class="tb-time" onclick="UI.openSheet('局面')"><span id="tbEra">—</span><span id="tbXun">—</span></button>
     <div class="tb-stats">
       <div class="tstat"><label>位份</label><b id="tbRank">—</b></div>
-      <div class="tstat"><label>银两</label><b id="tbSilver">—</b></div>
+      <button class="tstat" style="border:0;background:transparent;padding:0;margin:0;text-align:center;font-size:inherit;font-family:inherit;color:inherit;cursor:pointer;appearance:none;-webkit-appearance:none" onclick="Game.openMarket()" title="宫中采买"><label>银两</label><b id="tbSilver">—</b></button>
       <button class="tstat" style="border:0;background:transparent;padding:0;margin:0;text-align:center;font-size:inherit;font-family:inherit;color:inherit;cursor:pointer;appearance:none;-webkit-appearance:none" onclick="Game.openShop()" title="打开商城"><label>积分</label><b id="tbPoints">—</b></button>
     </div>
   </div>
@@ -2836,6 +2836,17 @@ async function callModel(userMsg,opts){
       }catch(e){}
       if(!ok){const err=new Error('返回不是手作 JSON');err.raw=String(raw==null?'':raw).trim();err.invalidJson=true;throw err}
     }
+    if(expect==='market'){
+      let ok=false;
+      try{
+        const t=String(raw==null?'':raw),a=t.indexOf('{'),b=t.lastIndexOf('}');
+        if(b>a){
+          const o=JSON.parse(t.slice(a,b+1))||{};
+          ok=Array.isArray(o.items)&&o.items.length>0&&o.items.every(it=>it&&typeof it.name==='string'&&!!it.name.trim()&&MARKET_KINDS.includes(it.kind)&&['寻常','精巧','珍罕'].includes(it.tier));
+        }
+      }catch(e){}
+      if(!ok){const err=new Error('返回不是市集 JSON');err.raw=String(raw==null?'':raw).trim();err.invalidJson=true;throw err}
+    }
   };
   const send=async(messages,useStream=true)=>{
     const ctrl=new AbortController();abortCtrl=ctrl;
@@ -3600,6 +3611,8 @@ const UI={
     else if(name==='物品详情')B.innerHTML=this.sheetItemDetail(param);
     else if(name==='商城')B.innerHTML=this.sheetShop();
     else if(name==='商品详情')B.innerHTML=this.sheetShopDetail(param);
+    else if(name==='采买')B.innerHTML=this.sheetMarket();
+    else if(name==='采买详情')B.innerHTML=this.sheetMarketDetail(param);
     else if(name==='大事记')B.innerHTML=this.sheetChronicle();
     else if(name==='六宫')B.innerHTML=this.sheetVisit('妃');
     else if(name==='太医院')B.innerHTML=this.sheetVisit('医');
@@ -3784,6 +3797,49 @@ const UI={
       ${cat.usage?wide('用法',cat.usage):''}
       ${cat.fx?wide('效用',cat.fx):''}</div>
       <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px">${buy}</div>`;
+  },
+  sheetMarket(){ // 宫市：本月货单一览，品相与存货一目了然
+    const p=state.protagonist||{},m=state.market||{};
+    const row=(it,i)=>{
+      const tag=`<span class="itag">${esc(it.kind)}</span>`;
+      const rare=it.tier==='珍罕'?`<span class="itag on">${esc(it.tier)}</span>`:'';
+      const stock=Number(it.stock)||0;
+      const right=stock<=0
+        ?'<span class="nr-rel" style="color:var(--ink-soft)">售罄</span>'
+        :`<span class="nr-rel num">${esc(it.price)} 两${stock>1?` · 存 ${stock}`:''}</span>`;
+      return `<button class="npcrow" onclick="UI.goSheet('采买详情',${i})"><span class="nr-name">${esc(it.name)}</span>${tag}${rare}${right}</button>`;
+    };
+    const list=(Array.isArray(m.items)?m.items:[]).map(row).join('');
+    return `<div class="sec"><div class="sec-cap">宫市 · 采买</div>
+      <div class="sheet-note" style="margin:0">囊中银两 <b class="num">${esc(p.silver??0)}</b> 两 · 货色每月初入新，本月这单采买回来便不再变动</div></div>
+      <div class="sec">${list||'<div class="sheet-note">本月货色未至，稍后再来。</div>'}</div>
+      <div class="sheet-note">布料、香料、药材是净材料，买入即入手作材料，裁绣、调香、合药皆可用；食物与玩意儿入行囊，用时由剧情承接效用。</div>`;
+  },
+  sheetMarketDetail(i){
+    const m=state.market;
+    if(!m||!Array.isArray(m.items))return '<div class="sheet-note">本月货单未开，点顶栏「银两」遣人采买。</div>';
+    const it=m.items[i];
+    if(!it)return '<div class="sheet-note">此物已不在本月货色中。</div>';
+    const p=state.protagonist||{};
+    const wide=(k,v)=>`<div class="rowline" style="align-items:flex-start"><span style="flex:none">${k}</span><span class="cnt" style="white-space:normal;text-align:right;max-width:70%">${esc(v)}</span></div>`;
+    const stock=Number(it.stock)||0;
+    const lack=(Number(p.silver)||0)<it.price;
+    const buy=stock<=0
+      ?`<button class="btn" disabled style="opacity:.45;letter-spacing:.1em;text-indent:.1em">已售罄 · 待下月换新</button>`
+      :lack
+        ?`<button class="btn" disabled style="opacity:.45;letter-spacing:.1em;text-indent:.1em">银两不足（需 ${esc(it.price)} 两）</button>`
+        :`<button class="btn btn-primary" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.buyMarketItem(${i})">购入 · ${esc(it.price)} 两</button>`;
+    return `<button class="backbtn" onclick="UI.sheetBack()">◀ 返回宫市</button>
+      <div class="sec"><div class="sec-cap">${esc(it.name)}</div>
+      <div class="itemrow"><span>品类</span><span class="cnt">${esc(it.kind)}${it.mat?' · 净材料':''}</span></div>
+      <div class="itemrow"><span>品相</span><span class="cnt">${esc(it.tier)}</span></div>
+      <div class="itemrow"><span>市价</span><span class="cnt num">${esc(it.price)} 两</span></div>
+      <div class="itemrow"><span>存货</span><span class="cnt num">${stock>0?'×'+stock:'售罄'}</span></div>
+      ${it.desc?wide('看相',it.desc):''}
+      ${it.effect?wide('效用',it.effect):''}
+      <div class="itemrow"><span>可否典卖</span><span class="cnt">可</span></div></div>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px">${buy}</div>
+      <div class="sheet-note" style="margin-top:10px">${it.mat?'净材料入库即作手作之料，不占地儿、不入膳。':'入手即入行囊；点物品可查看效用，使用时由剧情承接。'}</div>`;
   },
   relBadge(who){
     const r=(state.relationships||{})[who];
@@ -4873,6 +4929,130 @@ function canonicalSceneWho(who){ // 对话中换人守卫：只认档案在册�
   return '';
 }
 
+/* ============================================================ 市集采买（后端）
+   顶栏「银两」入口：宫人每月出宫采买一单货色。货单由模型按月生成（首次点开该月时），
+   前端只收 name/kind/tier/desc 等词条，价码与存货按品相带宽本地定死，经济与节奏不失衡；
+   请求失败时退回内置兜底货单，保证每月都有市可逛。净材料（布料/香料/药品）收入手作料。 */
+const MARKET_KINDS=['布料','香料','药品','食物','玩意儿','奇物'];
+const MARKET_MAT_KIND={'布料':'绣','香料':'香','药品':'药'};
+const MARKET_SLOTS=8; // 每月货色件数
+const MARKET_TIER_PRICE={'寻常':[2,6],'精巧':[8,18],'珍罕':[25,60]}; // 品相→银两带宽
+const MARKET_TIER_STOCK={'寻常':3,'精巧':2,'珍罕':1};               // 品相→存货
+const MARKET_TIER_MAT={'寻常':1,'精巧':2,'珍罕':3};
+const MARKET_FALLBACK=[ // 兜底货单：接口失败或货色不足时补齐，按月散列轮换
+  {name:'素色细棉布',kind:'布料',tier:'寻常',desc:'浆洗得发白的细棉布，裁中衣正好。'},
+  {name:'茜色暗花罗',kind:'布料',tier:'精巧',desc:'茜草染的暗花罗，日头下隐隐流转。'},
+  {name:'檀香末',kind:'香料',tier:'寻常',desc:'捣得细细的檀香末，一捻清甜。'},
+  {name:'安息香饼',kind:'香料',tier:'精巧',desc:'蜜合的安息香饼，炉上一枚满室生温。'},
+  {name:'川贝母',kind:'药品',tier:'寻常',desc:'润肺止咳的川贝母，研末冲服。'},
+  {name:'阿胶糕',kind:'药品',tier:'精巧',desc:'阿胶合核桃仁蒸的糕，养血润燥。'},
+  {name:'玫瑰酥',kind:'食物',tier:'寻常',desc:'层层起酥的玫瑰馅点心，甜香不腻。',usable:true,effect:'佐茶吃两块，唇齿留香，心绪稍展。'},
+  {name:'桂花糖藕',kind:'食物',tier:'寻常',desc:'糯米灌藕沁足桂花糖，软糯清甜。',usable:true,effect:'吃一盏解馋，甜意漫上眉梢。'},
+  {name:'雪浪纸',kind:'玩意儿',tier:'精巧',desc:'帘纹细密的雪浪纸，写字不洇墨。'},
+  {name:'九连环',kind:'玩意儿',tier:'精巧',desc:'铜打的九连环，解得开的人不多。',usable:true,effect:'把玩半晌，指上活络，心思也静下来。'},
+  {name:'走马灯',kind:'玩意儿',tier:'精巧',desc:'纸扎走马灯，点上蜡烛人马追逐。',usable:true,effect:'夜点一盏，满室活气，孩子看了欢喜。'},
+  {name:'波斯绿葡萄干',kind:'食物',tier:'珍罕',desc:'西域来的绿葡萄干，蜜也似的，宫里难得一见。',usable:true,effect:'含一枚，甜津生津，是外邦的滋味。'},
+  {name:'錾花小铜手炉',kind:'玩意儿',tier:'珍罕',desc:'錾花小铜手炉，炭灰一捧暖到指尖。',usable:true,effect:'寒夜捧在袖中，十指回温，睡得也安稳。'}
+];
+const MARKET_SYSTEM=[
+'你是文字游戏《带着系统去宫斗》的市集开单人。架空盛唐后宫，主控遣心腹宫人出宫采买。你只负责开本月货单，不推进剧情、不结算、不输出解释。',
+'',
+'【输入】time 是本月（年号、月名、旬），season 是季节，silver 是主控现有银两，rank 是主控位份。',
+'【货单】共 8 件：寻常布料、香料、药品、食物与精巧的小玩意儿为主，至多夹一样比较特别的珍罕货色。',
+'- kind：布料／香料／药品／食物／玩意儿／奇物。布料、香料、药品是净材料（裁衣的料、熏香的料、入药的料，不是成品）；食物与玩意儿是成品；珍罕之物的 kind 写奇物。',
+'- 五类常见货色每类至少一件、至多三件；珍罕至多一件，没有合适的珍罕货色就不写，宁缺毋滥。',
+'- tier：寻常／精巧／珍罕。寻常是市井大路货；精巧是匠人手笔；珍罕是宫里也难见的（外邦来的、节令限有的、带点小传闻的）。',
+'- name：2—8 个汉字，像宫人会在市上随口叫的名字；不要引号，不要“款”“式”等标注。',
+'- desc：一句，40 字以内，写它看起来、闻起来或尝起来如何；不写数值、不写功效。',
+'- usable：食物、玩意儿按实际写（能入口、能把玩生趣的 true；只作摆设收藏的 false）；布料、香料、药品一律 false。',
+'- effect：usable 为 true 时写一句具体效用与分寸（50 字以内：解馋、安神、驱寒、逗趣之类）；医药只写温和调理，不写疗效打包票；usable 为 false 时不写此字段。',
+'【时令】货色贴合 time 与 season：春日新茶夏冰碗，秋风蟹肥冬腊味；节令限有的货色最讨喜。',
+'【禁忌】不出现现代物件与词名；不出现御赐之物、兵刃、方术仙药等超现实或犯禁之物；货色是民间市上的东西，宫里稀见即可，不可僭越逾制。',
+'【输出】只输出一个 JSON 对象，不要 markdown、不要解释：',
+'{"items":[{"name":"","kind":"食物","tier":"寻常","desc":"","usable":true,"effect":""}]}'
+].join('\n');
+function marketKey(){const t=state.time||{};return `${Number(t.year)||1}-${Number(t.month)||1}`} // 货单按月对键：换月初次点开即重采买
+function marketSeason(m){m=Number(m)||1;return m>=3&&m<=5?'春':(m>=6&&m<=8?'夏':(m>=9&&m<=11?'秋':'冬'))}
+function marketHash(str){let h=0;const s=String(str);for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return h}
+function marketFinish(it,ym){ // 落价与存货：品相定带宽，名字散列取稳定扰动，本月内价码不变
+  const band=MARKET_TIER_PRICE[it.tier]||MARKET_TIER_PRICE['寻常'];
+  const h=marketHash(it.name+'@'+ym);
+  it.price=band[0]+h%(band[1]-band[0]+1);
+  it.stock=MARKET_TIER_STOCK[it.tier]||3;
+  it.desc=String(it.desc||'').trim().slice(0,60);
+  if(MARKET_MAT_KIND[it.kind]){ // 净材料：入库即作手作之料
+    it.mat=true;it.matKind=MARKET_MAT_KIND[it.kind];
+    it.matTier=MARKET_TIER_MAT[it.tier]||1;
+    it.matTags=it.matKind==='绣'?['布帛']:(it.matKind==='香'?['香']:['药']);
+    it.usable=false;delete it.effect;
+  }else{
+    it.usable=!!it.usable;
+    if(it.usable)it.effect=String(it.effect||'').trim().slice(0,60);
+    else delete it.effect;
+  }
+  return it;
+}
+function marketNormalize(list,ym){ // 洗净模型货单：按名去重、限件数、珍罕至多一件，缺品类/缺件数从兜底补
+  const seen=new Set(),out=[];
+  let rare=0;
+  for(const raw of (Array.isArray(list)?list:[])){
+    if(!raw||typeof raw!=='object')continue;
+    const name=String(raw.name||'').trim().replace(/["'「」『』]/g,'').slice(0,12);
+    if(!name||seen.has(name))continue;
+    const kind=MARKET_KINDS.includes(raw.kind)?raw.kind:'玩意儿';
+    let tier=['寻常','精巧','珍罕'].includes(raw.tier)?raw.tier:'寻常';
+    if(tier==='珍罕'){if(rare>=1)tier='精巧';else rare++}
+    seen.add(name);
+    out.push(marketFinish({name,kind,tier,desc:raw.desc,usable:raw.usable,effect:raw.effect},ym));
+    if(out.length>=MARKET_SLOTS)break;
+  }
+  for(const k of ['布料','香料','药品','食物','玩意儿']){ // 常见五类每类至少一件
+    if(out.length>=MARKET_SLOTS)break;
+    if(out.some(x=>x.kind===k))continue;
+    const fb=MARKET_FALLBACK.find(f=>f.kind===k&&!seen.has(f.name));
+    if(fb){seen.add(fb.name);out.push(marketFinish(Object.assign({},fb),ym))}
+  }
+  for(const fb of MARKET_FALLBACK){ // 补足额定件数；已有一件珍罕则不再添珍罕
+    if(out.length>=MARKET_SLOTS)break;
+    if(seen.has(fb.name))continue;
+    if(fb.tier==='珍罕'&&out.some(x=>x.tier==='珍罕'))continue;
+    seen.add(fb.name);out.push(marketFinish(Object.assign({},fb),ym));
+  }
+  return out;
+}
+function marketFallback(ym){ // 接口失败时的兜底货单：按月散列洗牌，五类俱全
+  let seed=marketHash('fb@'+ym)||1;
+  const rnd=()=>((seed=(seed*1103515245+12345)>>>0)/4294967296);
+  const pool=MARKET_FALLBACK.slice();
+  for(let i=pool.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));const t=pool[i];pool[i]=pool[j];pool[j]=t}
+  const out=[],seen=new Set();
+  for(const k of ['布料','香料','药品','食物','玩意儿']){
+    const it=pool.find(x=>x.kind===k);
+    if(it){seen.add(it.name);out.push(marketFinish(Object.assign({},it),ym))}
+  }
+  for(const it of pool){
+    if(out.length>=MARKET_SLOTS)break;
+    if(seen.has(it.name))continue;
+    seen.add(it.name);out.push(marketFinish(Object.assign({},it),ym));
+  }
+  return out;
+}
+async function marketGenerate(ym){ // 首次点开该月：请求模型开货单；失败与空货单由调用方兜底
+  if(abortCtrl)throw new Error('已有请求正在进行，稍候再采买');
+  const s=state,t=s.time||{};
+  const input={time:fmtTime(t),season:marketSeason(t.month),silver:Number(s.protagonist.silver)||0,rank:s.protagonist.rank||''};
+  const msg='请按规则开本月货单。输入：'+JSON.stringify(input);
+  const raw=await callModel(msg,{
+    messages:[{role:'system',content:MARKET_SYSTEM},{role:'user',content:msg}],
+    maxTokens:1200,
+    expect:'market'
+  });
+  if(state!==s)throw new Error('采买期间存档已切换，货单未落地');
+  const a=raw.indexOf('{'),b=raw.lastIndexOf('}');
+  const o=JSON.parse(raw.slice(a,b+1));
+  return marketNormalize(o.items,ym);
+}
+
 /* ============================================================ 游戏流程 */
 const Game={
   /* 开局 */
@@ -5818,6 +5998,48 @@ const Game={
     toast(`已购「${it.name}」，即刻入囊`);
     logXunAction(`商城·${it.name}`);
     persistCurrent();markSafe();UI.renderSheet('商品详情',i);UI.updateStatusbar();
+  },
+  /* 市集采买 */
+  openMarket(){ // 顶栏银两按钮：每月首次点开现采买单（宫人采买中），之后直接用本月货单
+    if(!state||!state.protagonist){toast('尚未开局');return}
+    if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
+    const ym=marketKey();
+    if(state.market&&state.market.ym===ym&&Array.isArray(state.market.items)&&state.market.items.length){UI.openSheet('采买');return}
+    const s=state;
+    UI.showBusy('宫人采买中','宫人提着钱袋与食盒出宫去了，正沿街问价采买本月货色……',true);
+    marketGenerate(ym).then(items=>{
+      if(state!==s){UI.hideBusy();return}
+      state.market={ym,items};
+      UI.hideBusy();persistCurrent();markSafe();
+      UI.openSheet('采买');
+    }).catch(e=>{
+      if(state!==s){UI.hideBusy();return}
+      UI.hideBusy();
+      if(e.name==='AbortError')return;
+      if(e.noKey){this.handleCallErr(e);return}
+      state.market={ym,items:marketFallback(ym)}; // 采买不凑巧：兜底货单顶上，保证有市可逛
+      persistCurrent();markSafe();
+      toast('出宫采买不凑巧，宫人只在市上置办了些寻常货色',3600);
+      UI.openSheet('采买');
+    });
+  },
+  buyMarketItem(i){ // 购入即刻入囊：扣银记入账本差额；净材料顺手归入手作料
+    const m=state.market,it=m&&m.items[i];
+    if(!it)return;
+    if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
+    if((Number(it.stock)||0)<=0){toast('此物已售罄，待下月初换新');return}
+    const p=state.protagonist;
+    if((Number(p.silver)||0)<it.price){toast(`银两不足（${it.name} 需 ${it.price} 两）`);return}
+    ensureXunBook();
+    p.silver=Number(p.silver)-it.price;
+    it.stock-=1;
+    const obj={name:it.name,count:1,note:'市中购得',usable:!!it.usable,pawnable:true,src:'市集'};
+    if(it.effect)obj.effect=it.effect;
+    if(it.mat){obj.mat=true;obj.matKind=it.matKind;obj.matTier=it.matTier;obj.matTags=it.matTags}
+    addToInventory([obj]);
+    logXunAction(`采买·${it.name}`);
+    persistCurrent();markSafe();UI.updateStatusbar();UI.renderSheet('采买详情',i);
+    toast(`已购「${it.name}」，${it.price} 两，即刻入囊`);
   },
   toggleEquip(i){ // 长期之物：启用（随身佩戴）／收存（停用效用）；不耗件数、不占回合
     const it=(state.inventory||[])[i];if(!it||!it.durable)return;
