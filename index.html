@@ -5410,7 +5410,7 @@ const Game={
       // 相关的待续琐事：挂账计旬是否重置只看本轮 statePatch 是否真改/真删（见 applyPatch 的 pending 分支），不再"提过即刷新"，免得一条琐事被每旬顺口一提就永不过期
       const meta=ensurePlotMeta();
       if(p.hasEvent||adj.due.length||adj.overdue.length||adj.mainPub||adj.gardenMeet)meta.lastEventTurn=state.turn;
-      if(adj.mainPub||opts._mainPubPop)meta._mainMissed=!activePlots().some(x=>x.line==='主线'); // 新主线是否落账：未落账则下轮裁决加重语气（含旬首断档直弹）
+      if(adj.mainPub||(opts&&opts._mainPubPop))meta._mainMissed=!activePlots().some(x=>x.line==='主线'); // 新主线是否落账：未落账则下轮裁决加重语气（含旬首断档直弹）
       if(isMajorTurn(p.statePatch,p))meta.lastBigTurn=state.turn;
       if(adj.hit){meta.rollHit=false;meta.rollTargetId=null} // 本旬骰子已用毕，同旬后续行动不再重复强制
       state.energy=Math.max(0,Math.min(ENERGY_MAX,Math.round((typeof state.energy==='number'?state.energy:ENERGY_MAX)-(typeof cost==='number'?cost:focusEnergyCost(focus)))));
