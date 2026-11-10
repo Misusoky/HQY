@@ -1238,6 +1238,85 @@ function nextMonthFirstSerial(t,m){ // 同一处「m 月上旬」的旬号（与
   return nextMonthSerial(t,m)-1;
 }
 function dueTextFor(t,m){let y=Number(t.year)||1;if(m<Number(t.month)||(m===Number(t.month)&&t.xun==='下旬'))y+=1;return `${t.era||''}${y}年${MONTHS[m]}内`}
+
+/* ============================================================ 岁岁节宴（写死的固定日历）
+   日期钉在月旬上：每年到这一旬必触发，不掷骰、不受剧情冷却影响，模型不得改期、略过或推到来旬。
+   模型只负责把宴演出来；宴席同时充当当旬剧情的舞台（到期引线、恩宠账、新主线都可并入）。 */
+const FESTIVALS=[
+  {id:'yuandan',m:1,x:'上旬',name:'元日大朝宴',scale:'大宴',
+   host:'帝与皇后同席，太后若在世则同临',
+   scene:'正月初一天未亮宫门即启，帝御含元殿受百官与命妇朝贺，午后移驾麟德殿赐宴。后妃依位份列席，座次便是体面；席上进椒柏酒、五辛盘，散席后按位份颁彩胜、衣料。',
+   chance:['座次升沉，谁被挪前、谁被挪后','母族命妇入宫朝贺，递话、托事，或带来外朝风声','席前献贺、呈物，一年里头一个露脸的机会','与皇后、太后同席的分寸，及旁人看在眼里的亲疏'],
+   rule:'一年之首最重礼数，失仪会传遍六宫；也是新岁立威、结识命妇之机，但不必写成大祸。'},
+  {id:'huazhao',m:2,x:'上旬',name:'花朝赏红宴',scale:'常宴',
+   host:'皇后主宴，太后若好花可临',
+   scene:'二月花朝，御花园剪彩为花、悬红赏红，六宫携各自莳弄的花木赴会，斗花、簪花、尝花糕。这是开春头一场女眷齐聚，满园新绿，人比花多。',
+   chance:['斗花品评，莳花与巧思见高下','以花入诗、入画、入绣，寻由头献艺','向高位献花、替人解围，结一份人情','花下三两人私语，试探、递话或翻旧账'],
+   rule:'春宴宜轻快，胜负可小伤体面；旧怨借花事发，也要有前因。'},
+  {id:'shangsi',m:3,x:'上旬',name:'上巳曲水宴',scale:'常宴',
+   host:'帝或皇后主宴，翰林陪侍，命妇与妃嫔列坐水次',
+   scene:'三月初三，太液池畔修禊祓除，曲水流觞。觞至则饮，饮则赋诗，命妇与妃嫔依次列坐；席间兰汤、荠花、春衫，处处是斯文。',
+   chance:['觞到跟前不得不应，即席赋诗或献艺','与外朝命妇、陪宴文臣家眷交集，听得前朝风声','旧怨借酒发作，或当众失仪','水边失足、酒醉、衣物沾污一类小意外'],
+   rule:'这一场最见才学与急智，也最容易被抓把柄；诗不必惊艳，接得住才要紧。'},
+  {id:'duanwu',m:5,x:'上旬',name:'端午竞渡宴',scale:'常宴',
+   host:'帝与皇后登临水殿，皇嗣可随侍',
+   scene:'五月初五，太液池龙舟竞渡，鼓声喧天。帝率后妃登临水殿观赛，赐扇、五色缕、角黍；宫人系缕于腕，谓可辟邪。',
+   chance:['赐物分等，谁得头一份、谁被漏下','皇嗣同观，子嗣线露脸或出岔子','席间暑热、落水、船只相撞等突发','借观竞渡挤到帝近前说话'],
+   rule:'热闹场中最易出事；帝若在，注意力有限，谁抢到那一瞬谁得势。'},
+  {id:'qixi',m:7,x:'上旬',name:'七夕乞巧宴',scale:'常宴',
+   host:'皇后或太后主宴，帝夜临与否不定',
+   scene:'七月初七，庭中陈瓜果、设乞巧楼，妃嫔与宫人穿针乞巧、以蛛丝验巧。入夜设宴，灯影重重，人多私语。',
+   chance:['穿针、乞巧胜负，女红见高下','以绣品、诗笺寄意，赠帝或赠人','帝夜临，月下有一段短暂独处','宫人私情、失物、密信借夜色交接'],
+   rule:'夜宴最宜写人前热闹、人后各怀心事；帝至与否须有明确交代。'},
+  {id:'zhongqiu',m:8,x:'上旬',name:'中秋赏月宴',scale:'大宴',
+   host:'帝、皇后与皇嗣同席，太后若在世必临',
+   scene:'八月十五，月台设宴，帝与后妃、皇嗣同席，分月饼、陈瓜果，赏月至夜半。家宴之制，座次按位份与子嗣排定。',
+   chance:['座次与皇嗣位次，牵动后位与夺嫡暗流','皇嗣席上露脸或失仪，子嗣线推进','席散后月下独处，与帝说体己话','旧案、密信借家宴人多眼杂交接或撞破'],
+   rule:'帝必至；团圆场里最宜埋“看似圆满、各有所缺”的伏笔，但不要每场都翻旧案。'},
+  {id:'chongyang',m:9,x:'上旬',name:'重阳登高宴',scale:'常宴',
+   host:'太后若在世则主宴，皇后陪侍；帝多在前朝，或傍晚至',
+   scene:'九月初九，御苑高台登高，赏菊、饮菊酒、佩茱萸囊。太后常临，六宫陪侍，宴后各赐重阳糕。',
+   chance:['太后跟前侍奉、陪话，太后线最实在的一旬','菊事与莳花，往年的菊、旧物可回收','登高赋诗、献菊','高台上下人多，失足、旧疾、风口着凉'],
+   rule:'敬老是主调；太后在场，礼数与耐心比机锋有用。'},
+  {id:'dongzhi',m:11,x:'下旬',name:'冬至赐宴',scale:'大宴',
+   host:'帝与皇后；太后若在世受贺',
+   scene:'冬至大如年，帝御正殿受朝，太庙荐新；午后赐宴，命妇入贺，后妃列席。宴后赐冬衣、炭火、馄饨，各宫分领。',
+   chance:['朝贺礼数与座次，岁末人事风声由此起','命妇入贺，母族递话','天寒病起，侍疾、送炭见人情','岁末盘点，谁把这旬的旧账收干净'],
+   rule:'冬至是“小年”，宜写岁末收束感；冷、炭、衣、病是好用的实景。'},
+  {id:'chuxi',m:12,x:'下旬',name:'除夕守岁宴',scale:'大宴',
+   host:'帝与皇后同席，太后若在世同席',
+   scene:'腊月除夜，宫中张灯、贴桃符、燃爆竹，帝与后妃同席守岁。席间赐金银钱、新衣，封赏宫人；宴后各宫围炉守岁至天明。',
+   chance:['岁末封赏与来年位份风声，谁得脸、谁失宠','旧年恩怨在守岁夜摊开或按下','围炉私语，与帝、与心腹宫人','来年布局：托事、结盟、递话'],
+   rule:'一年收束，宜有回望与前望；封赏按位份与这一年的事来，不凭空大涨。'}
+];
+function festivalOf(t){ // 本旬是否有固定节宴（月旬写死）
+  if(!t)return null;
+  const x=t.xun==='下旬'?'下旬':'上旬';
+  return FESTIVALS.find(f=>f.m===(Number(t.month)||0)&&f.x===x)||null;
+}
+function festWhen(f){return (MONTHS[f.m]||'')+f.x}
+function festivalSoon(t){ // 本旬之后最近的一场节宴（最多找一年）
+  let tt=Object.assign({},t||{});
+  for(let i=0;i<24;i++){tt=advanceTime(tt);const f=festivalOf(tt);if(f)return{fest:f,time:tt}}
+  return null;
+}
+function festivalBlock(f,soft){ // 注入提示词的固定底本：soft=初入宫缓冲期，只作背景不占剧情额度
+  const scale=f.scale==='大宴'?'大宴':'常宴';
+  if(soft)return [
+    `【定例·本旬节宴·初入宫】${fmtTime()} · ${f.name}（每年${festWhen(f)}必至，前端写死）`,
+    `宫中照例设${f.name}，但主控新入宫、尚在安顿：本旬只在养成叙事里带一两句——宫人备办、远处鼓乐、听闻席上情形皆可，作为背景，不单独成戏。`,
+    '本旬 hasEvent 保持 false，不占剧情额度，不另开引子；节宴的正式戏留待来年此旬。'
+  ].join('\n');
+  return [
+    `【定例·本旬节宴】${fmtTime()} · ${f.name}（${scale}｜前端写死：每年${festWhen(f)}必至，不掷骰、不占随机引子、不可改期或略过）`,
+    `场面（固定底本）：${f.scene}`,
+    `主宴：${f.host}。来客、座次、仪注依${scale==='大宴'?'大朝旧制':'六宫常例'}，主控按位份列席。`,
+    `本轮必须写这场宴：hasEvent=true，用剧情对话 scene 结构开场——宴上有人来搭话、传话或试探，或席间出了事；给 2—4 个实质不同的应对后停止，不结算应对后果。当旬剧情额度即此场宴，不再另开随机引子。`,
+    `宴是舞台：到期/发酵引线、恩宠账、新主线发布都嵌入宴中兑现，不另开场。${scale==='大宴'?'大宴上，帝须露面，与帝相处的正戏可落在席间或散席之后。':'帝若此前无缺席、恩宠不低，可临席；不临席也须交代一句缘由。'}`,
+    `席上机缘（择一到两条即可，不必面面俱到）：${f.chance.map((c,i)=>`${'①②③④'[i]}${c}`).join('；')}。`,
+    `分寸：${f.rule}主控若位份低，多写位次、礼数与听来的话；被排到末座、被漏下赏赐也是有效结果。`
+  ].join('\n');
+}
 function migratePlotLedger(s){ // 一次性迁移：pending/npcGoalCards → 结构化 plots
   s.plotMeta={lastEventTurn:-99,lastBigTurn:-99};
   if(Array.isArray(s.plots))return;
@@ -1324,6 +1403,8 @@ function matchPending(ctxList){ // 与给定语境相关的待续琐事（同 ma
 function adjudicatePlots(skipDice){ // 旬首裁决：到期强制兑现 + 前端剧情骰被动触发（每旬一次，冷却 gated；skipDice=玩家主动触发，骰子让位）
   const now=xunSerial(state.time);
   const meta=ensurePlotMeta();
+  const fest=festivalOf(state.time); // 本旬固定节宴（月旬写死，不参与掷骰）
+  const festNew=!!fest&&state.lastFestSerial!==now; // 本旬节宴尚未演过
   for(const p of activePlots())if(p.touch==null)p.touch=now; // 旧档无 touch 字段：以本旬起算，避免一涌而上全判发酵
   const eligible=activePlots().filter(p=>p.earliest==null||now>=p.earliest);
   const due=eligible.filter(p=>p.latest!=null&&now<=p.latest);
@@ -1340,7 +1421,7 @@ function adjudicatePlots(skipDice){ // 旬首裁决：到期强制兑现 + 前�
     const coolEvent=(state.turn-(meta.lastEventTurn??-99))>=1;
     const coolBig=(state.turn-(meta.lastBigTurn??-99))>=3;
     const grace=(meta.graceTurn||0)>(state.turn||0); // 新入宫缓冲期：头几旬只安顿，不掷剧情骰（到期剧情不受限）
-    meta.rollHit=!grace&&coolEvent&&coolBig&&Math.random()<PLOT_TRIGGER_BASE;
+    meta.rollHit=!fest&&!grace&&coolEvent&&coolBig&&Math.random()<PLOT_TRIGGER_BASE; // 节宴之旬不掷骰：宴席即当旬剧情
     const pool0=eligible.filter(p=>!due.includes(p)&&!overdue.includes(p));
     const fresh=meta.rollHit&&(!pool0.length||Math.random()<PLOT_NEW_LEAD_CHANCE); // 新引子与在途后续混抽
     meta.rollTargetId=(meta.rollHit&&!fresh&&pool0.length)?pool0[Math.floor(Math.random()*pool0.length)].id:null;
@@ -1351,6 +1432,10 @@ function adjudicatePlots(skipDice){ // 旬首裁决：到期强制兑现 + 前�
   const mainPub=needMain&&!skipDice&&!(due.length||overdue.length)&&((meta.lastEventTurn??-99)<(state.turn||0)); // 主线断档：到期/超期主线优先（死线当场兑现）；与在途引线、发酵条目共存可同场处置；本旬剧情额度已用掉则顺延至本旬后续行动或下一旬
   const emp=adjudicateEmperor(now,{due,overdue,stale,pendStale,hit,mainPub:!!mainPub,skipDice:!!skipDice}); // 恩宠账与剧情账并行裁决
   const lines=[];
+  const festSoft=festNew&&!!graceNow; // 初入宫缓冲期：节宴只作背景，不占剧情额度
+  if(festNew)lines.push(festivalBlock(fest,festSoft));
+  else if(fest)lines.push(`【节令】本旬节宴「${fest.name}」已演过，本旬不再重复摆宴；散席后的余波可在后续行动里承接。`);
+  else {const soon=festivalSoon(state.time);if(soon)lines.push(`【节令·预告】下一场固定节宴：${festWhen(soon.fest)}「${soon.fest.name}」（每年此旬必至）。本旬不必演，可让主控听见备办风声，或提前备办献物、衣裳、贺礼。`)}
   if(overdue.length)lines.push(`【须立即兑现·已超期】${overdue.map(describePlot).join('；')}。本轮必须触发，且正文须体现其搁置期间发酵的后果；原场景不成立时，改写为符合当前处境的兑现方式。`);
   if(due.length)lines.push(`【须兑现·本旬到期】${due.map(describePlot).join('；')}。本轮必须触发，嵌入主控所选重心场景自然发生。`);
   if(stale.length)lines.push(`【须处理·搁置发酵】${stale.map(describePlot).join('；')}。已悬置 ${STALE_PLOT_XUN} 旬以上无人推进，本旬须逐一处理：①仍活着的线——当旬兑现为剧情，旬首直接弹出（hasEvent=true，优先 scene 对话）；②情形已变——改写期限，在 note 说明理由并给出新 dueText；③机会已过——作废，注明搁置期间的发酵后果（对方态度、机会流失等）。连续 ${STALE_AUTO_EXPIRE} 旬列入此块仍不回写，前端将自动作废该线。`);
@@ -1360,6 +1445,7 @@ function adjudicatePlots(skipDice){ // 旬首裁决：到期强制兑现 + 前�
   if(target)lines.push(`【触发·剧情骰命中】${describePlot(target)}。本轮必须触发该线的后续剧情，用剧情对话 scene 结构呈现（对方说话、玩家接话），让它推进或了结；本轮 hasEvent=true。`);
   else if(hit)lines.push('【触发·全新引子】剧情骰命中：本轮必须触发一条全新剧情引子，用 scene 对话结构呈现；引子须从主控本旬所选重心与当前处境自然长出（主控正在做的事、主控见过或将见的人）；事后为它立一条新引线写入 statePatch.plots（id 用 "p-" 加短标题）。');
   else if(mainPub)lines.push(`【发布·新主线】剧情账中已无进行中的主线（前主线已兑现或作废）。本旬必须开立新主线：从主控位份、处境、派系、恩宠与既有伏笔自然长出（晋升之途、子嗣、旧案、母族、新敌皆可），与在途引线、发酵条目并行不悖——若本旬同时列有须处置的发酵条目，可同一场戏处置：了结旧事时引出新线头；新主线以剧情对话 scene 结构呈现，给 2—4 个接话选项后停止，不结算应对后果；无论如何都须以 statePatch.plots 新增一条 line="主线" 的台账条目（id 用 "p-" 加短标题，note 一句话写清走向，可给 dueText 期限）。${meta._mainMissed?'此前已要求开立新主线仍未见台账回写，本轮务必落账。':''}`);
+  else if(festNew&&!festSoft)lines.push('本旬剧情额度由节宴与上述条款共用一场：到期/发酵的事一并拿到宴上处置、散席后续接，不再另开新剧情；宴上了结的事照常回写台账，其余安排照常演绎养成。');
   else if(stale.length||pendStale.length)lines.push('【触发·发酵条目优先】本旬的主要剧情额度用于处理上述搁置发酵条目（含琐事），不再另开新剧情；处理完毕并回写台账后，本旬其余安排照常演绎养成。');
   else if(!due.length&&!overdue.length)lines.push(skipDice?'本轮为玩家主动触发，剧情骰不参与、不消耗；按上方指令照常演绎，相关剧情线变动仍须回写台账。':meta.graceOn?`新入宫·引导旬（第 ${(state.turn||0)+1}／${meta.graceTurn} 旬）：不触发需要应对的随机剧情，hasEvent 保持 false。请在演绎本旬重心的同时，自然带出一项入宫引导——${GRACE_GUIDE[Math.min(state.turn||0,GRACE_GUIDE.length-1)]}。`:`本旬剧情骰未命中（触发概率 ${Math.round(PLOT_TRIGGER_BASE*100)}%；冷却：距上次主要剧情 ${state.turn-(meta.lastEventTurn??-99)} 旬、距上次大事件 ${state.turn-(meta.lastBigTurn??-99)} 旬）。本旬不触发需要应对的剧情，只演绎养成过程；可酌情添加不占冷却的轻量日常碎事。`);
   if(due.length||overdue.length)lines.push('本旬至多突出一条主要剧情；到期剧情兑现时 hasEvent=true，给出选项或 scene 对话后停止，不结算应对后果。');
@@ -1404,7 +1490,7 @@ function adjudicatePlots(skipDice){ // 旬首裁决：到期强制兑现 + 前�
   }
   lines.push('结算只经 statePatch.plots 回写【发生变化】的台账条目：兑现者 stage 改"已兑现"；改写期限者须在 note 说明理由并给出新 dueText；新埋引线新增条目（id 用 "p-" 加短标题，与现存 id 区分）；作废者 stage 改"已作废"并注明缘由。只回写变化的条目，前端按 id 合并。注意：条件已足的条目必须兑现（stage 改"已兑现"，可附积分与任务进度），只改写 note 不算办结；手作成品相赠、请托办妥皆可兑现任务，规则见系统提示词手作模块与剧情台账条。pending 只留非剧情琐事。');
   const before={};[...overdue,...due].forEach(p=>before[p.id]=p.dueText||'');
-  return {due,overdue,stale,pendStale,target,hit,mainPub:!!mainPub,needMain:!!needMain,gardenMeet:'',empDue:emp.due,before,text:'【剧情裁决 · 本旬】（前端判定：到期/超期强制兑现＋搁置发酵强制处理＋主线断档强制发布＋剧情骰被动触发，覆盖"自行决定是否触发剧情"）\n'+lines.map((l,i)=>`${i+1}. ${l}`).join('\n')};
+  return {due,overdue,stale,pendStale,target,hit,mainPub:!!mainPub,needMain:!!needMain,fest:festNew?fest:null,festSoft,gardenMeet:'',empDue:emp.due,before,text:'【剧情裁决 · 本旬】（前端判定：固定节宴到旬必演＋到期/超期强制兑现＋搁置发酵强制处理＋主线断档强制发布＋剧情骰被动触发，覆盖"自行决定是否触发剧情"）\n'+lines.map((l,i)=>`${i+1}. ${l}`).join('\n')};
 }
 function matchLeads(ctxList){ // 与给定语境（人名/地名/事由）相关的在途引线：标题或备注含对方名讳/地名即命中
   const cvs=(ctxList||[]).map(s=>String(s||'').trim()).filter(s=>s.length>=2);
@@ -1573,6 +1659,19 @@ const PLOTS_MODULE = [
 'pending（待续琐事）与引线同生命周期：挂账超 4 旬未办即"发酵"，旬首以【须处理·琐事发酵】列入裁决块，须当旬择一处理——本旬办掉（从 statePatch.pending 移除）、升级为剧情引线（移入 statePatch.plots）或改写文本说明现状（回写即重置计旬）；连续 3 旬不理前端自动清除。'
 ].join('\n');
 
+/* 固定节宴：岁岁此旬必至，前端写死触发；模型只演，不得改期或略过 */
+const FESTIVAL_MODULE = [
+'## 十六、固定节宴（岁岁此旬必至，前端写死）',
+'每年九场固定节宴，日期钉在月旬上：正月上旬元日大朝宴｜二月上旬花朝赏红宴｜三月上旬上巳曲水宴｜五月上旬端午竞渡宴｜七月上旬七夕乞巧宴｜八月上旬中秋赏月宴｜九月上旬重阳登高宴｜冬月下旬冬至赐宴｜腊月下旬除夕守岁宴。它们不由剧情骰决定，也不受剧情冷却影响，不得改期、略过或推到来旬。',
+'1. 逢节宴之旬，请求附【定例·本旬节宴】块：必须写这场宴，hasEvent=true，以 scene 开场；当旬剧情额度即此，不再另开随机引子。',
+'2. 宴上须有实际内容：座次、仪注、赐物、来客、试探、献艺，至少推进一项关系、信息、机会或风险；不写成吃食流水账，也不每场都出大祸。',
+'3. 到期/发酵引线、恩宠账、新主线发布嵌入宴中兑现；散席后的私谈可承接这些线。宴上已了结的事，照常回写 statePatch.plots。',
+'4. 主控不能以“不去”取消节宴；缺席只可来自本旬已结算的重病、禁足、丧制等硬性原因，缺席也须结算后果（失仪、被记、错失露脸、赏赐落空）。',
+'5. 场面、主宴者、席上机缘与分寸以该旬【定例·本旬节宴】块为准；未到之旬可让主控听见备办风声、提前备礼，但不得提前把宴演完。',
+'6. 节宴的固定底本只定场面与礼数，不动数值；赏赐、晋升、恩宠仍按世界书与既有关系结算，不因过节凭空大涨。',
+'7. 初入宫缓冲期（存档 plotMeta.graceTurn）内逢节宴，块内会注明“初入宫”只作背景：只在养成叙事里带一两句，不单独成戏、不占剧情额度。'
+].join('\n');
+
 /* 剧情分段协议：narr 完全旁白 / act 当前说话人动作神态 / say 本人台词 / quote 转述他人原话。完整提示与 ongoing 精简提示共用同一段 */
 const SCENE_PARTS_RULES = [
 '【scene.parts 分段协议】按语义拆 2—5 段，每段只做一件事：',
@@ -1642,7 +1741,7 @@ const CRAFT_MODULE = [
 /* ============================================================ 工具 */
 const $=s=>document.querySelector(s);
 const MONTHS=['','正月','二月','三月','四月','五月','六月','七月','八月','九月','十月','冬月','腊月'];
-const BUILD='2026-11-10·藏书阁V6'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
+const BUILD='2026-11-10·节宴V7'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
 /* 月俸：按位份每月下旬末由前端自动入账（单位：两） */
 const SALARY_BY_GRADE={'正一品':220,'从一品':150,'正二品':110,'从二品':80,'正三品':60,'从三品':45,'正四品':36,'从四品':28,'正五品':20,'从五品':15,'正六品':12,'从六品':10,'正七品':8,'从七品':6,'正八品':5,'从八品':4,'正九品':3,'从九品':2};
 const SALARY_TITLES=[[/皇后/,220],[/皇贵妃/,150],[/贵妃/,110],[/贤妃|良妃|淑妃|德妃/,80],[/昭仪|昭容|昭媛|修仪|修容|修媛|充仪|充容|充媛/,45],[/贵嫔/,36],[/嫔/,28],[/贵人/,20],[/才人/,15],[/美人/,12],[/宝林/,10],[/常在/,8],[/答应/,6],[/选侍/,5],[/更衣/,4],[/采女/,3],[/官女子/,2],[/妃/,60]];
@@ -2692,7 +2791,7 @@ function compactState(s,focusMsg){ // 只压缩送入模型的那一份，localS
   const out=Object.assign({},s);
   out.turn=xunNoOf(s.turn); // 对外统一 1 起旬号，与指令里的「第N旬」一致
   // 前端内部标记与展示字段不送模型
-  for(const k of ['avatarMap','plotMeta','xunBook','saveVersion','plotLedgerV1','pawnFix1','itemFlagV1','readMindV1','energyWarned','mealCount','lastSalaryMonth','items','craftV1'])delete out[k];
+  for(const k of ['avatarMap','plotMeta','xunBook','saveVersion','plotLedgerV1','pawnFix1','itemFlagV1','readMindV1','energyWarned','mealCount','lastSalaryMonth','lastFestSerial','items','craftV1'])delete out[k];
   if(out.protagonist&&typeof out.protagonist==='object'){
     out.protagonist=Object.assign({},s.protagonist);
     delete out.protagonist.avatar; // 头像由前端按身份分配
@@ -2801,7 +2900,7 @@ function buildStaticSystem(){
       .replace('{{世界书全文：02-世界书.md}}',WORLD_BOOK_RUNTIME)
       .replace('{{叙事文风全文：03-叙事文风.md}}',STYLE_GUIDE)
       .replace('{{当前存档 JSON：04-当前存档-v36.json 或玩家当前档}}','（见本提示词末尾「当前存档」段，动态存档在最后）')
-      +'\n\n'+NPC_MODULE+'\n\n'+ENERGY_MODULE+'\n\n'+PLOTS_MODULE+'\n\n'+EMPEROR_MODULE+'\n\n'+EMPEROR_PERSONA_MODULE+'\n\n'+SCENE_MODULE+'\n\n'+SKILL_MODULE+'\n\n'+CRAFT_MODULE+'\n\n'+PERSONA_MODULE+'\n\n'+LENGTH_MODULE;
+      +'\n\n'+NPC_MODULE+'\n\n'+ENERGY_MODULE+'\n\n'+PLOTS_MODULE+'\n\n'+FESTIVAL_MODULE+'\n\n'+EMPEROR_MODULE+'\n\n'+EMPEROR_PERSONA_MODULE+'\n\n'+SCENE_MODULE+'\n\n'+SKILL_MODULE+'\n\n'+CRAFT_MODULE+'\n\n'+PERSONA_MODULE+'\n\n'+LENGTH_MODULE;
   }
   return _staticSystem;
 }
@@ -3433,7 +3532,9 @@ const UI={
     const pend=[...[...adj.overdue,...adj.due].map(p=>'【到期】'+p.title),...(adj.stale||[]).map(p=>'【发酵】'+p.title),...(adj.pendStale||[]).map(x=>'【发酵·琐事】'+pendText(x)),(state.pending||[]).slice(0,2).map(x=>'【琐事】'+pendText(x))].flat().slice(0,6).join('；');
     const maids=(state.protagonist&&state.protagonist.maids)||[];
     const maidRows=maids.map(m=>`<button class="npcrow" onclick="Game.maidTalk('${esc(m)}')"><span class="nr-name">${esc(m)}</span><span class="nr-depth">配属宫女</span></button>`).join('');
-    return `<div class="focus-cap">— 吩咐 · 精力 ${state.energy}／${ENERGY_MAX} —</div>`+
+    const fest=festivalOf(state.time);
+    const festNote=fest?`<div class="sheet-note" style="margin:0 0 8px">本旬节宴：<b>${esc(fest.name)}</b>（${esc(fest.scale)}）——座次、仪注与席上机缘见「局面」。</div>`:'';
+    return `<div class="focus-cap">— 吩咐 · 精力 ${state.energy}／${ENERGY_MAX} —</div>`+festNote+
       (pend?`<div class="sheet-note" style="margin:0 0 8px">临期引线：${esc(pend)}</div>`:'')+
       (maidRows?`<div class="sec"><div class="sec-cap">召宫人问话</div>${maidRows}<div class="sheet-note" style="margin-top:6px">进对话、开口问话都不耗精力：交代差事、打听消息、问办差进度皆可，吩咐下去的事日后兑现。</div></div>`:'<div class="sheet-note">暂无配属宫人。</div>');
   },
@@ -3444,10 +3545,17 @@ const UI={
     const plots=(state.plots||[]).filter(p=>p.stage==='进行中').map(p=>`<div class="itemrow"><span>${esc(p.title)}　<span class="tag">${esc(p.line)}</span></span><span class="cnt">${p.latest!=null&&xunSerial(state.time)>p.latest?'已逾期·':''}${esc(p.dueText||(p.latest!=null?'有期限':(stale.some(s=>s.id===p.id)?'搁置发酵':'缓图')))}</span></div>`).join('')||'<div class="sheet-note">暂无在途剧情线。</div>';
     const pStale=(adj.pendStale||[]).map(x=>pendText(x));
     const pend=(state.pending||[]).map(x=>`<div class="itemrow"><span>${esc(pendText(x))}</span><span class="cnt">${pStale.includes(pendText(x))?'搁置发酵·须处理':'缓办'}</span></div>`).join('')||'<div class="sheet-note">暂无待续事项</div>';
+    const fest=festivalOf(state.time);
+    const soon=festivalSoon(state.time);
+    const festSoft=fest&&(ensurePlotMeta().graceTurn||0)>(state.turn||0);
+    const festSec=`<div class="sec"><div class="sec-cap">节令</div>
+        ${fest?`<div class="itemrow"><span>本旬 · ${esc(fest.name)}</span><span class="cnt">${esc(fest.scale)}${festSoft?'·初入宫仅作背景':''}</span></div><div class="sheet-note" style="margin-top:4px">${esc(fest.scene)}</div>`:'<div class="sheet-note">本旬无固定节宴。</div>'}
+        ${soon?`<div class="itemrow" style="margin-top:6px"><span>下一场 · ${esc(soon.fest.name)}</span><span class="cnt">${esc(festWhen(soon.fest))}</span></div>`:''}</div>`;
     return `<div class="sec"><div class="sec-cap">当前局面</div>
         <div class="itemrow"><span>${esc(state.lastNode||'—')}</span></div>
         ${state.time&&state.time.note?`<div class="itemrow"><span>${esc(state.time.note)}</span></div>`:''}
         ${state.nextStep?`<div class="itemrow"><span>下一步：${esc(state.nextStep)}</span></div>`:''}</div>
+      ${festSec}
       ${due.length||stale.length?`<div class="sec"><div class="sec-cap">剧情到期</div>${due.map(p=>`<div class="itemrow"><span>${esc(p.title)}</span><span class="cnt">${esc(p.dueText||'本旬')}</span></div>`).join('')}${stale.map(p=>`<div class="itemrow"><span>${esc(p.title)}</span><span class="cnt">搁置发酵·须处理</span></div>`).join('')}</div>`:''}
       <div class="sec"><div class="sec-cap">剧情账</div>${plots}</div>
       <div class="sec"><div class="sec-cap">待续事项</div>${pend}</div>
@@ -5308,6 +5416,16 @@ const Game={
     UI.goHome();
     UI.syncGlobalSet();
     markSafe();
+    this._festivalPop(); // 读档/导入时正逢节宴且尚未演：直接开席，不因中途读档把固定节宴跳过
+  },
+  _festivalPop(){ // 只处理固定节宴：本旬到旬且未演过，直接以宴席开场；不接管发酵/主线/帝至（那些仍归 _xunStartPop）
+    if(!state||phase!=='FOCUS_SELECT')return false;
+    const f=festivalOf(state.time);if(!f)return false;
+    if(state.lastFestSerial===xunSerial(state.time))return false;
+    if((ensurePlotMeta().graceTurn||0)>(state.turn||0))return false; // 初入宫缓冲期：节宴只作背景，不旬首强弹
+    const msg=`第${xunNo()}旬：本旬逢固定节宴「${f.name}」（${f.scale}，${festWhen(f)}必至）。这场宴就是本旬的剧情额度：以宴席开场（来客通传、引至席上、席间有人搭话皆可），hasEvent=true；宴的场面、主宴者、席上机缘与分寸见下方【定例·本旬节宴】。请用剧情对话 scene 结构开场（state="ongoing"，对方的话或动作开场），给 2—4 个接话选项后停止，不结算应对后果；应对后 resolve 时统一结算本旬。`;
+    this.round1(msg,'旬首·节宴 '+f.name,0,{skipDice:true,_xunPop:true});
+    return true;
   },
   openFocus(){if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}UI.openSheet('吩咐')}, // 吩咐：自拟本旬要做的事
   hsGoOut(){if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}$('#mapClock').textContent=fmtTime();$('#mapview').classList.add('on')}, // 出门＝宫城图选目的地
@@ -5419,32 +5537,35 @@ const Game={
     state.lastSalaryMonth=key;
     return {amount,rank,text:`${prevTime.era||''}${toCN(prevTime.year)}年${MONTHS[prevTime.month]||''}俸银（${rank}）`};
   },
-  _xunStartPop(){ // 旬首强制处置：发酵引线/琐事一旬之首直接弹出（hasEvent=true），不待玩家先行动；主线断档（无进行中主线）同在此处直接弹新主线
+  _xunStartPop(){ // 旬首强制处置：固定节宴/发酵引线/琐事一旬之首直接弹出（hasEvent=true），不待玩家先行动；主线断档（无进行中主线）同在此处直接弹新主线
     if(!state||phase!=='FOCUS_SELECT')return;
     const adj=adjudicatePlots(true); // skipDice：本旬剧情额度即此，不再另掷
+    const fest=adj.festSoft?null:adj.fest; // 本旬固定节宴（写死日历）尚未演：旬首即开席；初入宫缓冲期只作背景，不旬首强弹
     const mainMiss=adj.needMain; // 主线断档：进行中的主线一清零，旬首即补新主线——做完了不会没下文
-    // 旬首帝至：恩宠≥40、无缺席、上旬未有相处，且本旬不与发酵处置抢戏——掷骰决定帝是否主动相见（宠爱兑现成动静）
+    // 旬首帝至：恩宠≥40、无缺席、上旬未有相处，且本旬不与发酵处置/节宴抢戏——掷骰决定帝是否主动相见（宠爱兑现成动静）
     const meta=ensurePlotMeta();
     const e=state.emperor;
     const favor=Number((state.relationships&&state.relationships['皇帝']||{}).value)||0;
     const win=favor>=60?2:4;
     const now=xunSerial(state.time);
     const gap=now-(typeof(e&&e.lastContact)==='number'?e.lastContact:now);
-    const visitOk=(meta.graceTurn||0)<=(state.turn||0)&&favor>=40&&!!e&&!e.absence&&gap>=1&&!adj.stale.length&&!adj.pendStale.length;
+    const visitOk=(meta.graceTurn||0)<=(state.turn||0)&&favor>=40&&!!e&&!e.absence&&gap>=1&&!adj.stale.length&&!adj.pendStale.length&&!fest;
     if(meta.visitRollTurn!==state.turn){meta.visitRollTurn=state.turn;meta.visitHit=visitOk&&Math.random()<(gap>win?EMPEROR_VISIT_OVERDUE:EMPEROR_VISIT_BASE+(favor>=75?0.08:0))} // 一旬一骰，同旬重复调用不重复掷
     const visitHit=!!meta.visitHit;
-    if(!adj.stale.length&&!adj.pendStale.length&&!mainMiss&&!visitHit)return;
+    if(!adj.stale.length&&!adj.pendStale.length&&!mainMiss&&!visitHit&&!fest)return;
     const items=[...adj.stale.map(p=>`「${p.title}」`),...adj.pendStale.map(x=>pendText(x))].join('；');
     let msg=`第${xunNo()}旬旬首：`;
+    if(fest)msg+=`本旬逢固定节宴「${fest.name}」（${fest.scale}，${festWhen(fest)}必至），宴须当旬演出。`;
     if(items)msg+=`以下事项已搁置发酵，须立即处置：${items}。`;
     if(mainMiss)msg+=`${items?'同场处置（了结旧事时引出新线头）——':''}剧情账中已无进行中的主线任务，本旬旬首即须发布新主线：从主控位份、处境、派系、恩宠与既有伏笔自然长出（晋升之途、子嗣、旧案、母族、新敌皆可）。`;
     if(visitHit)msg+=`${items||mainMiss?'——同场带出帝线：':''}本旬旬首，帝主动与主控相见（恩宠所致，不必另寻由头）——${favor>=60?'夜访住处、遣高德全接入阁、游园时遣开随从说话皆可；宠爱 '+favor+'，他肯花心思，"主动记得、提前安排、破例"至少体现其一':'经高德全传召往养心殿、晨起问安遇驾、园中偶逢皆可；宠爱 '+favor+'，按"每 '+win+' 旬至少一次有内容相处"的账，这旬轮到他主动'}。`;
+    if(fest)msg+=`这场宴就是本旬的剧情额度：${items||mainMiss?'上面列的事一并拿到宴上处置——':'不必另找由头，'}以宴席开场（来客通传、引至席上、席间有人搭话皆可），hasEvent=true；宴的场面、主宴者、席上机缘与分寸见下方【定例·本旬节宴】。`;
     msg+='请用剧情对话 scene 结构开场（state="ongoing"，对方的话或动作开场，嵌入主控当前处境自然发生：来人传话、事发、旧事被翻上门等皆可），给 2—4 个接话选项后停止，不结算应对后果；';
     if(visitHit)msg+='帝相处的正戏在这场：给足一来一往的实际内容（谈旧事、记挂着什么、破什么例），并经 statePatch["emperor.contact"] 记一句相处注记；';
     if(mainMiss)msg+=`并务必以 statePatch.plots 落账一条 line="主线" 的新条目（id 用 "p-" 加短标题，note 一句话写清走向，可给 dueText 期限）${meta._mainMissed?'——此前已要求开立新主线仍未落账，本轮务必落账':''}；`;
     else if(items)msg+='应对后 resolve 时统一结算并回写台账/待续（兑现者 stage 改"已兑现"；琐事办掉即从 pending 移除）；';
     else msg+='应对后 resolve 时统一结算本旬；';
-    this.round1(msg,mainMiss?'旬首·新主线发布':(visitHit?'旬首·帝至':'旬首·发酵处置'),0,{skipDice:true,_xunPop:true,_mainPubPop:!!mainMiss}); // 强制处置不占精力
+    this.round1(msg,fest?('旬首·节宴 '+fest.name):(mainMiss?'旬首·新主线发布':(visitHit?'旬首·帝至':'旬首·发酵处置')),0,{skipDice:true,_xunPop:true,_mainPubPop:!!mainMiss}); // 强制处置不占精力
   },
   collapse(){ // 精力归零：当场昏迷，扣体质，弹窗确认后强制进入下一旬
     $('#mapview').classList.remove('on'); // 从宫城图直接触发时也兜底收起
@@ -5512,6 +5633,7 @@ const Game={
       if(gear.some(x=>x.name==='避毒珠'))msg+='\n另：主控佩戴避毒珠期间，任何针对主控的下毒与慢药暗算都不能得手——毒近身时珠身发烫示警，主控得以察觉、避开或起疑；除非对方明知此珠存在并先设法除之，不得让佩戴中的毒害静默成立。';
     }
     const adj=adjudicatePlots(opts&&opts.skipDice); // 旬首剧情裁决：到期/超期剧情与冷却状态（主动触发时骰子让位）
+    Game._festSerial=adj.fest?xunSerial(state.time):null; // 本轮把节宴演出去：落定后记为已演，同旬不再重复
     if(opts&&opts.meetWho)adj.gardenMeet=opts.meetWho; // 御花园偶遇命中：本轮必须触发与这个人的 scene 事件
     Game._lastAdj=adj;Game._lastFocus=focus; // 供剧情场景收尾与纪事摘要
     const craftHint=craftQuestHint();
@@ -5522,6 +5644,7 @@ const Game={
       $('#mapview').classList.remove('on'); // 目的地行动落定即收起宫城图（加载层 z-60 本就叠在图上）
       UI.hideBusy();
       soldNotes=[];lastUseIdx=null;
+      if(Game._festSerial!=null){state.lastFestSerial=Game._festSerial;Game._festSerial=null} // 节宴已演：记旬号，同旬后续行动不再重复摆宴
       finalize(p,{focus,adj});
       logXunAction(focus);
       if(opts&&opts.leadIds&&opts.leadIds.length){ // 呼应过的引线：模型回写台账才算实质推进（touch 已由 mergePlots 刷新）；只演不写记一次落空
@@ -5535,7 +5658,7 @@ const Game={
       }
       // 相关的待续琐事：挂账计旬是否重置只看本轮 statePatch 是否真改/真删（见 applyPatch 的 pending 分支），不再"提过即刷新"，免得一条琐事被每旬顺口一提就永不过期
       const meta=ensurePlotMeta();
-      if(p.hasEvent||adj.due.length||adj.overdue.length||adj.mainPub||adj.gardenMeet)meta.lastEventTurn=state.turn;
+      if(p.hasEvent||adj.due.length||adj.overdue.length||adj.mainPub||adj.gardenMeet||adj.fest)meta.lastEventTurn=state.turn;
       if(adj.mainPub||(opts&&opts._mainPubPop))meta._mainMissed=!activePlots().some(x=>x.line==='主线'); // 新主线是否落账：未落账则下轮裁决加重语气（含旬首断档直弹）
       if(isMajorTurn(p.statePatch,p))meta.lastBigTurn=state.turn;
       if(adj.hit){meta.rollHit=false;meta.rollTargetId=null} // 本旬骰子已用毕，同旬后续行动不再重复强制
@@ -5564,10 +5687,11 @@ const Game={
     }).catch(e=>{UI.hideBusy();this.handleCallErr(e)});
   },
   /* 剧情触发判定辅助：裁决是否强制本旬出剧情（到期/超期/剧情骰命中/主线断档/御花园偶遇） */
-  _eventMandated(adj){return !!(adj&&(adj.due&&adj.due.length||adj.overdue&&adj.overdue.length||adj.hit||adj.mainPub||adj.gardenMeet||adj.empDue))},
+  _eventMandated(adj){return !!(adj&&((adj.fest&&!adj.festSoft)||adj.due&&adj.due.length||adj.overdue&&adj.overdue.length||adj.hit||adj.mainPub||adj.gardenMeet||adj.empDue))},
   _mandateText(adj,opts){
     if(!adj)return '';
     const names=[...(adj.overdue||[]),...(adj.due||[])].map(p=>`「${p.title}」到期须兑现`);
+    if(adj.fest&&!adj.festSoft)names.push(`固定节宴「${adj.fest.name}」须当旬演出`);
     if(opts&&opts._mainPubPop)names.push('主线断档须以 scene 开新主线并落账');
     if(adj.stale&&adj.stale.length)names.push(`「${adj.stale.map(p=>p.title).join('」「')}」发酵须处置`);
     if(adj.pendStale&&adj.pendStale.length)names.push(`待续琐事（${adj.pendStale.map(pendText).join('；')}）发酵须处置`);
@@ -5617,7 +5741,7 @@ const Game={
     const plot=adj.target||[...(adj.overdue||[]),...(adj.due||[])][0]||(adj.stale||[])[0];
     const who=sceneSpeaker(p,sc);
     if(!sc.who||/^(宫中来人|来人|某人|众人|宫人|宫女|太监|不详|事发)$/.test(sc.who))sc.who=who; // 回写兜底说话人，进入对话时不再丢
-    const title=plot?plot.title:(who==='宫中来人'?'事发':who);
+    const title=(adj.fest&&!adj.festSoft)?adj.fest.name:(plot?plot.title:(who==='宫中来人'?'事发':who));
     const meta=[sc.when,sc.where].filter(Boolean).join('｜');
     const parts=this.sceneParts(sc);
     const lead=sc.line?filterText(sc.line):(parts?parts.map(x=>x.type==='say'?`“${x.text}”`:x.type==='quote'?`${x.who?x.who+'说：':''}「${x.text}」`:x.text).join(''):this.chatLead(p));
