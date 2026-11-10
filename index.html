@@ -2289,7 +2289,7 @@ function toast(msg,ms=2200){const el=$('#toast');el.textContent=msg;el.classList
 
 /* ============================================================ 设置 */
 const SET_KEY='sgd_settings';
-const DEFAULT_SETTINGS={apiKey:'',baseUrl:'https://api.deepseek.com/v1',model:'deepseek-chat',theme:'auto',stream:true};
+const DEFAULT_SETTINGS={apiKey:'',baseUrl:'https://api.deepseek.com/v1',model:'deepseek-chat',theme:'auto',stream:true,bgm:true};
 function loadSettings(){
   try{return Object.assign({},DEFAULT_SETTINGS,JSON.parse(localStorage.getItem(SET_KEY)||'{}'))}
   catch(e){return Object.assign({},DEFAULT_SETTINGS)}
@@ -2297,6 +2297,60 @@ function loadSettings(){
 function saveSettings(s){localStorage.setItem(SET_KEY,JSON.stringify(s));applyTheme()}
 function applyTheme(){const t=loadSettings().theme;document.documentElement.dataset.theme=t==='auto'?'':t}
 applyTheme();
+
+/* ============================================================ BGM（WebAudio 程序生成，无音频文件）
+   C 宫五声音阶拨弦旋律＋低缓铺底；默认开启，受浏览器自动播放限制，首次点击页面后启动。 */
+const BGM=(()=>{
+  const PENTA=[261.63,293.66,329.63,392.00,440.00,523.25,587.33,659.25,783.99,1046.50];
+  let ctx=null,master=null,drone=null,timer=null,idx=3,playing=false,rate=1;
+  function ensure(){
+    if(ctx)return true;
+    const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return false;
+    ctx=new AC();
+    master=ctx.createGain();master.gain.value=0;master.connect(ctx.destination);
+    drone=ctx.createGain();drone.gain.value=0;drone.connect(master);
+    [130.81,196.00].forEach((f,i)=>{ // 根音＋五度长音，慢起伏
+      const o=ctx.createOscillator();o.type='sine';o.frequency.value=f;
+      const g=ctx.createGain();g.gain.value=i?0.35:0.5;o.connect(g);g.connect(drone);o.start();
+      const lfo=ctx.createOscillator();lfo.frequency.value=0.05+i*0.023;
+      const lg=ctx.createGain();lg.gain.value=0.15;lfo.connect(lg);lg.connect(g.gain);lfo.start();});
+    return true;
+  }
+  function pluck(f,when,vol){
+    const o=ctx.createOscillator();o.type='triangle';o.frequency.value=f;
+    const flt=ctx.createBiquadFilter();flt.type='lowpass';flt.frequency.value=1800;
+    const g=ctx.createGain();g.gain.setValueAtTime(0,when);
+    g.gain.linearRampToValueAtTime(vol,when+0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001,when+2.6);
+    o.connect(flt);flt.connect(g);g.connect(master);o.start(when);o.stop(when+2.8);
+    const o2=ctx.createOscillator();o2.type='sine';o2.frequency.value=f*2; // 轻泛音
+    const g2=ctx.createGain();g2.gain.setValueAtTime(vol*0.25,when);
+    g2.gain.exponentialRampToValueAtTime(0.0001,when+1.2);
+    o2.connect(g2);g2.connect(master);o2.start(when);o2.stop(when+1.4);
+  }
+  function step(){
+    if(!playing)return;
+    if(Math.random()<0.78){ // 偶尔留白，像琴声断句
+      idx=Math.max(0,Math.min(PENTA.length-1,idx+[-2,-1,-1,0,1,1,2][Math.floor(Math.random()*7)]));
+      pluck(PENTA[idx],ctx.currentTime+0.05,0.16+Math.random()*0.06);
+      if(Math.random()<0.22)pluck(PENTA[Math.max(0,idx-2)]/2,ctx.currentTime+0.05,0.10); // 低八度应和
+    }
+    timer=setTimeout(step,(1700+Math.random()*2200)/rate);
+  }
+  function start(){if(playing)return;if(!ensure())return;playing=true;
+    rate=loadSettings().bgmRate||1;
+    ctx.resume();
+    drone.gain.setTargetAtTime(0.10,ctx.currentTime,1.2);
+    master.gain.setTargetAtTime(0.5,ctx.currentTime,0.8);step();}
+  function stop(){if(!playing)return;playing=false;clearTimeout(timer);
+    if(ctx){master.gain.setTargetAtTime(0,ctx.currentTime,0.4);drone.gain.setTargetAtTime(0,ctx.currentTime,0.4);}}
+  document.addEventListener('visibilitychange',()=>{ // 切后台暂停，回来自动续
+    if(!ctx)return;
+    if(document.hidden)ctx.suspend();else if(playing)ctx.resume();});
+  return{start,stop,setRate(v){rate=Math.max(0.5,Math.min(1.5,v||1));},get playing(){return playing}};
+})();
+function applyBgm(){if(loadSettings().bgm!==false)BGM.start();else BGM.stop()}
+document.addEventListener('pointerdown',()=>applyBgm(),{once:true}); // 首次点击后按设置启动（绕开自动播放限制）
 
 /* ============================================================ 存档 */
 const SV={cur:'sgd_current',auto:'sgd_slot_auto',manual:i=>'sgd_slot_'+i};
@@ -3994,6 +4048,8 @@ const UI={
       <div class="setrow"><span class="sk">模型</span><input id="setModel" placeholder="deepseek-chat" value="${esc(s.model)}"></div>
       <div class="setrow"><span class="sk">流式输出</span><select id="setStream"><option value="1" ${s.stream!==false?'selected':''}>开启（边写边看，推荐）</option><option value="0" ${s.stream===false?'selected':''}>关闭（接口不支持流式时）</option></select></div>
       <div class="setrow"><span class="sk">外观</span><select id="setTheme"><option value="auto" ${s.theme==='auto'?'selected':''}>跟随系统</option><option value="light" ${s.theme==='light'?'selected':''}>宣纸（浅色）</option><option value="dark" ${s.theme==='dark'?'selected':''}>墨底（深色）</option></select></div>
+      <div class="setrow"><span class="sk">背景音乐</span><select onchange="Game.toggleBgm(this.value!=='0')"><option value="1" ${s.bgm!==false?'selected':''}>开启（古琴氛围）</option><option value="0" ${s.bgm===false?'selected':''}>关闭</option></select></div>
+      <div class="setrow"><span class="sk">BGM 速率</span><input type="range" id="setBgmRate" min="0.5" max="1.5" step="0.05" value="${s.bgmRate||1}" oninput="Game.setBgmRate(parseFloat(this.value))"><span class="sk num" id="bgmRateVal">${Math.round((s.bgmRate||1)*100)}%</span></div>
       <div class="setbtns"><button class="btn btn-primary" onclick="Game.saveSettingsFromUI()">保存设置</button><button class="btn btn-line" id="btnTestApi" onclick="Game.testApi()">测试连通</button></div>
       <div id="apiTestRes" style="display:none;margin-top:10px;font-size:13px;line-height:1.7;border-radius:8px;padding:8px 10px"></div></div>
       <div class="sec"><div class="sec-cap">数据</div>
@@ -6532,6 +6588,8 @@ const Game={
   },
   /* 设置 */
   switchSetPane(p){setPane=p;UI.renderSheet('设置')},
+  toggleBgm(on){const s=loadSettings();s.bgm=on;localStorage.setItem(SET_KEY,JSON.stringify(s));applyBgm();toast(on?'背景音乐已开启':'背景音乐已关闭')},
+  setBgmRate(v){if(!(v>=0.5&&v<=1.5))return;const s=loadSettings();s.bgmRate=Math.round(v*100)/100;localStorage.setItem(SET_KEY,JSON.stringify(s));BGM.setRate(s.bgmRate);const el=$('#bgmRateVal');if(el)el.textContent=Math.round(s.bgmRate*100)+'%';},
   openSettings(p){
     if(phase==='PROFILE'){toast('请先确认档案');return}
     if(p)setPane=p;
