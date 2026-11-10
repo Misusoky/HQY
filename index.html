@@ -2358,7 +2358,9 @@ function normalizeState(s){
   s.relationships=(s.relationships&&typeof s.relationships==='object'&&!Array.isArray(s.relationships))?s.relationships:{};
   s.system=(s.system&&typeof s.system==='object')?s.system:{shop:[]};
   if(!Array.isArray(s.system.shop))s.system.shop=[];
-  s.pending=normalizePending(s.pending,s.turn);s.time=s.time||{era:'元朔',year:1,month:3,xun:'上旬'};
+  s.time=s.time||{era:'元朔',year:1,month:3,xun:'上旬'};
+  if(!s.plotLedgerV1){migratePlotLedger(s);s.plotLedgerV1=true} // 一次性迁移须先于 pending 归一：此时剧情类条目还是字符串，模式才匹配得上；归一后再迁永远命中不了
+  s.pending=normalizePending(s.pending,s.turn);
   if(s.time.xun==='中旬')s.time.xun='下旬'; // 旧三旬制存档归入两旬制
   if(typeof s.energy!=='number'||!(s.energy>=0)){ // 旧档（无精力字段）：turn 由「已完成旬数」转为「当前旬号」
     s.energy=ENERGY_MAX;
@@ -2416,7 +2418,6 @@ function normalizeState(s){
   if(!s.itemFlagV1){for(const it of s.inventory)it.usable=guessUsable(it.name,it.note);s.itemFlagV1=true} // 旧档一次性重算可否使用
   for(const it of s.inventory)itemFlags(it); // 补齐缺失词条
   ensureCraftState(s); // 手作：补 craft 状态；旧档首次接入补一份入门材料
-  if(!s.plotLedgerV1){migratePlotLedger(s);s.plotLedgerV1=true} // 一次性迁移剧情台账
   migrateEmperor(s); // 恩宠账：旧档补知心/上次接触/共同经历（内部一次性守卫）
   if(!Array.isArray(s.plots))s.plots=[];
   if(!s.readMindV1){const sys=s.system=s.system||{};const shop=sys.shop=Array.isArray(sys.shop)?sys.shop:[];if(!shop.some(it=>it&&it.name==='读心笺'))shop.push({name:'读心笺',cost:15});s.readMindV1=true} // 旧档商城补读心笺
