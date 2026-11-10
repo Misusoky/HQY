@@ -106,6 +106,12 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
 .cr-tags{display:flex;flex-wrap:wrap;gap:6px}
 .cr-attrs{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:14px}
 .cr-attrs b{font-family:var(--sans);font-weight:600}
+.cr-emp{margin-top:4px}
+.cr-emp textarea{width:100%;min-height:96px;border:1px solid var(--line);border-radius:8px;background:var(--card);font-size:14px;line-height:1.7;padding:8px 10px;outline:none;color:var(--ink);resize:vertical;font-family:inherit}
+.cr-emp textarea:focus{border-color:var(--cinnabar)}
+.cr-empbar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px}
+.cr-varbtn{border:1px solid var(--line);border-radius:14px;padding:3px 12px;font-size:12px;color:var(--cinnabar);background:var(--card)}
+.cr-count{font-size:12px;color:var(--ink-soft);font-family:var(--sans)}
 .create-foot{display:flex;gap:10px;padding-top:16px}
 
 /* ---------- 叙事流 ---------- */
@@ -542,6 +548,20 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
     <div class="rm-title">眼前一黑</div>
     <div class="rm-body">这旬排得太满，你眼前一黑，栽倒在榻前。宫人七手八脚将人抬回寝殿，太医令静养——本旬戛然而止，体质也受了损。</div>
     <div class="rm-ops"><button class="btn btn-primary" onclick="Game.collapseConfirm()">不知过了多久……</button></div>
+  </div>
+</div>
+<!-- 移性符：重撰帝设（商城道具，每件限改一次） -->
+<div class="restmodal" id="shiftModal">
+  <div class="rm-card">
+    <div class="rm-title">移性符 · 重撰帝设</div>
+    <div class="rm-body" style="max-height:56vh;overflow:auto">
+      <div class="cr-emp">
+        <textarea id="shiftEmpPersona" maxlength="1000" placeholder="为他重写一段人设：性情、好恶、隐秘，以及他待你的方式。他将自此照此行事。"></textarea>
+        <div class="cr-empbar"><button class="cr-varbtn" onclick="Game.crInsertPlayerVar('shiftEmpPersona','shiftEmpCount')">插入 &lt;player&gt;</button><span class="cr-count num" id="shiftEmpCount">0/1000</span></div>
+        <div class="sheet-note" style="margin-top:6px">一千字以内 · 自本旬起，他的举止与待你的态度向新设靠拢 · 「插入 &lt;player&gt;」代入你的名讳 · 写毕符纸自焚</div>
+      </div>
+    </div>
+    <div class="rm-ops"><button class="btn btn-line" onclick="Game.closeShiftCharm()">收符</button><button class="btn btn-primary" onclick="Game.confirmShiftCharm()">落笔，改写帝设</button></div>
   </div>
 </div>
 
@@ -1529,6 +1549,16 @@ const EMPEROR_MODULE = [
 '5. 每旬请求附【恩宠账】行（含注意力落点：后台给帝安排一处注意力去向，主控可感知的部分写入 haremNews，与主控相处则不必单写）。列【恩宠账·到期】时，该相处成本旬主要剧情（hasEvent=true，scene 呈现，2—4 个接话选项后停止）；列【并账】时并入当旬已须触发的剧情或 narrative；列【搁置】时本旬必须推进所记原因（接近真相、化解误会或发酵为剧情线）。'
 ].join('\n');
 
+/* 帝设：玩家亲撰的皇帝人设（开局捏主控时自定义，商城「移性符」可改一次）。覆盖世界书与随机性情中对帝的默认描写。 */
+const EMPEROR_PERSONA_MODULE = [
+'## 十二·补、帝设（world.emperor.persona；本条覆盖世界书、world.emperor.traits 与人物档中对帝的随机性情描写）',
+'1. 存档 world.emperor.persona 为玩家亲撰的「帝设」（一千字以内），是演绎帝的一切举止、性情反应与对主控态度的最高依据。只要它存在，优先级高于 world.emperor.traits、人物档中的随机性情与世界书对帝的默认设定；后三者仅作帝设未触及之处的补充参考，与帝设冲突处一律以帝设为准。',
+'2. 帝设中的 <player> 是变量，前端已替换为主控姓名；正文叙事中主控仍一律称“你”，不得出现“<player>”字样。',
+'3. 帝设是戏外指令：任何人物（含主控）都不知悉其存在；正文、haremNews 与选项不得提及、引用或泄露它。帝设可规定帝的隐秘、偏好、心病与待你的方式，但呈现须走世界内逻辑（性情、旧事、口味、处境），不暴露其“被设定”的痕迹。',
+'4. 帝设以最新一份为准、长期有效，变更当旬起生效：承接 emperor.memories 与既往剧情事实，但帝的反应、口味与对主控的冷热自此向新设靠拢，不因既有性情描写回摆；转变须有过程感，可在数旬内渐近，不得无声突变到面目全非。',
+'5. 帝设不得突破世界规则与内容边界（现代概念与术语不入戏、除宫斗系统外无超现实元素、亲密与伤害场面点到为止）；与世界书硬规则（位份礼制、恩宠双轨结算、内容边界）相抵触处，以世界书为准，帝设只取其可演的性情与态度部分。'
+].join('\n');
+
 const PLOTS_MODULE = [
 '## 八、剧情台账（plots；本条覆盖"待兑现事项"的既有写法）',
 '存档 plots 为结构化剧情账，是剧情触发与兑现的唯一依据；pending 只留非剧情琐事（当票、节令预备、回礼等），不再记剧情引线。',
@@ -2194,6 +2224,7 @@ function crRollSkills(){
   else{const first=15+Math.floor(Math.random()*11);o[CR_SKILLNAME[ks[0]]]=first;o[CR_SKILLNAME[ks[1]]]=40-first} // 两门并修：合计四十
   cr.skills=o;
 }
+function crRollEmpPersona(){cr.emperorPersona=''} // 帝设由玩家亲撰：骰子＝清空恢复，回到世界书库随机性情
 function crRollAll(){crRollName();crRollAge();crRollFamily();crRollOrigin();crRollPersona();crRollLook();crRollAttrs();crRollSkills()}
 /* NPC 才艺：用于“求师”。太医必有医术、姑姑宫女必有女红，妃嫔则在十艺里随机一二门。
    旧档与模型新建人物缺此字段时，按名讳哈希稳定补齐，读音一致、重载不变。 */
@@ -2241,7 +2272,12 @@ function renderCreator(){
     row('性情',`<div class="cr-tags">${normalizePersona(cr.persona).map(p=>`<span class="tag">${esc(p)}</span>`).join('')}</div>`,'persona')+
     row('容貌',`<span class="cr-txt">${esc(cr.look)}</span><div class="cr-note num">外貌 ${cr.attrs['外貌']}</div>`,'look')+
     row('属性',`<div class="cr-attrs num">${Object.entries(cr.attrs).map(([k,v])=>`<span>${k} <b>${v}</b></span>`).join('')}</div>`,'attrs')+
-    row('才艺',`<span class="cr-txt num">${Object.entries(cr.skills).map(([k,v])=>`${esc(k)} ${v}`).join('　')||'暂未开窍'}</span><div class="cr-note num">共 ${Object.values(cr.skills).reduce((a,b)=>a+b,0)} 点 · 余下诸艺可求师或往藏书阁另学</div>`,'skills');
+    row('才艺',`<span class="cr-txt num">${Object.entries(cr.skills).map(([k,v])=>`${esc(k)} ${v}`).join('　')||'暂未开窍'}</span><div class="cr-note num">共 ${Object.values(cr.skills).reduce((a,b)=>a+b,0)} 点 · 余下诸艺可求师或往藏书阁另学</div>`,'skills')+
+    `<div class="cr-row"><span class="cr-k">帝设</span><div class="cr-v cr-emp">
+      <textarea id="crEmpPersona" maxlength="1000" placeholder="不填则由世界书库随机性情。可写他的性情、好恶、隐秘与待你的方式——他会照此行事。" oninput="Game.crSetEmpPersona(this.value)">${esc(cr.emperorPersona||'')}</textarea>
+      <div class="cr-empbar"><button class="cr-varbtn" onclick="Game.crInsertPlayerVar('crEmpPersona','crEmpCount')">插入 &lt;player&gt;</button><span class="cr-count num" id="crEmpCount">${String(cr.emperorPersona||'').length}/1000</span></div>
+      <div class="cr-note">一千字以内 · 极大影响帝的举止与待你的态度 · 点「插入 &lt;player&gt;」可在文中代入你的名讳</div>
+    </div><button class="cr-dice" onclick="Game.rollCreator('empPersona')">⟳</button></div>`;
 }
 function filterText(t){ // 正文过滤：去 emoji / markdown 残留
   return String(t||'')
@@ -2437,6 +2473,12 @@ function normalizeState(s){
   }
   ensureNpcRealNames(s); // 旧档人物补本名；已有本名不覆盖
   s.protagonist=s.protagonist||{};s.protagonist.attributes=s.protagonist.attributes||{};s.protagonist.skills=s.protagonist.skills||{};
+  s.world=(s.world&&typeof s.world==='object')?s.world:{};
+  if(s.world.emperor!=null&&typeof s.world.emperor!=='object')delete s.world.emperor; // 旧档脏数据兜底
+  if(s.world.emperor&&s.world.emperor.persona!=null){ // 帝设（玩家亲撰）：统一截断一千字
+    const ps=String(s.world.emperor.persona).slice(0,1000);
+    if(ps)s.world.emperor.persona=ps;else delete s.world.emperor.persona;
+  }
   if(typeof s.protagonist.maids==='string')s.protagonist.maids=s.protagonist.maids.split(/[、,，\s]+/).filter(Boolean);
   if(!Array.isArray(s.protagonist.maids))s.protagonist.maids=[];
   s.protagonist.personality=normalizePersona(s.protagonist.personality); // 旧档性情去重、归并近义、剔除相斥
@@ -2777,15 +2819,16 @@ function buildStaticSystem(){
       .replace('{{世界书全文：02-世界书.md}}',WORLD_BOOK_RUNTIME)
       .replace('{{叙事文风全文：03-叙事文风.md}}',STYLE_GUIDE)
       .replace('{{当前存档 JSON：04-当前存档-v36.json 或玩家当前档}}','（见本提示词末尾「当前存档」段，动态存档在最后）')
-      +'\n\n'+NPC_MODULE+'\n\n'+ENERGY_MODULE+'\n\n'+PLOTS_MODULE+'\n\n'+EMPEROR_MODULE+'\n\n'+SCENE_MODULE+'\n\n'+SKILL_MODULE+'\n\n'+CRAFT_MODULE+'\n\n'+PERSONA_MODULE+'\n\n'+LENGTH_MODULE;
+      +'\n\n'+NPC_MODULE+'\n\n'+ENERGY_MODULE+'\n\n'+PLOTS_MODULE+'\n\n'+EMPEROR_MODULE+'\n\n'+EMPEROR_PERSONA_MODULE+'\n\n'+SCENE_MODULE+'\n\n'+SKILL_MODULE+'\n\n'+CRAFT_MODULE+'\n\n'+PERSONA_MODULE+'\n\n'+LENGTH_MODULE;
   }
   return _staticSystem;
 }
 function buildSystem(focusMsg){
   // 静态内容（世界书/文风/模块）全部在前、动态存档放最后：
   // 每次请求的前缀保持一致，接口侧前缀缓存才能命中，省 prefill 与费用。
-  return buildStaticSystem()
+  const sys=buildStaticSystem()
     +'\n\n## 十三、当前存档（动态进度的唯一依据，覆盖世界书默认值）\n\n'+JSON.stringify(compactState(state,focusMsg));
+  return sys.split('<player>').join(String(state.protagonist.name||'主控')); // 帝设变量：player=主控名讳
 }
 function buildMessages(userMsg,noHistory){
   const msgs=[{role:'system',content:buildSystem(userMsg)}];
@@ -2811,7 +2854,8 @@ const SCENE_RULES=[
 SCENE_PARTS_RULES,
 '【收尾】narrative 只写旁白，不写引号对白。',
 '【约束】本轮 scene.state 必须是 "ongoing" 或 "wrap"，不得是 "resolve"；narrative 必须为空字符串，changes=[]，statePatch={}；options 给 2—3 个方向不同的接话，只写当下可见的机会或代价。scene.where 只有场景确实移动时才写，在本宫说话就写本宫住处，不要重复上一场的地点。话已说尽、对方乏了或有事欲别时，用 "wrap" 收话（如"我要歇息了"），不结算、不写道别旁白——玩家会自决再追问还是就此告辞。擅自写 "resolve" 会被前端视为收话（wrap）并继续本场、不结算；即便判断话已说尽，也只写 wrap 一句收话，把"再追问还是就此告辞"留给玩家点选。对话对象当场换手（被传入阁面圣、正主登场等）：把 scene.who 改写为新对象（档案在册的称谓），过渡写进 parts 的 narr 段，新对象的言行照常写 act/say，scene.state 用 "ongoing" 继续对谈，不得借换手 resolve 收场。',
-'【承接】严格承接用户消息里的本场对话记录，把话题往前推；对方只依据自己的性情、目标、与主控的关系及已知信息回应。'
+'【承接】严格承接用户消息里的本场对话记录，把话题往前推；对方只依据自己的性情、目标、与主控的关系及已知信息回应。',
+'【帝设】若【本场信息】中 world.emperor.persona 非空，那是玩家亲撰的帝设：凡与帝相关的演绎（本场对话及一切正文），他的言行、口味与待主控的态度都须严格符合帝设，其优先级高于性情词表与既有印象；persona 中的 <player> 已替换为主控姓名，正文里主控仍称“你”。'
 ].join('\n');
 function buildSceneSystem(who){
   let n=(state.npcs||{})[who];
@@ -2831,7 +2875,7 @@ function buildSceneSystem(who){
       traits:normalizePersona(prof.traits),hidden,relationship,
       biography:Array.isArray(prof.biography)?prof.biography.slice(-5).map(b=>String((b&&b.text)||b||'').slice(0,100)):[],
       recent:Array.isArray(prof.recent)?prof.recent.slice(-2):[]},
-    world:{dynasty:w.dynasty,emperor:w.emperor?{name:w.emperor.name,age:w.emperor.age,traits:w.emperor.traits}:null,factions:w.factions},
+    world:{dynasty:w.dynasty,emperor:w.emperor?{name:w.emperor.name,age:w.emperor.age,traits:w.emperor.traits,persona:String(w.emperor.persona||'').split('<player>').join(String(p.name||'主控'))}:null,factions:w.factions},
     activePlots:(state.plots||[]).filter(x=>x.stage==='进行中').slice(0,6).map(x=>({title:x.title,line:x.line,note:String(x.note||'').slice(0,100)})),
     recentFacts:(state.recentConfirmedFacts||[]).slice(-3)
   };
@@ -3736,6 +3780,7 @@ const UI={
     const fv=typeof favor==='object'?favor.value:favor;
     const mems=[...(e.memories||[])].reverse();
     const gap=typeof e.lastContact==='number'?xunSerial(state.time)-e.lastContact:null;
+    const persona=(state.world&&state.world.emperor&&state.world.emperor.persona)||''; // 玩家亲撰帝设
     const rows=[
       `<div class="rowline"><span class="rk">知心</span><span class="rv">${esc(stage)}</span></div>`,
       (typeof fv==='number')?`<div class="rowline"><span class="rk">宠爱</span><span class="rv num">${fv}</span></div>`:'',
@@ -3746,7 +3791,8 @@ const UI={
     const list=mems.slice(0,10).map(m=>`<div class="tl-item"><div class="tl-time">${esc(m.xun||'')} <span class="tag">${esc(m.type||'共历')}</span>${m.open?' <span class="tag t-rumor">未了</span>':''}</div>${esc(m.text)}</div>`).join('');
     const more=mems.length>10?`<div class="sheet-note">更早还有 ${mems.length-10} 条，往后正文里自会提起。</div>`:'';
     return `<div class="sec"><div class="sec-cap">知心</div>${rows}
-      ${list?`<div class="tl" style="margin-top:8px">${list}</div>${more}`:'<div class="sheet-note">尚无共同经历。相处得多了，这里会记下他记得的事、欠下的约定与未解的误会。</div>'}</div>`;
+      ${list?`<div class="tl" style="margin-top:8px">${list}</div>${more}`:'<div class="sheet-note">尚无共同经历。相处得多了，这里会记下他记得的事、欠下的约定与未解的误会。</div>'}</div>
+      ${persona?`<div class="sec"><div class="sec-cap">帝设（你所撰）</div><div class="sheet-note" style="white-space:pre-wrap;line-height:1.8">${esc(persona)}</div><div class="sheet-note">他自此照此行事。若想改写，商城的「移性符」每件可改一次。</div></div>`:''}`;
   },
   npcRowHtml(who,onclick){
     const c=this.npcCard(who);
@@ -3812,7 +3858,7 @@ const UI={
       :`<button class="btn" disabled style="opacity:.45;letter-spacing:.1em;text-indent:.1em">不可典卖</button>`;
     const act=it.durable
       ?`<button class="btn btn-primary" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.toggleEquip(${i})">${it.equipped!==false?'收存（停用效用）':'启用（随身佩戴）'}</button>`
-      :(it.usable!==false?`<button class="btn btn-primary" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.useItem(${i})">使用（耗精力 ${focusEnergyCost('使用道具')}）</button>`:`<button class="btn" disabled style="opacity:.45;letter-spacing:.1em;text-indent:.1em">不可使用</button>`);
+      :(it.usable!==false?`<button class="btn btn-primary" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.useItem(${i})">${it.name==='移性符'?'使用 · 重撰帝设':`使用（耗精力 ${focusEnergyCost('使用道具')}）`}</button>`:`<button class="btn" disabled style="opacity:.45;letter-spacing:.1em;text-indent:.1em">不可使用</button>`);
     const wide=(k,v)=>`<div class="rowline" style="align-items:flex-start"><span style="flex:none">${k}</span><span class="cnt" style="white-space:normal;text-align:right;max-width:70%">${esc(v)}</span></div>`;
     const crafted=!!it.crafted;
     const matKindLabel={绣:'绣作',香:'合香',药:'丸散',花:'花作',杂:'杂件'};
@@ -4168,7 +4214,7 @@ const WORLD_LIB = {
   ],
 };
 
-/* 商城总商品库（写死 25 种）：类别 / 积分 / 详情 / 用法 / 效用。
+/* 商城总商品库（写死 26 种）：类别 / 积分 / 详情 / 用法 / 效用。
    每 SHOP_CYCLE 旬从库中轮换 SHOP_SLOTS 件上架（refreshShop），积分价与词条都以名为键在此维护 */
 const SHOP_CYCLE=3, SHOP_SLOTS=10;
 const SHOP_CATALOG = {
@@ -4271,7 +4317,11 @@ const SHOP_CATALOG = {
   '子嗣缘符': {kind:'durable', cost:100,
     desc:'朱砂符纸折成的符令，贴身收着，微微发热。',
     usage:'贴身佩戴（入手即启用），无需也不可「使用」。行囊详情页可「收存」停用，再「启用」戴回。',
-    fx:'长期之效：佩戴中增益子嗣缘，帷帐之事后更易有信；收存则无效。'}
+    fx:'长期之效：佩戴中增益子嗣缘，帷帐之事后更易有信；收存则无效。'},
+  '移性符': {kind:'consumable', cost:100,
+    desc:'朱砂符纸一道，纹如蟠龙，入手微温，不焚不化。系统之物，只你可见可触。',
+    usage:'行囊详情页点「使用」：屏息凝神，重撰帝设——为皇帝重写一段人设（一千字以内，可插入 <player> 代你的名讳）。不占回合、不耗精力；写毕符纸自焚。',
+    fx:'改写皇帝人设：帝自此依新设性情行事、待你。每件限改一次，用毕即焚。'}
 };
 function shopCycleOf(turn){return Math.floor(((Number(turn)||1)-1)/SHOP_CYCLE)} // 第几轮货色（每 3 旬一轮）
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
@@ -4675,6 +4725,7 @@ function buildOpeningWorld(proto){
     health:wlPick(WORLD_LIB.emperorHealth),
     hobby:wlPick(WORLD_LIB.emperorHobbies)
   };
+  if(proto.emperorPersona)emperor.persona=String(proto.emperorPersona).slice(0,1000); // 玩家亲撰帝设：开局写入存档，演绎以它为准
   const hasQueen=Math.random()<0.6;
   const dowager=Math.random()<0.7?Object.assign({},wlPick(WORLD_LIB.dowagers)):null;
   if(dowager&&!hasQueen)dowager.stance=dowager.stance.replace(/皇后/g,'主位');
@@ -5156,14 +5207,24 @@ const Game={
     if(loadCurrent()&&!confirm('开新档会替换本机当前进度（可在 设置→存档 先把旧档存入手动档位）。确认开新档？'))return;
     this.openCreator();
   },
-  openCreator(){crRollAll();UI.show('#screen-create');renderCreator()},
+  openCreator(){crRollAll();cr.emperorPersona='';UI.show('#screen-create');renderCreator()},
   backToStart(){UI.show('#screen-start')},
   rollCreator(field){ // 单项重掷
-    ({name:crRollName,age:crRollAge,family:()=>crRollFamily(),origin:crRollOrigin,persona:crRollPersona,look:crRollLook,attrs:crRollAttrs,skills:crRollSkills}[field]||(()=>{}))();
+    ({name:crRollName,age:crRollAge,family:()=>crRollFamily(),origin:crRollOrigin,persona:crRollPersona,look:crRollLook,attrs:crRollAttrs,skills:crRollSkills,empPersona:crRollEmpPersona}[field]||(()=>{}))();
     renderCreator();
   },
   pickFamily(i){crRollFamily(i);renderCreator()},
   crSetName(v){cr.name=String(v||'').slice(0,8)||cr.name},
+  crSetEmpPersona(v){cr.emperorPersona=String(v||'').slice(0,1000);const c=$('#crEmpCount');if(c)c.textContent=cr.emperorPersona.length+'/1000'},
+  crInsertPlayerVar(taId,countId){ // <player> 快捷键：光标处插入变量，正文中代入主控名讳
+    const ta=$('#'+taId);if(!ta)return;
+    const s=typeof ta.selectionStart==='number'?ta.selectionStart:ta.value.length;
+    const e=typeof ta.selectionEnd==='number'?ta.selectionEnd:s;
+    ta.value=ta.value.slice(0,s)+'<player>'+ta.value.slice(e);
+    if(taId==='crEmpPersona')this.crSetEmpPersona(ta.value);
+    else{const c=$('#'+countId);if(c)c.textContent=ta.value.length+'/1000'}
+    ta.focus();ta.selectionStart=ta.selectionEnd=s+8;
+  },
   rerollCreator(){crRollAll();renderCreator();toast('重新掷过了')},
   confirmCreate(){ // 捏定主控 → 本地世界书库组装其余世界
     const fam=CR_FAMILIES[cr.family];
@@ -5171,7 +5232,8 @@ const Game={
       family:`${fam.k}：${fam.d}`,origin:cr.origin,personality:normalizePersona(cr.persona),look:cr.look,
       attributes:Object.assign({},cr.attrs),skills:Object.assign({},cr.skills),
       constitutionBase:cr.constitutionBase||(cr.attrs&&cr.attrs['体质'])||50,
-      silver:fam.silver,points:100,health:'康健',maids:[]};
+      silver:fam.silver,points:100,health:'康健',maids:[],
+      emperorPersona:String(cr.emperorPersona||'').trim().slice(0,1000)};
     this.startWorldGen();
   },
   startWorldGen(){ // 本地世界书库随机开局：不调模型，瞬时组装
@@ -6504,6 +6566,7 @@ const Game={
     const it=(state.inventory||[])[i];if(!it||it.count<=0)return;
     if(it.durable){toast('长期之物无需使用：在详情页启用／收存即可');return}
     if(it.usable===false){toast('此物不能使用');return}
+    if(it.name==='移性符'){this.openShiftCharm(i);return} // 系统道具：本地改写帝设，不占回合、不耗精力、不走模型
     it.count-=1;const gone=it.count<=0;lastUseIdx=i;
     const label=`使用「${it.name}」`;
     const cost=focusEnergyCost('使用道具');
@@ -6511,6 +6574,33 @@ const Game={
     const fxNote=cat?`此物效用：${cat.fx}`:(it.effect?`此物效用：${it.effect}${Array.isArray(it.traits)&&it.traits.length?`（特质：${it.traits.join('、')}；品质：${it.quality||'—'}）`:''}`:'');
     UI.closeSheet();
     this.round1(`第${xunNo()}旬第一轮：玩家消耗精力 ${cost} ${label}（${gone?'已用尽':'尚余 '+it.count+' 件'}${it.note?'；'+it.note:''}）。${fxNote}演绎使用此物的具体过程与其效果，然后决定是否触发剧情（hasEvent）。`,label,cost);
+  },
+  openShiftCharm(i){ // 移性符：本地改写帝设（每件限改一次；不占回合、不耗精力、不走模型）
+    const it=(state.inventory||[])[i];if(!it||it.count<=0)return;
+    Game._shiftItem=it;
+    const ta=$('#shiftEmpPersona');
+    ta.value=(state.world&&state.world.emperor&&state.world.emperor.persona)||'';
+    $('#shiftEmpCount').textContent=ta.value.length+'/1000';
+    $('#shiftModal').classList.add('on');
+  },
+  closeShiftCharm(){$('#shiftModal').classList.remove('on');Game._shiftItem=null},
+  confirmShiftCharm(){
+    const it=Game._shiftItem;
+    if(!it||it.count<=0){this.closeShiftCharm();return}
+    const v=$('#shiftEmpPersona').value.trim().slice(0,1000);
+    if(!v){toast('帝设不可留白：写点什么，或收符作罢');return} // 符仍握在手中：补写后再落笔
+    Game._shiftItem=null;
+    const w=state.world=state.world||{};
+    const e=w.emperor=w.emperor||{};
+    e.persona=v; // 新设当旬生效；下次模型请求自动带上（buildSystem 拼入存档并替换 <player>）
+    it.count-=1;
+    if(it.count<=0){const idx=(state.inventory||[]).indexOf(it);if(idx>=0)state.inventory.splice(idx,1)}
+    $('#shiftModal').classList.remove('on');
+    ensureXunBook();
+    logXunAction('使用·移性符');
+    persistCurrent();markSafe();
+    toast('符纸无火自燃：帝设已改写，自本旬生效');
+    UI.closeSheet();
   },
   pawnItem(i){
     const it=(state.inventory||[])[i];if(!it||!it.pawnable||it.count<=0)return;
