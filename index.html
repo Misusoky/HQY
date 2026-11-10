@@ -1317,7 +1317,7 @@ function adjudicatePlots(skipDice){ // 旬首裁决：到期强制兑现 + 前�
   else if(hit)lines.push('剧情骰命中的触发同样每旬至多一条；进入 scene 对话后给 2—4 个接话选项，等待玩家应对。');
   else if(mainPub)lines.push('新主线发布每旬至多一条：scene 对话呈现，给 2—4 个接话选项，等待玩家应对；与发酵条目同场时 hasEvent 随那场处置戏；新主线条目必须随本轮 statePatch.plots 落账。');
   for(const l of emp.lines)lines.push(l);
-  lines.push('结算只经 statePatch.plots 回写【发生变化】的台账条目：兑现者 stage 改"已兑现"；改写期限者须在 note 说明理由并给出新 dueText；新埋引线新增条目（id 用 "p-" 加短标题，与现存 id 区分）；作废者 stage 改"已作废"并注明缘由。只回写变化的条目，前端按 id 合并。pending 只留非剧情琐事。');
+  lines.push('结算只经 statePatch.plots 回写【发生变化】的台账条目：兑现者 stage 改"已兑现"；改写期限者须在 note 说明理由并给出新 dueText；新埋引线新增条目（id 用 "p-" 加短标题，与现存 id 区分）；作废者 stage 改"已作废"并注明缘由。只回写变化的条目，前端按 id 合并。注意：条件已足的条目必须兑现（stage 改"已兑现"，可附积分与任务进度），只改写 note 不算办结；手作成品相赠、请托办妥皆可兑现任务，规则见系统提示词手作模块与剧情台账条。pending 只留非剧情琐事。');
   const before={};[...overdue,...due].forEach(p=>before[p.id]=p.dueText||'');
   return {due,overdue,stale,pendStale,target,hit,mainPub:!!mainPub,needMain:!!needMain,gardenMeet:'',empDue:emp.due,before,text:'【剧情裁决 · 本旬】（前端判定：到期/超期强制兑现＋搁置发酵强制处理＋主线断档强制发布＋剧情骰被动触发，覆盖"自行决定是否触发剧情"）\n'+lines.map((l,i)=>`${i+1}. ${l}`).join('\n')};
 }
@@ -1472,7 +1472,8 @@ const PLOTS_MODULE = [
 '主线不断档：进行中的主线兑现或作废后清零，裁决块会以【发布·新主线】要求本旬剧情额度空出的常规回合开立新主线；新主线与在途引线、发酵条目并行共存（可与发酵处置同场：了结旧事时引出新线头）；模型须经 statePatch.plots 新增 line="主线" 条目（id 用 "p-" 加短标题），正文埋入落账亦可，不强求单独成戏。',
 '无期限（缓图）条目并非永久挂账：悬置超过 4 旬未推进即"发酵"，会在裁决块以【须处理·搁置发酵】列出，当旬必须择一处理——兑现为剧情（旬首直接弹出，hasEvent=true）、改写期限（note 说明理由并给新 dueText）或作废（注明发酵后果）；连续 3 旬不回写前端自动作废。',
 '每轮结算（第一、二轮皆然）只经 statePatch.plots 回写【发生变化的条目】（新增、更新、兑现、作废）；只回写发生变化的条目，前端按 id 合并，漏写视为不变。',
-'玩家主动拜访某人、或往御花园散步时，请求可能附【呼应引线】块：所列在途引线与该人/该地相关，须借此次行动实质推进（兑现、或产生新信息/态度变化并经 statePatch.plots 更新 note）；只演绎不回写不算推进——同一引线连续两次被呼应却无回写，前端不再提示它，并交回旬首"发酵"强制处置。若此番确无新进展，照实写一两句无获即可，不要为凑交集硬编事件。',
+'兑现与"改备注"是两回事：条目条件已满足——所托之事办成、所求之物送到并被收下、当众献艺达成等——必须把该条目 stage 改为"已兑现"，可另附积分（protagonist.points）与"本旬变化"中的任务进度；只改写 note 而 stage 留在"进行中"，一律视为未办结，任务继续挂账。任务兑现不拘形式：亲手做的成品相赠、拜托旁人代办、旧约当面履行皆可；手作成品对应任务时的兑现规则另见手作模块。',
+'玩家主动拜访某人、或往御花园散步时，请求可能附【呼应引线】块：所列在途引线与该人/该地相关，须借此次行动实质推进（兑现、或产生新信息/态度变化并经 statePatch.plots 更新 note）；已条件满足的条目直接兑现（stage 改"已兑现"），不要只写进展。只演绎不回写不算推进——同一引线连续两次被呼应却无回写，前端不再提示它，并交回旬首"发酵"强制处置。若此番确无新进展，照实写一两句无获即可，不要为凑交集硬编事件。',
 'pending（待续琐事）与引线同生命周期：挂账超 4 旬未办即"发酵"，旬首以【须处理·琐事发酵】列入裁决块，须当旬择一处理——本旬办掉（从 statePatch.pending 移除）、升级为剧情引线（移入 statePatch.plots）或改写文本说明现状（回写即重置计旬）；连续 3 旬不理前端自动清除。'
 ].join('\n');
 
@@ -1538,7 +1539,8 @@ const CRAFT_MODULE = [
 '4. 赠礼、献物、委托兑现走正常社交与剧情规则：品质与心意只提供更好的起点，收礼者可欣然、客气、推辞、起疑或转赠他人。',
 '5. 医药手作只作温和调理、缓解与救急，不得起死回生、保证怀孕或出现现代医学；剧毒、致幻、迷香类成品只在材料带毒性且灵感明确要求时存在，使用时须有前置、败露与追查风险。',
 '6. 带手作暗记的成品可被追查来源；御赐、禁物、信物、剧毒之物不可典卖。',
-'7. 一次手作只能用同类材料：绣料、香材、药材、花材互不混用。别人相赠的净材料（香末、药材、绣线、绢缎、干花等）前端已自动收入手作料，正文不必另写；御赐、禁物、信物、已完工之物不算材料。'
+'7. 一次手作只能用同类材料：绣料、香材、药材、花材互不混用。别人相赠的净材料（香末、药材、绣线、绢缎、干花等）前端已自动收入手作料，正文不必另写；御赐、禁物、信物、已完工之物不算材料。',
+'8. 手作成品常是任务与请托的兑现物。玩家写灵感时若已注明对象与用意（如"给罗嫔的绣样"），该用意随成品入行囊；玩家把成品赠予、呈送剧情账（plots）中任务所系之人并被收下时，承接那场戏除正常社交结算外，必须同轮以 statePatch.plots 把对应条目 stage 改为"已兑现"，并完成任务积分（protagonist.points）与"本旬变化"中的任务进度。只写"对方收下了"而漏掉任务落账，视为未兑现。'
 ].join('\n');
 
 /* ============================================================ 工具 */
@@ -2386,6 +2388,12 @@ let soldNotes=[];            // 典卖通报队列（并入下一次主持人请
 let setPane='存档';          // 设置面板当前栏：存档|API
 let selSkill=null;          // 才艺修习面板当前选中项
 let craftSel={mats:{},energy:20,inspiration:'',kind:null}; // 手作面板当前选料/精力/灵感/所做类别
+function craftQuestHint(){ // 手作成品可能对应任务：相赠收场时提醒主持人把 plots 条目兑现落账
+  const lc=state&&state.craft&&state.craft.lastItem;
+  if(!lc||typeof lc.turn!=='number'||typeof state.turn!=='number')return '';
+  if((state.turn-lc.turn)<0||(state.turn-lc.turn)>1)return '';
+  return `另：主控${lc.turn===state.turn?'本旬':'上一旬'}手作了「${lc.name}」（${lc.quality}·${(lc.traits||[]).join('、')}），灵感原话："${String(lc.inspiration||'').slice(0,80)}"。若本场戏已将它相赠、呈送剧情账所系之人并被收下，收场结算时务必把对应 plots 条目 stage 改为"已兑现"，并完成任务积分与任务进度——只写"对方收下"而漏掉任务落账，视为未兑现。`;
+}
 let craftResult=null;       // 最近一次手作成品（结果页展示）
 let abortCtrl=null;
 let lastUseIdx=null;          // 使用道具的件数回滚索引（调用失败时恢复）
@@ -4294,6 +4302,7 @@ function craftCommit(data,parsed,s){ // 校验通过且 API 返回成功后，�
   if(!Array.isArray(c.history))c.history=[];
   c.history.push({turn:s.turn,time:fmtTime(),name:item.name,quality:item.quality,traits:item.traits,materials:item.materials,energy:item.energy,inspiration:item.inspiration});
   if(c.history.length>30)c.history=c.history.slice(-30);
+  c.lastItem={turn:s.turn,name:item.name,quality:item.quality,traits:item.traits,inspiration:item.inspiration}; // 供下一轮回合提醒主持人：成品可能对应任务，相赠时须落账兑现
   if(typeof logXunAction==='function')logXunAction('手作·'+item.name);
   if(typeof persistCurrent==='function')persistCurrent();
   if(typeof markSafe==='function')markSafe();
@@ -5007,6 +5016,8 @@ const Game={
     const adj=adjudicatePlots(opts&&opts.skipDice); // 旬首剧情裁决：到期/超期剧情与冷却状态（主动触发时骰子让位）
     if(opts&&opts.meetWho)adj.gardenMeet=opts.meetWho; // 御花园偶遇命中：本轮必须触发与这个人的 scene 事件
     Game._lastAdj=adj;Game._lastFocus=focus; // 供剧情场景收尾与纪事摘要
+    const craftHint=craftQuestHint();
+    if(craftHint)msg+='\n【手作·新成品】'+craftHint;
     if(adj.text)msg+='\n'+adj.text;
     lastRequest={type:'r1',msg,focus,cost,opts};
     const settle=p=>{
@@ -5474,7 +5485,7 @@ const Game={
     const r=sceneCtx.round,cap=sceneCtx.maid?(r>=MAID_MAX_ROUNDS):(r>=SCENE_MAX_ROUNDS); // 宫女问话上限更宽，但到顶同样强制收尾
     const settlement=sceneCtx.standalone
       ?'并收束这场问话：只结算它实际带来的关系、情报、差事与行囊变化；主角才艺与属性成长留到旬末小结，修习、散步等与问话无关的收益也留到那时。没有变化就不写 changes。'
-      :'并一并完整结算本旬养成与剧情（narrative 收尾、changes、statePatch，含 statePatch.plots 的变动条目）。';
+      :'并一并完整结算本旬养成与剧情（narrative 收尾、changes、statePatch，含 statePatch.plots 的变动条目）。'+craftQuestHint();
     const maidPend=sceneCtx.maid?matchPending([sceneCtx.who]):[]; // 她名下挂账的差事/琐事：每轮提醒模型回话
     const maidPendNote=maidPend.length?`她名下还挂着这些待办：${maidPend.map(x=>pendText(x)).join('；')}。主控问起办差时她须逐条回进度——办妥的交货、回话并从 statePatch.pending 移除；未妥的说清缘由与预计何时能成；不得反问一堆或佯装忘记。`:'';
     const maidNote=sceneCtx.maid?'本场是主控在住处吩咐宫女：scene.state 只可写 "ongoing" 或 "wrap"，不得自行 resolve 收场结算（已达对话上限轮的除外，见下）；她还要当差或话已说尽时可用 "wrap" 收一句（如"奴婢还要去当值，小主若无别的吩咐……"），不结算；主控点「结束对话」或「就此告辞」时才收尾结算。'+maidPendNote+'主控交代具体差事（采买、传话、留意动静等）时：她至多提一句现实顾虑，随即领命应下、复述要领，不得反复追问请示；主控已解答她的顾虑后，她应领命，不得再抛新问题。':'';
@@ -5490,7 +5501,7 @@ const Game={
     const r=sceneCtx.round,cap=sceneCtx.maid?(r>=MAID_MAX_ROUNDS):(r>=SCENE_MAX_ROUNDS); // 追问同样吃轮数上限，不能无限纠缠
     const settlement=sceneCtx.standalone
       ?'并收束这场问话：只结算它实际带来的关系、情报、差事与行囊变化；主角才艺与属性成长留到旬末小结，修习、散步等与问话无关的收益也留到那时。没有变化就不写 changes。'
-      :'并一并完整结算本旬养成与剧情（narrative 收尾、changes、statePatch，含 statePatch.plots 的变动条目）。';
+      :'并一并完整结算本旬养成与剧情（narrative 收尾、changes、statePatch，含 statePatch.plots 的变动条目）。'+craftQuestHint();
     const msg=`第${xunNo()}旬剧情对话第${r}轮：对方刚把话收住（欲告退、要歇息或说改日再叙），玩家不肯就此作罢，仍追问下去。只演绎${sceneCtx.who}的当即反应——她可婉拒：scene.state="resolve"，写一句拒绝或收场的台词（如"我要歇息了，小主请回吧"），${settlement}她也可再简要答一两句：scene.state 写 "ongoing" 或 "wrap"，narrative 留空字符串，changes=[]，statePatch={}，并给 2—3 个接话选项。scene.parts 规则不变（2—5 段、act 写动作神态、say 写台词、quote 写转述、narr 写场面，总长 ≤70 字、台词不带引号）。${cap?'本场对话已达上限：本轮必须 resolve 收尾结算，不再给她答话的余地。':''}`+this.sceneContextBlock();
     this.requestScene(msg,press,MAX_OUTPUT_TOKENS,!cap,!cap);
   },
@@ -5498,7 +5509,7 @@ const Game={
     if(phase!=='EVENT_CHOICE'||!sceneCtx)return;
     const settle=sceneCtx.standalone
       ?'这只是一位宫中人在旬中回话，并非本旬养成重心：只结算这场问话实际带来的关系、情报、交办差事与行囊变化；主角才艺与属性成长留到旬末小结，修习、散步等无关收益也留到那时。没有变化就不写 changes。'
-      :'并完整结算本旬养成与剧情（changes、statePatch，含 statePatch.plots 的变动条目）。';
+      :'并完整结算本旬养成与剧情（changes、statePatch，含 statePatch.plots 的变动条目）。'+craftQuestHint();
     const msg=`第${xunNo()}旬剧情对话：对方已把话收住（要歇息、欲告退或说改日再叙），玩家不再追问，就此告辞。请收尾：scene.state="resolve"，补一两句简短收场旁白（如各自散去、欠身告退；不写引号对白），${settle}收场只写本场已发生的事。`+this.sceneContextBlock();
     this.requestScene(msg,'（就此告辞）',undefined,undefined,undefined,true); // endReq：响应必须收场结算
   },
@@ -5516,7 +5527,7 @@ const Game={
     }
     const settle=sceneCtx.standalone
       ?'这只是一位宫中人在旬中回话，并非本旬养成重心：只结算这场问话实际带来的关系、情报、交办差事与行囊变化；主角才艺与属性成长留到旬末小结，修习、散步等无关收益也留到那时。没有变化就不写 changes。'
-      :'并完整结算本旬养成与剧情（changes、statePatch，含 statePatch.plots 的变动条目）。';
+      :'并完整结算本旬养成与剧情（changes、statePatch，含 statePatch.plots 的变动条目）。'+craftQuestHint();
     const msg=`第${xunNo()}旬剧情对话：玩家示意话已说完，结束与${sceneCtx.who}的对话。请收尾：scene.state="resolve"，补一段简短的收场演绎（narrative 一两句旁白即可，如各自散去、欠身告退；不写引号对白），${settle}收场只写本场已发生的事。`+this.sceneContextBlock();
     this.requestScene(msg,'（结束对话）',undefined,undefined,undefined,true); // endReq：响应必须收场结算，宫女问话亦不例外
   },
