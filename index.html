@@ -1684,6 +1684,8 @@ const STALE_PLOT_XUN=4;      // 无期限在途线悬置 N 旬未推进即"发�
 const STALE_AUTO_EXPIRE=3;   // 发酵后连续 N 旬被裁决列出仍无回写：前端自动作废（机会流失）
 const ECHO_MISS_MAX=2;       // 同一引线连续被散步/拜访呼应 N 次却无台账回写：此后不再借行动硬凑交集，留待旬首发酵处置
 const GARDEN_MEET_CHANCE=0.7; // 御花园散步偶遇概率：前端代码掷骰硬约束，不交给提示词"随缘"；帝、太后也在偶遇池（撞见即初识的入口）
+const EMPEROR_VISIT_BASE=0.18;    // 旬首帝主动相见基础概率：恩宠≥40、无缺席、上旬未有相处才掷；一旬一骰
+const EMPEROR_VISIT_OVERDUE=0.65; // 恩宠账逾期（距上次相处超过每N旬上限）：他主动来/召的概率大增——宠爱须兑现成动静，不兑现则无感
 function focusEnergyCost(focus){ // 各类行动精力消耗
   const f=String(focus||'');
   if(/使用道具|使用物品/.test(f))return 5; // 用物最轻
@@ -5208,12 +5210,15 @@ const Game={
   openFocus(){if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}UI.openSheet('吩咐')}, // 吩咐：自拟本旬要做的事
   hsGoOut(){if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}$('#mapClock').textContent=fmtTime();$('#mapview').classList.add('on')}, // 出门＝宫城图选目的地
   mapBack(){$('#mapview').classList.remove('on')},
-  _gardenMeetPick(){ // 御花园偶遇人选：已认识的宫中人物随机一位；帝、太后不受结识限制——游园撞见正是初识途径，相熟之后再走正式觐见
+  _gardenMeetPick(){ // 御花园偶遇人选：已认识的宫中人物随机一位；帝、太后不受结识限制——游园撞见正是初识途径，相熟之后再走正式觐见。恩宠≥40起帝在池中的权重上调（≥70再翻倍）——恩宠越高，越容易在园中撞见他
     const npcs=(state&&state.npcs)||{};
     const pool=Object.keys(npcs).filter(id=>{const n=npcs[id];if(!n)return false;
       if(/皇帝|皇上|陛下|太后|帝/.test(id+(n.rank||'')))return true;
       return !!n.known});
-    return pool.length?pool[Math.floor(Math.random()*pool.length)]:null;
+    if(!pool.length)return null;
+    const favor=Number((state.relationships&&state.relationships['皇帝']||{}).value)||0;
+    if(favor>=40)for(const id of pool){if(/皇帝|皇上|陛下|帝/.test(id+(npcs[id].rank||''))&&!/太后/.test(id)){pool.push(id);if(favor>=70)pool.push(id);break}}
+    return pool[Math.floor(Math.random()*pool.length)];
   },
   mapGo(place){ // 宫城图目的地：养心殿见驾、六宫访妃嫔、太医院问医、藏书阁寻书、御花园散步闲逛；出宫暂留空
     if(place==='养心殿'){this.visitNpc('皇帝');return}
@@ -5316,15 +5321,28 @@ const Game={
     if(!state||phase!=='FOCUS_SELECT')return;
     const adj=adjudicatePlots(true); // skipDice：本旬剧情额度即此，不再另掷
     const mainMiss=adj.needMain; // 主线断档：进行中的主线一清零，旬首即补新主线——做完了不会没下文
-    if(!adj.stale.length&&!adj.pendStale.length&&!mainMiss)return;
+    // 旬首帝至：恩宠≥40、无缺席、上旬未有相处，且本旬不与发酵处置抢戏——掷骰决定帝是否主动相见（宠爱兑现成动静）
+    const meta=ensurePlotMeta();
+    const e=state.emperor;
+    const favor=Number((state.relationships&&state.relationships['皇帝']||{}).value)||0;
+    const win=favor>=60?2:4;
+    const now=xunSerial(state.time);
+    const gap=now-(typeof(e&&e.lastContact)==='number'?e.lastContact:now);
+    const visitOk=(meta.graceTurn||0)<=(state.turn||0)&&favor>=40&&!!e&&!e.absence&&gap>=1&&!adj.stale.length&&!adj.pendStale.length;
+    if(meta.visitRollTurn!==state.turn){meta.visitRollTurn=state.turn;meta.visitHit=visitOk&&Math.random()<(gap>win?EMPEROR_VISIT_OVERDUE:EMPEROR_VISIT_BASE+(favor>=75?0.08:0))} // 一旬一骰，同旬重复调用不重复掷
+    const visitHit=!!meta.visitHit;
+    if(!adj.stale.length&&!adj.pendStale.length&&!mainMiss&&!visitHit)return;
     const items=[...adj.stale.map(p=>`「${p.title}」`),...adj.pendStale.map(x=>pendText(x))].join('；');
     let msg=`第${xunNo()}旬旬首：`;
     if(items)msg+=`以下事项已搁置发酵，须立即处置：${items}。`;
     if(mainMiss)msg+=`${items?'同场处置（了结旧事时引出新线头）——':''}剧情账中已无进行中的主线任务，本旬旬首即须发布新主线：从主控位份、处境、派系、恩宠与既有伏笔自然长出（晋升之途、子嗣、旧案、母族、新敌皆可）。`;
+    if(visitHit)msg+=`${items||mainMiss?'——同场带出帝线：':''}本旬旬首，帝主动与主控相见（恩宠所致，不必另寻由头）——${favor>=60?'夜访住处、遣高德全接入阁、游园时遣开随从说话皆可；宠爱 '+favor+'，他肯花心思，"主动记得、提前安排、破例"至少体现其一':'经高德全传召往养心殿、晨起问安遇驾、园中偶逢皆可；宠爱 '+favor+'，按"每 '+win+' 旬至少一次有内容相处"的账，这旬轮到他主动'}。`;
     msg+='请用剧情对话 scene 结构开场（state="ongoing"，对方的话或动作开场，嵌入主控当前处境自然发生：来人传话、事发、旧事被翻上门等皆可），给 2—4 个接话选项后停止，不结算应对后果；';
-    if(mainMiss)msg+=`并务必以 statePatch.plots 落账一条 line="主线" 的新条目（id 用 "p-" 加短标题，note 一句话写清走向，可给 dueText 期限）${ensurePlotMeta()._mainMissed?'——此前已要求开立新主线仍未落账，本轮务必落账':''}；`;
-    else msg+='应对后 resolve 时统一结算并回写台账/待续（兑现者 stage 改"已兑现"；琐事办掉即从 pending 移除）；';
-    this.round1(msg,mainMiss?'旬首·新主线发布':'旬首·发酵处置',0,{skipDice:true,_xunPop:true,_mainPubPop:!!mainMiss}); // 强制处置不占精力
+    if(visitHit)msg+='帝相处的正戏在这场：给足一来一往的实际内容（谈旧事、记挂着什么、破什么例），并经 statePatch["emperor.contact"] 记一句相处注记；';
+    if(mainMiss)msg+=`并务必以 statePatch.plots 落账一条 line="主线" 的新条目（id 用 "p-" 加短标题，note 一句话写清走向，可给 dueText 期限）${meta._mainMissed?'——此前已要求开立新主线仍未落账，本轮务必落账':''}；`;
+    else if(items)msg+='应对后 resolve 时统一结算并回写台账/待续（兑现者 stage 改"已兑现"；琐事办掉即从 pending 移除）；';
+    else msg+='应对后 resolve 时统一结算本旬；';
+    this.round1(msg,mainMiss?'旬首·新主线发布':(visitHit?'旬首·帝至':'旬首·发酵处置'),0,{skipDice:true,_xunPop:true,_mainPubPop:!!mainMiss}); // 强制处置不占精力
   },
   collapse(){ // 精力归零：当场昏迷，扣体质，弹窗确认后强制进入下一旬
     $('#mapview').classList.remove('on'); // 从宫城图直接触发时也兜底收起
