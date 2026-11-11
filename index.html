@@ -2739,6 +2739,11 @@ function normalizeState(s){
   if(!Array.isArray(s.plots))s.plots=[];
   if(!s.readMindV1){const sys=s.system=s.system||{};const shop=sys.shop=Array.isArray(sys.shop)?sys.shop:[];if(!shop.some(it=>it&&it.name==='读心笺'))shop.push({name:'读心笺',cost:15});s.readMindV1=true} // 旧档商城补读心笺
   refreshShop(s); // 商城货色按旬轮换：旧档读入即对齐到当前轮次
+  if(!s.meetCardV1){ // 新上架的邂逅笺：旧档本轮货色里补一件，之后随三旬轮换自然进出
+    const shop=s.system.shop=Array.isArray(s.system.shop)?s.system.shop:[];
+    if(!shop.some(it=>it&&it.name==='邂逅笺'))shop.push({name:'邂逅笺',cost:60});
+    s.meetCardV1=true;
+  }
   s.pending=(s.pending||[]).filter(x=>!/当票|赎当|已逾期/.test(pendText(x))); // 典当银货两讫、当场结清：不留逾期话口
   s.inventory=(s.inventory||[]).filter(it=>!/当票/.test(String(it.name||''))); // 旧档当票条目一并清除
   backfillAvatars(s); // 头像：旧档主控/人物补配（新档在开局生成时已分配）
@@ -3949,6 +3954,7 @@ const UI={
     else if(name==='手作')B.innerHTML=this.sheetCraft();
     else if(name==='手作结果')B.innerHTML=this.sheetCraftResult();
     else if(name==='物品详情')B.innerHTML=this.sheetItemDetail(param);
+    else if(name==='择人')B.innerHTML=this.sheetMeetTargets();
     else if(name==='商城')B.innerHTML=this.sheetShop();
     else if(name==='商品详情')B.innerHTML=this.sheetShopDetail(param);
     else if(name==='采买')B.innerHTML=this.sheetMarket();
@@ -4092,7 +4098,7 @@ const UI={
       :`<button class="btn" disabled style="opacity:.45;letter-spacing:.1em;text-indent:.1em">不可典卖</button>`;
     const act=it.durable
       ?`<button class="btn btn-primary" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.toggleEquip(${i})">${it.equipped!==false?'收存（停用效用）':'启用（随身佩戴）'}</button>`
-      :(it.usable!==false?`<button class="btn btn-primary" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.useItem(${i})">${it.name==='移性符'?'使用 · 重撰帝设':`使用（耗精力 ${focusEnergyCost('使用道具')}）`}</button>`:`<button class="btn" disabled style="opacity:.45;letter-spacing:.1em;text-indent:.1em">不可使用</button>`);
+      :(it.usable!==false?`<button class="btn btn-primary" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.useItem(${i})">${it.name==='移性符'?'使用 · 重撰帝设':(it.name==='邂逅笺'?'使用 · 择一人':`使用（耗精力 ${focusEnergyCost('使用道具')}）`)}</button>`:`<button class="btn" disabled style="opacity:.45;letter-spacing:.1em;text-indent:.1em">不可使用</button>`);
     const wide=(k,v)=>`<div class="rowline" style="align-items:flex-start"><span style="flex:none">${k}</span><span class="cnt" style="white-space:normal;text-align:right;max-width:70%">${esc(v)}</span></div>`;
     const crafted=!!it.crafted;
     const matKindLabel={绣:'绣作',香:'合香',药:'丸散',花:'花作',杂:'杂件'};
@@ -4114,6 +4120,7 @@ const UI={
       ${it.src?`<div class="itemrow"><span>来历</span><span class="cnt">${esc(it.src)}</span></div>`:''}
       ${it.durable?`<div class="itemrow"><span>状态</span><span class="cnt">${it.equipped!==false?'佩戴中 · 效用生效':'已收存 · 效用暂停'}</span></div>`:''}
       ${it.note?`<div class="rowline" style="align-items:flex-start"><span style="flex:none">备注</span><span class="cnt" style="white-space:normal;text-align:right;max-width:70%">${esc(it.note)}</span></div>`:''}
+      ${it.name==='邂逅笺'&&state.gardenMeetWhom?`<div class="itemrow"><span>已记之人</span><span class="cnt">${esc(dispName(state.gardenMeetWhom))} · 下次御花园必遇</span></div>`:''}
       ${cat.usage?wide('用法',cat.usage):''}
       ${cat.fx?wide('效用',cat.fx):''}
       <div class="itemrow"><span>可否使用</span><span class="cnt">${it.durable?'无需使用 · 启用即生效':(it.usable?'可':'不可')}</span></div>
@@ -4163,6 +4170,27 @@ const UI={
       ${cat.usage?wide('用法',cat.usage):''}
       ${cat.fx?wide('效用',cat.fx):''}</div>
       <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px">${buy}</div>`;
+  },
+  sheetMeetTargets(){ // 邂逅笺：择定下一次园中必遇之人
+    const npcs=state.npcs||{};
+    const rels=state.relationships||{};
+    const empId=Object.keys(npcs).find(id=>this.isEmperorId(id))||Object.keys(rels).find(id=>this.isEmperorId(id))||'皇帝';
+    const ids=[empId];
+    for(const id of Object.keys(npcs)){
+      if(id===empId)continue;
+      const n=npcs[id];if(!n)continue;
+      if(!n.known&&!/太后/.test(id+(n.rank||'')))continue; // 未照面的人不在可选之列；太后是例外
+      ids.push(id);
+    }
+    const rows=ids.map(id=>{
+      const c=this.npcCard(id);
+      const role=c.role==='只知名讳'?'':c.role; // 帝的档案可能不在 npcs 里，别在名字下写“只知名讳”
+      return `<button class="npcrow" onclick="Game.pickMeetTarget('${esc(id)}')"><span class="nr-main"><span class="nr-name">${esc(c.name)}</span>${role?`<span class="nr-role">${esc(role)}</span>`:''}</span><span class="nr-rel">${this.relBadge(id)}</span></button>`;
+    }).join('');
+    const pending=state.gardenMeetWhom;
+    return `<div class="sheet-note" style="margin-top:0">择定一人：下一次往御花园散步，必与此人相遇；正文会演成自然巧合，不提道具。${pending?`<br>当前已记：<b>${esc(dispName(pending))}</b>——重择会作废前一次。`:''}</div>
+      <div class="sec"><div class="sec-cap">可选之人</div>${rows||'<div class="sheet-note">宫中尚无相识之人，暂无可遇。</div>'}</div>
+      <button class="backbtn" onclick="UI.sheetBack()">◀ 返回行囊</button>`;
   },
   sheetMarket(){ // 宫市：本月货单一览，品相与存货一目了然
     const p=state.protagonist||{},m=state.market||{};
@@ -4492,6 +4520,10 @@ const SHOP_CATALOG = {
     desc:'折纸白鹤，吹气即成，翅振三声便到那人耳边，说完即散作光尘。',
     usage:'对着鹤轻声嘱托一句紧要话，指明收话人。行囊详情页点「使用」即遣，耗些许精力。',
     fx:'隔空传一句话：不经人手、不落字迹，隔墙有耳时最稳。'},
+  '邂逅笺': {kind:'consumable', cost:60,
+    desc:'当你有话想说，又不愿显得刻意。',
+    usage:'行囊详情页点「使用」，择定一人。下一次往御花园散步，必与此人相遇——不占回合、不耗精力，用毕即无。',
+    fx:'下一次御花园散步必遇所选之人：帝、太后、妃嫔、皇嗣、宫人皆可（重择会作废前一次）。'},
   '驻颜膏': {kind:'consumable', cost:60,
     desc:'琥珀色小盒膏子，膏体细滑，带一缕冷香，据说是前朝方士所传。',
     usage:'晨起妆前点敷眼角唇边，一次一盒。行囊详情页点「使用」即敷，耗些许精力。',
@@ -5604,6 +5636,7 @@ const Game={
   hsGoOut(){if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}$('#mapClock').textContent=fmtTime();$('#mapview').classList.add('on')}, // 出门＝宫城图选目的地
   mapBack(){$('#mapview').classList.remove('on')},
   _gardenMeetPick(){ // 御花园偶遇人选：帝单独按恩宠掷骰，不与known人物挤同一个池子（池子越大越撞不见帝）；其余为太后与已认识的宫中人物
+    if(state&&state.gardenMeetWhom)return state.gardenMeetWhom; // 邂逅笺：下一次必遇所选之人，不再掷骰
     const npcs=(state&&state.npcs)||{};
     const rels=(state&&state.relationships)||{};
     const empRelKey=Object.keys(rels).find(k=>UI.isEmperorId(k)); // 帝的存档键可能是「皇帝」，也可能是本名
@@ -5646,9 +5679,11 @@ const Game={
         :(tb>0&&ti>=tb)?'气血已达根基，散步只作维持、不再提升。'
         :'体质正常且无疾病时，本次散步体质+1（恢复气血）——请写入 changes 与 statePatch。';
       const meetWho=this._gardenMeetPick();
-      const meetHit=!!meetWho&&Math.random()<GARDEN_MEET_CHANCE; // 偶遇由前端代码掷骰硬约束，不交给提示词"随缘"
+      const forcedMeet=!!(meetWho&&state.gardenMeetWhom===meetWho); // 邂逅笺指认的人：不走概率，必遇
+      const meetHit=!!meetWho&&(forcedMeet||Math.random()<GARDEN_MEET_CHANCE); // 偶遇由前端代码掷骰硬约束，不交给提示词"随缘"
+      const forcedNote=forcedMeet?'此行是一次有意的“巧合”：正文不得提及道具、系统或“安排”，照常写成自然相遇；若对方本有避嫌、病中或久不召见，只作一次短暂照面，不必长谈。':'';
       const meetNote=meetHit
-        ?`本轮偶遇骰已命中（概率 ${Math.round(GARDEN_MEET_CHANCE*100)}%）：玩家须在园中偶遇「${meetWho}」，用剧情对话 scene 结构呈现（scene.who 填「${meetWho}」，地点写园中所在）；偶遇内容须与在途引线、双方关系或主控当前处境自然相关，给 2—4 个接话选项后停止，不结算应对后果；本轮 hasEvent 必须为 true。若主控与此人尚未照面（如帝、太后），按初见演绎：问安避让、自报家门、留下第一印象，事后经 dossier 建档。`
+        ?`本轮偶遇骰已命中（概率 ${Math.round(GARDEN_MEET_CHANCE*100)}%）：玩家须在园中偶遇「${meetWho}」，用剧情对话 scene 结构呈现（scene.who 填「${meetWho}」，地点写园中所在）；偶遇内容须与在途引线、双方关系或主控当前处境自然相关，给 2—4 个接话选项后停止，不结算应对后果；本轮 hasEvent 必须为 true。若主控与此人尚未照面（如帝、太后），按初见演绎：问安避让、自报家门、留下第一印象，事后经 dossier 建档。${forcedNote}`
         :`本轮偶遇骰未命中（概率 ${Math.round(GARDEN_MEET_CHANCE*100)}%）：只演物候风景、宫人闲话等轻量见闻，不安排与具体人物的撞见剧情。`;
       const msg=`第${xunNo()}旬第一轮：玩家往御花园散步闲逛（本旬第 ${walkNo} 次，耗精力 ${focusEnergyCost('散步')}）。演绎一路物候风景与园中见闻。${meetNote}${gainNote}（同一旬高强度活动与康健收益不兼得。）${leadHint}${pendHint}散步只是本旬中的一段外出：scene.where 可写园中所在，但 statePatch.location 仍写本宫住处，不要把 location 改成御花园。`;
       this.round1(msg,'外出·御花园散步',focusEnergyCost('散步'),{skipDice:meetHit,meetWho:meetHit?meetWho:null,leadIds:hits.map(p=>p.id),pendTexts:phits.map(pendText),whoHint:meetHit?meetWho:undefined}); // 偶遇命中即本轮剧情额度；宫城图不关：加载与结果都叠在图上，避免背景弹回房间
@@ -5851,6 +5886,7 @@ const Game={
       const meta=ensurePlotMeta();
       if(p.hasEvent||adj.due.length||adj.overdue.length||adj.mainPub||adj.gardenMeet||adj.fest)meta.lastEventTurn=state.turn;
       if(adj.gardenMeet&&UI.isEmperorId(adj.gardenMeet))(state.emperor=state.emperor||{}).lastGardenTurn=state.turn; // 记下园中撞见帝的旬号：同旬不再重复、下旬减半
+      if(adj.gardenMeet&&state.gardenMeetWhom===adj.gardenMeet)state.gardenMeetWhom=null; // 邂逅笺的约定已兑现
       if(adj.mainPub||(opts&&opts._mainPubPop))meta._mainMissed=!activePlots().some(x=>x.line==='主线'); // 新主线是否落账：未落账则下轮裁决加重语气（含旬首断档直弹）
       if(isMajorTurn(p.statePatch,p))meta.lastBigTurn=state.turn;
       if(adj.hit){meta.rollHit=false;meta.rollTargetId=null} // 本旬骰子已用毕，同旬后续行动不再重复强制
@@ -6865,6 +6901,7 @@ const Game={
     if(it.durable){toast('长期之物无需使用：在详情页启用／收存即可');return}
     if(it.usable===false){toast('此物不能使用');return}
     if(it.name==='移性符'){this.openShiftCharm(i);return} // 系统道具：本地改写帝设，不占回合、不耗精力、不走模型
+    if(it.name==='邂逅笺'){this.openMeetPick(i);return} // 指定下次园中偶遇：择人后才耗笺，不占回合、不耗精力
     it.count-=1;const gone=it.count<=0;lastUseIdx=i;
     const label=`使用「${it.name}」`;
     const cost=focusEnergyCost('使用道具');
@@ -6872,6 +6909,27 @@ const Game={
     const fxNote=cat?`此物效用：${cat.fx}`:(it.effect?`此物效用：${it.effect}${Array.isArray(it.traits)&&it.traits.length?`（特质：${it.traits.join('、')}；品质：${it.quality||'—'}）`:''}`:'');
     UI.closeSheet();
     this.round1(`第${xunNo()}旬第一轮：玩家消耗精力 ${cost} ${label}（${gone?'已用尽':'尚余 '+it.count+' 件'}${it.note?'；'+it.note:''}）。${fxNote}演绎使用此物的具体过程与其效果，然后决定是否触发剧情（hasEvent）。`,label,cost);
+  },
+  openMeetPick(i){ // 邂逅笺：先择人，择定才耗笺
+    if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
+    const it=(state.inventory||[])[i];
+    if(!it||it.name!=='邂逅笺'||(Number(it.count)||0)<=0){toast('囊中没有邂逅笺');return}
+    Game._meetItemIdx=i;
+    UI.goSheet('择人');
+  },
+  pickMeetTarget(who){
+    const idx=Game._meetItemIdx;
+    const inv=state.inventory||[];
+    const it=inv[idx];
+    if(!it||it.name!=='邂逅笺'||(Number(it.count)||0)<=0){Game._meetItemIdx=null;toast('此物已不在囊中');return}
+    if(state.gardenMeetWhom&&state.gardenMeetWhom!==who&&!confirm(`尚有一次未用的邂逅（${dispName(state.gardenMeetWhom)}），改用「${dispName(who)}」会作废前一次。继续？`))return;
+    it.count=(Number(it.count)||0)-1;
+    if(it.count<=0)inv.splice(idx,1);
+    state.gardenMeetWhom=who;
+    Game._meetItemIdx=null;
+    logXunAction(`使用·邂逅笺（${dispName(who)}）`);
+    persistCurrent();markSafe();UI.updateStatusbar();UI.closeSheet();
+    toast(`邂逅笺已化：下次往御花园，必遇「${dispName(who)}」`,3600);
   },
   openShiftCharm(i){ // 移性符：本地改写帝设（每件限改一次；不占回合、不耗精力、不走模型）
     const it=(state.inventory||[])[i];if(!it||it.count<=0)return;
