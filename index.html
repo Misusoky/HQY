@@ -36,6 +36,7 @@
   --indigo:#2f4858; --gold:#b08d4a;
   --line:rgba(43,38,32,.14); --shadow:0 2px 12px rgba(43,38,32,.08);
   --line-strong:rgba(43,38,32,.28); --line-gold:rgba(176,141,74,.55);
+  --grain:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.30 0 0 0 0 0.25 0 0 0 0 0.16 0 0 0 0.055 0'/></filter><rect width='140' height='140' filter='url(%23n)'/></svg>");
   --scrim:rgba(43,38,32,.45);
   --delta-up:#f6e8e4; --delta-down:#e9edf0;
   --sans:"Zhuque Fangsong","STFangsong","FangSong","仿宋","Songti SC","STSong","宋体","SimSun",serif;
@@ -69,20 +70,25 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
 .screen{display:none;min-height:100dvh;flex-direction:column}
 .screen.active{display:flex}
 
-/* ---------- ① 开局页 ---------- */
-#screen-start{align-items:center;justify-content:center;text-align:center;padding:calc(var(--sat) + 40px) 32px calc(var(--sab) + 40px);position:relative}
-#screen-start::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.35;background:url("data:image/png;base64,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") repeat-y left top/48px 112px}
+/* ---------- ① 开局页：封面＝《红墙引》海报（assets/cover.jpg），按钮＝绢签式 ---------- */
+#screen-start{position:relative;align-items:center;justify-content:flex-end;text-align:center;padding:calc(var(--sat) + 24px) 28px calc(var(--sab) + 34px);background:url(assets/cover.jpg) center/cover no-repeat #241f19}
+#screen-start::before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(26,18,12,.18),rgba(26,18,12,0) 26%,rgba(26,18,12,0) 50%,rgba(26,18,12,.66) 100%)}
 #screen-start>*{position:relative;z-index:1}
-.title-cal{font-size:52px;letter-spacing:.12em;color:var(--ink);font-family:var(--serif);font-weight:700;line-height:1.2}
-.title-sub{margin-top:10px;font-size:14px;color:var(--ink-soft);letter-spacing:.18em}
-.ornament{display:flex;align-items:center;justify-content:center;gap:12px;margin:26px 0 22px;color:var(--gold)}
-.ornament::before,.ornament::after{content:"";width:64px;height:1px;background:var(--gold);opacity:.7}
 .btn{display:flex;align-items:center;justify-content:center;width:100%;min-height:48px;border-radius:10px;font-size:15px;letter-spacing:.28em;text-indent:.28em}
 .btn-primary{background:var(--cinnabar);color:#fdfbf5;box-shadow:var(--shadow)}
 .btn-primary:active{background:var(--cinnabar-deep)}
 .btn-ghost{border:1px solid var(--cinnabar);color:var(--cinnabar)}
 .btn-line{border:1px solid var(--line);color:var(--ink-soft)}
 .btn[disabled]{opacity:.45}
+/* 开局页按钮：绢签式（设计来源：古风热区标签方案.html）——绢底＋外墨线＋金细线内框＋金角线 */
+#screen-start .btn{position:relative;border:1px solid rgba(43,38,32,.55);border-radius:2px;background:var(--grain),linear-gradient(165deg,rgba(246,237,216,.96),rgba(233,220,189,.94));color:#33302A;box-shadow:0 1px 2px rgba(46,36,24,.2),0 6px 18px rgba(46,36,24,.24);-webkit-backdrop-filter:blur(1.5px);backdrop-filter:blur(1.5px)}
+#screen-start .btn::before{content:"";position:absolute;inset:3px;pointer-events:none;border:1px solid var(--line-gold);border-radius:1px;background:linear-gradient(rgba(198,164,102,.9),rgba(198,164,102,.9)) 0 0/9px 1.5px,linear-gradient(rgba(198,164,102,.9),rgba(198,164,102,.9)) 0 0/1.5px 9px,linear-gradient(rgba(198,164,102,.9),rgba(198,164,102,.9)) 100% 0/9px 1.5px,linear-gradient(rgba(198,164,102,.9),rgba(198,164,102,.9)) 100% 0/1.5px 9px,linear-gradient(rgba(198,164,102,.9),rgba(198,164,102,.9)) 0 100%/9px 1.5px,linear-gradient(rgba(198,164,102,.9),rgba(198,164,102,.9)) 0 100%/1.5px 9px,linear-gradient(rgba(198,164,102,.9),rgba(198,164,102,.9)) 100% 100%/9px 1.5px,linear-gradient(rgba(198,164,102,.9),rgba(198,164,102,.9)) 100% 100%/1.5px 9px;background-repeat:no-repeat}
+#screen-start .btn:active{transform:translateY(1px);background:var(--grain),linear-gradient(165deg,rgba(232,219,187,.96),rgba(221,206,172,.95));box-shadow:inset 0 1px 5px rgba(56,44,30,.32),0 1px 2px rgba(46,36,24,.18)}
+#screen-start .btn:active::before{border-color:rgba(166,58,46,.6)}
+#screen-start .btn-primary{background:linear-gradient(165deg,#b0442f,#8e2f24);border-color:rgba(43,38,32,.4);color:#fdfbf5;text-shadow:none}
+#screen-start .btn-ghost{border-color:var(--cinnabar);color:var(--cinnabar)}
+#screen-start .btn-line{color:#33302A}
+#screen-start .btn[disabled]{opacity:.5}
 #screen-start .btn{margin-top:14px}
 
 /* ---------- 捏主控 ---------- */
@@ -288,12 +294,24 @@ button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:cente
 #dim{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity 1.2s ease;z-index:6}
 #dim.on{opacity:.88}
 .hs{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:7px}
-.hs.hs-up{flex-direction:column-reverse} /* 文字在圆点上方：用于贴近底缘的物件（坐墩） */
-.hs>i{width:20px;height:20px;border-radius:50%;border:3px solid #b0442f;background:rgba(253,251,245,.92);box-shadow:0 1px 5px rgba(30,25,18,.4);position:relative;flex:none}
-.hs>i::after{content:'';position:absolute;top:-7px;right:-7px;width:9px;height:9px;border-radius:50%;background:#b0442f;border:1.5px solid rgba(253,251,245,.9)}
-.hs>span{background:rgba(253,251,245,.95);border:1px solid var(--line);border-radius:999px;padding:5px 14px;font-size:14px;color:#33302A;box-shadow:0 2px 8px rgba(46,36,21,.25);white-space:nowrap}
-.hs:active>span{background:var(--paper-deep)}
-.hs-badge{margin-top:1px;background:#fdfbf5;border:1px solid #b0442f;color:#b0442f;border-radius:999px;padding:4px 12px;font-size:13px;white-space:nowrap;box-shadow:0 2px 8px rgba(46,36,21,.2)}
+.hs.hs-up{flex-direction:column-reverse} /* 文字在锚点上方：用于贴近底缘的物件（坐墩） */
+/* 朱砂双环锚点：中环点蕊、双环相扣（设计来源：古风热区标签方案.html） */
+.hs>i{position:relative;flex:none;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle,var(--cinnabar) 0 2.5px,rgba(247,240,221,.85) 3px 4px,transparent 4.5px);border:1.5px solid var(--cinnabar);box-shadow:0 0 0 2.5px rgba(247,240,221,.5),0 0 0 4px var(--cinnabar),0 1px 4px rgba(40,30,20,.35)}
+/* 引线：锚点与签之间的装裱细线 */
+.hs>i::after{content:'';position:absolute;left:50%;top:100%;width:1px;height:7px;transform:translateX(-.5px);background:linear-gradient(180deg,var(--cinnabar),rgba(198,164,102,.9));opacity:.85}
+.hs.hs-up>i::after{top:auto;bottom:100%;background:linear-gradient(0deg,var(--cinnabar),rgba(198,164,102,.9))}
+@media (prefers-reduced-motion:no-preference){
+  .hs>i{animation:hsBreathe 3.2s ease-in-out infinite}
+  @keyframes hsBreathe{0%,100%{box-shadow:0 0 0 2.5px rgba(247,240,221,.5),0 0 0 4px var(--cinnabar),0 1px 4px rgba(40,30,20,.35)}50%{box-shadow:0 0 0 3.5px rgba(247,240,221,.35),0 0 0 5px rgba(166,58,46,.65),0 1px 4px rgba(40,30,20,.35)}}
+}
+/* 绢签标签（按钮本体）：绢底＋外墨线＋金细线内框＋金角线 */
+.hs>span:not(.hs-badge){position:relative;display:inline-flex;align-items:center;min-height:36px;padding:8px 16px 9px;border:1px solid rgba(43,38,32,.55);border-radius:2px;background:var(--grain),linear-gradient(165deg,rgba(246,237,216,.96),rgba(233,220,189,.94));-webkit-backdrop-filter:blur(1.5px);backdrop-filter:blur(1.5px);font-size:14px;font-weight:600;letter-spacing:.18em;text-indent:.18em;line-height:1;color:#33302A;white-space:nowrap;text-shadow:0 1px 0 rgba(250,246,234,.6);box-shadow:0 1px 2px rgba(46,36,24,.2),0 6px 18px rgba(46,36,24,.24)}
+.hs>span:not(.hs-badge)::before{content:"";position:absolute;inset:3px;pointer-events:none;border:1px solid var(--line-gold);border-radius:1px;background:linear-gradient(rgba(198,164,102,.9),rgba(198,164,102,.9)) 0 0/9px 1.5px,linear-gradient(rgba(198,164,102,.9),rgba(198,164,102,.9)) 0 0/1.5px 9px,linear-gradient(rgba(198,164,102,.9),rgba(198,164,102,.9)) 100% 0/9px 1.5px,linear-gradient(rgba(198,164,102,.9),rgba(198,164,102,.9)) 100% 0/1.5px 9px,linear-gradient(rgba(198,164,102,.9),rgba(198,164,102,.9)) 0 100%/9px 1.5px,linear-gradient(rgba(198,164,102,.9),rgba(198,164,102,.9)) 0 100%/1.5px 9px,linear-gradient(rgba(198,164,102,.9),rgba(198,164,102,.9)) 100% 100%/9px 1.5px,linear-gradient(rgba(198,164,102,.9),rgba(198,164,102,.9)) 100% 100%/1.5px 9px;background-repeat:no-repeat}
+.hs>span:not(.hs-badge)::after{content:"";position:absolute;inset:-6px} /* 隐形点按外扩：视觉纤秀，触达不缩水 */
+.hs:active>span:not(.hs-badge){transform:translateY(1px);background:var(--grain),linear-gradient(165deg,rgba(232,219,187,.96),rgba(221,206,172,.95));box-shadow:inset 0 1px 5px rgba(56,44,30,.32),0 1px 2px rgba(46,36,24,.18)}
+.hs:active>span:not(.hs-badge)::before{border-color:rgba(166,58,46,.6)}
+/* 朱边小徽标（角标提示）：纸底朱边，如一方小印 */
+.hs-badge{margin-top:1px;display:inline-flex;align-items:center;justify-content:center;min-height:22px;padding:0 9px;background:#fdfbf5;border:1.5px solid #b0442f;border-radius:999px;color:#b0442f;font-size:11px;font-weight:700;letter-spacing:.06em;white-space:nowrap;box-shadow:0 1px 3px rgba(46,36,24,.3)}
 /* 精力条（三色，底部横条） */
 .energyrow{position:absolute;left:0;right:0;bottom:calc(66px + var(--sab));z-index:5;display:flex;align-items:center;gap:12px;padding:12px 18px;background:transparent;border-top:none}
 .energyrow .elabel{font-size:15px;color:#33302A;flex:none;text-shadow:0 1px 3px rgba(245,239,227,.9),0 0 6px rgba(245,239,227,.7)}
@@ -415,9 +433,6 @@ button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:cente
 <!-- ① 开局页：主菜单（继续 / 开新档 / 设置） -->
 <!-- 禁止在开局页底部添加版本号、build、字体、素材、署名等任何说明小字（用户要求，永久生效） -->
 <section id="screen-start" class="screen active">
-  <div class="title-cal">红墙引</div>
-  <div class="title-sub">带着系统去宫斗 · 旬回合养成</div>
-  <div class="ornament">❦</div>
   <div style="width:min(300px,80vw)">
     <button id="btnContinue" class="btn btn-primary" onclick="Game.continueGame()">继续本机进度</button>
     <button class="btn btn-line" onclick="Game.askNewGame()">开新档</button>
