@@ -5611,7 +5611,7 @@ const Game={
     const rel=rels[empRelKey]||rels['皇帝'];
     const favor=typeof rel==='number'?rel:(Number(rel&&rel.value)||0);
     const absence=String((state&&state.emperor&&state.emperor.absence)||'').trim(); // 避嫌/病中/前朝缠身：园中不该撞见他
-    let empChance=favor>=75?0.32:favor>=60?0.24:favor>=40?0.16:0.07; // 偶遇命中后再分给帝的占比：高恩宠约三成，不至于回回都撞上
+    let empChance=favor>=75?0.30:favor>=60?0.25:favor>=40?0.20:0.16; // 偶遇命中后再分给帝的占比：高恩宠约两成，低恩宠也留一成——越是没恩宠，越需要园中这条偶遇口子
     const lastGarden=Number(state&&state.emperor&&state.emperor.lastGardenTurn); // 上次园中撞见帝的旬号
     if(lastGarden===state.turn)empChance=0; // 同旬已见过：再逛也不重复
     else if(lastGarden===state.turn-1)empChance*=0.5; // 上旬刚见过：减半
