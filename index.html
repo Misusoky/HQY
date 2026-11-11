@@ -110,6 +110,9 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
 .cr-emp textarea{width:100%;min-height:96px;border:1px solid var(--line);border-radius:8px;background:var(--card);font-size:14px;line-height:1.7;padding:8px 10px;outline:none;color:var(--ink);resize:vertical;font-family:inherit}
 .cr-emp textarea:focus{border-color:var(--cinnabar)}
 .cr-empbar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px}
+.cr-presets{margin-bottom:8px}
+.cr-presets-k{display:block;font-size:12px;color:var(--ink-soft);margin-bottom:6px}
+.cr-presets .cr-chip{font-size:13px;padding:4px 12px}
 .cr-varbtn{border:1px solid var(--line);border-radius:14px;padding:3px 12px;font-size:12px;color:var(--cinnabar);background:var(--card)}
 .cr-count{font-size:12px;color:var(--ink-soft);font-family:var(--sans)}
 .create-foot{display:flex;gap:10px;padding-top:16px}
@@ -558,7 +561,8 @@ button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:cente
     <div class="rm-title">移性符 · 重撰帝设</div>
     <div class="rm-body" style="max-height:56vh;overflow:auto">
       <div class="cr-emp">
-        <textarea id="shiftEmpPersona" maxlength="1000" placeholder="为他重写一段人设：性情、好恶、隐秘，以及他待你的方式。他将自此照此行事。"></textarea>
+        <div id="shiftPresets"></div>
+        <textarea id="shiftEmpPersona" maxlength="1000" placeholder="为他重写一段人设：性情、好恶、隐秘，以及他待你的方式。他将自此照此行事。" oninput="Game.shiftEmpInput(this)"></textarea>
         <div class="cr-empbar"><button class="cr-varbtn" onclick="Game.crInsertPlayerVar('shiftEmpPersona','shiftEmpCount')">插入 &lt;player&gt;</button><span class="cr-count num" id="shiftEmpCount">0/1000</span></div>
         <div class="sheet-note" style="margin-top:6px">一千字以内 · 自本旬起，他的举止与待你的态度向新设靠拢 · 「插入 &lt;player&gt;」代入你的名讳 · 写毕符纸自焚</div>
       </div>
@@ -1746,7 +1750,7 @@ const CRAFT_MODULE = [
 /* ============================================================ 工具 */
 const $=s=>document.querySelector(s);
 const MONTHS=['','正月','二月','三月','四月','五月','六月','七月','八月','九月','十月','冬月','腊月'];
-const BUILD='2026-11-10·节宴V7'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
+const BUILD='2026-11-11·帝设预设'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
 /* 月俸：按位份每月下旬末由前端自动入账（单位：两） */
 const SALARY_BY_GRADE={'正一品':220,'从一品':150,'正二品':110,'从二品':80,'正三品':60,'从三品':45,'正四品':36,'从四品':28,'正五品':20,'从五品':15,'正六品':12,'从六品':10,'正七品':8,'从七品':6,'正八品':5,'从八品':4,'正九品':3,'从九品':2};
 const SALARY_TITLES=[[/皇后/,220],[/皇贵妃/,150],[/贵妃/,110],[/贤妃|良妃|淑妃|德妃/,80],[/昭仪|昭容|昭媛|修仪|修容|修媛|充仪|充容|充媛/,45],[/贵嫔/,36],[/嫔/,28],[/贵人/,20],[/才人/,15],[/美人/,12],[/宝林/,10],[/常在/,8],[/答应/,6],[/选侍/,5],[/更衣/,4],[/采女/,3],[/官女子/,2],[/妃/,60]];
@@ -2306,6 +2310,26 @@ const CR_LOOK={ // 容貌描述部件池：各抽一二，拼成一段话
   skin:['肤色胜雪','肌肤细腻如瓷','蜜色肌肤，透出健康润泽','肤色白皙，略带三分病气'],
   figure:['身形纤细如柳','体态匀称，行止有度','肩薄腰细','身量高挑，比寻常女子拔高一些'],
   air:['气度沉静，不言不笑时叫人猜不透','眉眼间有书卷气','举止爽利，不带闺阁扭捏','神态怯生生的，像受惊的小鹿','自带三分傲气，不肯轻易低头']};
+const EMP_PRESETS=[ // 帝设预设：玩家点选套用后可再自行删改
+  {name:'菀菀类卿',desc:'你像他早逝的元后，他一眼便动了心',
+   text:`他少年登基，元后是他唯一的发妻，成婚三载便病逝了。此后十年，他再未立后，寝殿深处始终供着她的旧物：半旧的玉簪、褪色的香囊，还有一幅从不示人的小像。
+你入宫那日，他隔着廊下的灯影看见你抬头——那双眉眼，与他记忆里的人如出一辙。他当场失态，唤错了一个名字，随即掩饰过去。
+他平日寡言冷肃，处置政务极有章法，唯独在你面前会不自觉地放软声气：赏你她爱吃的桂花糖蒸酥酪，赐你她惯用的旧样式钗环，连看你的眼神都像隔着一层旧梦。<player>若病一场，他能整夜守在榻边，握着你的手一句不吭。
+他的心病因她而起：他分不清自己是待你好，还是待她好。他最怕你问起先皇后，也最怕你穿她常穿的那身月白。你若偏要问，他先是沉默，继而动怒，事后再以重赏来掩。
+他待你的情意是真的，只是这份真意里掺着另一个人的影子。要让他的眼里真正只剩<player>一人，须得你自己把那道影子一点点揭下来。`},
+  {name:'高岭之花',desc:'冷面端方，情意一寸一寸才肯给',
+   text:`他自幼被严师教养成一副端方冷硬的性子：起居有时，言语有度，喜怒不形于色。朝臣称他圣明，宫人却怕他——他从不责骂，只消看你一眼，便叫人脊背发凉。
+他不近女色，也不信以色事人。头一回召见你，不问容貌、不问家世，只问你读什么书、会什么艺，答得敷衍便挥手让你退下。
+他赏罚极分明：你做得好，他记在心里，隔旬赏下一部旧书或一方端砚；你若在他面前搬弄是非、谄媚邀宠，他能当众让你难堪，事后也不解释。
+他待你的亲近是一寸一寸给的：先许你在御前多说两句话，再留你陪他看灯、听雨，最后才肯在你面前露出一点倦色。他极厌恶被人窥见软弱，若你撞见他撑额小憩，或对着一封旧信出神，切记装作没看见——他会记你这份分寸。
+他并非无心，只是把心收得太深。要走进他心里，靠的从来不是风情，而是他在你身上看见的那点不肯折的骨气。`},
+  {name:'暴戾昏君',desc:'喜怒无常的暴君，偏对你起了兴致',
+   text:`他十六岁登基，杀过谏臣，废过两任皇后，如今朝野噤声，只余他一人喜怒。他不上早朝，昼寝夜宴，酒至半酣便要人跪着说笑话，说不笑的人拖出去。
+他性情暴烈，翻脸只在顷刻：前一刻还赏你金珠，下一刻就能因你一句不慎掀了案几。宫人走路都贴着墙，你入宫头一日便看见廊下新换的地砖——听说上一个触怒他的美人就是在那儿没的。
+可他偏偏记得住你的名字。宴上众妃争艳，他谁也不看，只在你低头时忽然开口：「抬头。」你抬了，他便笑，笑得叫人心里发毛，又像得了什么新鲜玩意儿。
+他待你的方式是占有与试探：赏你、囚你、半夜闯进你的宫室，问你怕不怕他。你若伏地称怕，他嫌无趣；你若迎着他的眼睛说不怕，他反倒来了兴致，捏着你的下巴说有意思。
+他身边没有信得过的人，也没有睡得安稳的夜。要在他手里活着，甚至活得久，得比谁都清楚他哪句话是刀子、哪句话是钩子。`}
+];
 const CR_SKILLNAME={'琴':'琴艺','棋':'棋艺','书':'书法','画':'画艺','歌':'歌艺','舞':'舞艺','女红':'女红','医术':'医术','莳花':'莳花','香道':'香道'};
 const pick=a=>a[Math.floor(Math.random()*a.length)];
 const pickN=(a,n)=>{const c=a.slice(),o=[];while(o.length<n&&c.length)o.push(c.splice(Math.floor(Math.random()*c.length),1)[0]);return o};
@@ -2379,10 +2403,25 @@ function renderCreator(){
     row('属性',`<div class="cr-attrs num">${Object.entries(cr.attrs).map(([k,v])=>`<span>${k} <b>${v}</b></span>`).join('')}</div>`,'attrs')+
     row('才艺',`<span class="cr-txt num">${Object.entries(cr.skills).map(([k,v])=>`${esc(k)} ${v}`).join('　')||'暂未开窍'}</span><div class="cr-note num">共 ${Object.values(cr.skills).reduce((a,b)=>a+b,0)} 点 · 余下诸艺可求师或往藏书阁另学</div>`,'skills')+
     `<div class="cr-row"><span class="cr-k">帝设</span><div class="cr-v cr-emp">
+      ${empPresetChips('crEmpPersona')}
       <textarea id="crEmpPersona" maxlength="1000" placeholder="不填则由世界书库随机性情。可写他的性情、好恶、隐秘与待你的方式——他会照此行事。" oninput="Game.crSetEmpPersona(this.value)">${esc(cr.emperorPersona||'')}</textarea>
       <div class="cr-empbar"><button class="cr-varbtn" onclick="Game.crInsertPlayerVar('crEmpPersona','crEmpCount')">插入 &lt;player&gt;</button><span class="cr-count num" id="crEmpCount">${String(cr.emperorPersona||'').length}/1000</span></div>
       <div class="cr-note">一千字以内 · 极大影响帝的举止与待你的态度 · 点「插入 &lt;player&gt;」可在文中代入你的名讳</div>
     </div><button class="cr-dice" onclick="Game.rollCreator('empPersona')">⟳</button></div>`;
+  syncEmpPresets('crEmpPersona');
+}
+function empPresetChips(taId){
+  return `<div class="cr-presets"><span class="cr-presets-k">预设人设</span><div class="cr-chips">${
+    EMP_PRESETS.map((p,i)=>`<button type="button" class="cr-chip emp-preset" data-i="${i}" title="${esc(p.desc)}" onclick="Game.applyEmpPreset(${i},'${taId}')">${esc(p.name)}</button>`).join('')
+  }</div><div class="cr-note" id="${taId}PresetNote">点选一段现成人设，套用后仍可自行删改</div></div>`;
+}
+function syncEmpPresets(taId){ // 预设按钮高亮：文本与某段预设完全一致时点亮
+  const ta=$('#'+taId);if(!ta)return;
+  const val=ta.value.trim(),idx=EMP_PRESETS.findIndex(p=>p.text===val);
+  const box=ta.closest('.cr-emp');
+  if(box)box.querySelectorAll('.emp-preset').forEach(b=>b.classList.toggle('on',Number(b.dataset.i)===idx));
+  const note=$('#'+taId+'PresetNote');
+  if(note)note.textContent=idx>=0?EMP_PRESETS[idx].desc:'点选一段现成人设，套用后仍可自行删改';
 }
 function filterText(t){ // 正文过滤：去 emoji / markdown 残留
   return String(t||'')
@@ -5327,14 +5366,28 @@ const Game={
   },
   pickFamily(i){crRollFamily(i);renderCreator()},
   crSetName(v){cr.name=String(v||'').slice(0,8)||cr.name},
-  crSetEmpPersona(v){cr.emperorPersona=String(v||'').slice(0,1000);const c=$('#crEmpCount');if(c)c.textContent=cr.emperorPersona.length+'/1000'},
+  crSetEmpPersona(v){cr.emperorPersona=String(v||'').slice(0,1000);const c=$('#crEmpCount');if(c)c.textContent=cr.emperorPersona.length+'/1000';syncEmpPresets('crEmpPersona')},
+  applyEmpPreset(i,taId){ // 套用预设帝设：已有自撰内容时先确认覆盖
+    const p=EMP_PRESETS[i],ta=$('#'+taId);if(!p||!ta)return;
+    const cur=ta.value.trim();
+    if(cur&&cur!==p.text&&!confirm(`套用「${p.name}」会覆盖你已写的帝设，继续？`))return;
+    ta.value=p.text;
+    if(taId==='crEmpPersona')this.crSetEmpPersona(ta.value);
+    else this.shiftEmpInput(ta);
+    syncEmpPresets(taId);
+    toast(`已套用「${p.name}」，可再自行删改`);
+  },
+  shiftEmpInput(ta){ // 移性符输入：同步字数与预设高亮
+    const c=$('#shiftEmpCount');if(c)c.textContent=String(ta.value||'').length+'/1000';
+    syncEmpPresets('shiftEmpPersona');
+  },
   crInsertPlayerVar(taId,countId){ // <player> 快捷键：光标处插入变量，正文中代入主控名讳
     const ta=$('#'+taId);if(!ta)return;
     const s=typeof ta.selectionStart==='number'?ta.selectionStart:ta.value.length;
     const e=typeof ta.selectionEnd==='number'?ta.selectionEnd:s;
     ta.value=ta.value.slice(0,s)+'<player>'+ta.value.slice(e);
     if(taId==='crEmpPersona')this.crSetEmpPersona(ta.value);
-    else{const c=$('#'+countId);if(c)c.textContent=ta.value.length+'/1000'}
+    else{const c=$('#'+countId);if(c)c.textContent=ta.value.length+'/1000';syncEmpPresets(taId)}
     ta.focus();ta.selectionStart=ta.selectionEnd=s+8;
   },
   rerollCreator(){crRollAll();renderCreator();toast('重新掷过了')},
@@ -6711,8 +6764,10 @@ const Game={
     const it=(state.inventory||[])[i];if(!it||it.count<=0)return;
     Game._shiftItem=it;
     const ta=$('#shiftEmpPersona');
+    $('#shiftPresets').innerHTML=empPresetChips('shiftEmpPersona');
     ta.value=(state.world&&state.world.emperor&&state.world.emperor.persona)||'';
     $('#shiftEmpCount').textContent=ta.value.length+'/1000';
+    syncEmpPresets('shiftEmpPersona');
     $('#shiftModal').classList.add('on');
   },
   closeShiftCharm(){$('#shiftModal').classList.remove('on');Game._shiftItem=null},
