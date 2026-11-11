@@ -201,8 +201,9 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
 .itag{flex:none;font-size:10px;line-height:1.7;padding:0 6px;border-radius:999px;border:1px solid var(--line);color:var(--ink-soft);letter-spacing:.04em;white-space:nowrap}
 .itag.on{border-color:var(--gold);color:var(--gold)}
 
+/* 层级约定：底栏/热区 < 对话/地图 30 < 全局设置 67 < 遮罩 68 < 面板 70 < 弹窗 80 < toast 90 */
 /* 设置/存档 */
-.restmodal{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;background:rgba(30,24,18,.45);padding:32px}
+.restmodal{position:fixed;inset:0;z-index:80;display:none;align-items:center;justify-content:center;background:rgba(30,24,18,.45);padding:32px}
 .restmodal.on{display:flex}
 .rm-card{background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:20px;max-width:330px;width:100%}
 .rm-title{font-size:16px;letter-spacing:.15em;text-align:center}
@@ -253,7 +254,7 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
 
 
 /* toast */
-.toast{position:fixed;left:50%;bottom:calc(96px + var(--sab));transform:translateX(-50%) translateY(20px);z-index:40;background:var(--ink);color:var(--paper);font-size:13px;padding:8px 16px;border-radius:999px;opacity:0;pointer-events:none;transition:all .25s;max-width:80vw;text-align:center;font-family:var(--sans)}
+.toast{position:fixed;left:50%;bottom:calc(96px + var(--sab));transform:translateX(-50%) translateY(20px);z-index:90;background:var(--ink);color:var(--paper);font-size:13px;padding:8px 16px;border-radius:999px;opacity:0;pointer-events:none;transition:all .25s;max-width:80vw;text-align:center;font-family:var(--sans)}
 .toast.on{opacity:.92;transform:translateX(-50%) translateY(0)}
 
 /* 全局设置入口：压在加载/弹窗之上，对话与铺排中也能打开 */
@@ -274,6 +275,7 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
 .tb-time{flex:none;border:1px solid rgba(245,239,227,.75);outline:1px solid rgba(245,239,227,.35);outline-offset:2px;border-radius:2px;padding:6px 12px;color:#f5efe3;font-size:14px;letter-spacing:.12em;display:flex;gap:10px;align-items:baseline;background:transparent}
 .tb-stats{flex:1;display:flex;justify-content:space-around;gap:6px;text-align:center}
 .tstat{display:flex;flex-direction:column;line-height:1.3;min-width:52px}
+button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:center;font-size:inherit;font-family:inherit;color:inherit;cursor:pointer;appearance:none;-webkit-appearance:none}
 .tstat label{font-size:11px;color:rgba(245,239,227,.75)}
 .tstat b{font-size:17px;font-weight:600}
 /* 热区 */
@@ -451,8 +453,8 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
     <button class="tb-time" onclick="UI.openSheet('局面')"><span id="tbEra">—</span><span id="tbXun">—</span></button>
     <div class="tb-stats">
       <div class="tstat"><label>位份</label><b id="tbRank">—</b></div>
-      <button class="tstat" style="border:0;background:transparent;padding:0;margin:0;text-align:center;font-size:inherit;font-family:inherit;color:inherit;cursor:pointer;appearance:none;-webkit-appearance:none" onclick="Game.openMarket()" title="宫中采买"><label>银两</label><b id="tbSilver">—</b></button>
-      <button class="tstat" style="border:0;background:transparent;padding:0;margin:0;text-align:center;font-size:inherit;font-family:inherit;color:inherit;cursor:pointer;appearance:none;-webkit-appearance:none" onclick="Game.openShop()" title="打开商城"><label>积分</label><b id="tbPoints">—</b></button>
+      <button class="tstat" onclick="Game.openMarket()" title="宫中采买"><label>银两</label><b id="tbSilver">—</b></button>
+      <button class="tstat" onclick="Game.openShop()" title="打开商城"><label>积分</label><b id="tbPoints">—</b></button>
     </div>
   </div>
   <div id="dim"></div>
@@ -2367,7 +2369,7 @@ function renderCreator(){
   const fam=CR_FAMILIES[cr.family];
   const row=(k,v,dice,extra)=>`<div class="cr-row"><span class="cr-k">${k}</span><div class="cr-v">${v}</div>${extra||''}<button class="cr-dice" onclick="Game.rollCreator('${dice}')">⟳</button></div>`;
   $('#createBody').innerHTML=
-    row('姓名',`<input id="crName" value="${esc(cr.name)}" maxlength="8" onchange="Game.crSetName(this.value)">`,'name')+
+    row('姓名',`<input value="${esc(cr.name)}" maxlength="8" onchange="Game.crSetName(this.value)">`,'name')+
     row('年龄',`<span class="cr-txt num">${cr.age} 岁</span>`,'age')+
     `<div class="cr-row"><span class="cr-k">家世</span><div class="cr-v"><div class="cr-chips">${CR_FAMILIES.map((f,i)=>`<button class="cr-chip${cr.family===i?' on':''}" onclick="Game.pickFamily(${i})">${f.k}</button>`).join('')}</div>
       <div class="cr-note">${esc(fam.d)} · 初封${esc(fam.rank)} · 体己银 ${fam.silver} 两</div></div><button class="cr-dice" onclick="Game.rollCreator('family')">⟳</button></div>`+
@@ -3769,7 +3771,7 @@ const UI={
       </div>
       <div class="sheet-note">成品已入行囊，可在「行囊」查看详情、使用或典卖。赠人、献物按正常社交与剧情规则结算；品质与心意只提供更好的起点。</div>`;
   },
-  /* 事件选项（旧两轮制退路；主路径为剧情对话 scene） */
+  /* 歇下一旬：本旬小结弹窗 */
   showRestTip(){
     const title=$('#restTitle');if(title)title.textContent='歇下一旬';
     const body=$('#restBody');
@@ -3852,7 +3854,8 @@ const UI={
       const html=entries.length?entries.map(e=>`<div class="tl-item"><div class="tl-time">${esc(e.time||'')}</div>${esc(e.text||'')}</div>`).join(''):'<div class="sheet-note">新朝初立，尚无大事可记。</div>';
       return `<div class="sec"><div class="sec-cap">剧情大事记</div><div class="tl">${html}</div></div>`;
     }
-    return `<div class="sec"><div class="sec-cap">剧情大事记</div><div class="sheet-note" style="white-space:pre-wrap">${esc(CHRONICLE_MD)}</div></div>`;
+    const md=String(CHRONICLE_MD||'').replace(/^---\s*\n[\s\S]*?\n---\s*\n?/,''); // 去掉源文件 YAML 头：不给玩家看 name/type/description
+    return `<div class="sec"><div class="sec-cap">剧情大事记</div><div class="sheet-note" style="white-space:pre-wrap">${esc(md)}</div></div>`;
   },
   npcCard(who){ // 人物行：本名为主（不变），身份（位份）为辅（会随升降变动）
     const n=(state.npcs||{})[who];
@@ -4070,8 +4073,12 @@ const UI={
   relBadge(who){
     const r=(state.relationships||{})[who];
     const isObj=r&&typeof r==='object';
-    const val=isObj?r.value:r;const note=isObj?(r.note||''):String(r||'');
+    const val=isObj?r.value:r;
     const num=(typeof val==='number')?val:null;
+    if(isObj&&r.type==='仇恨'){ // 仇恨值是敌意深浅，不能拿好感档位读成"往来密切"
+      const tag=num==null?'宿怨':(num>=50?'积怨已深':(num>=20?'有嫌隙':(num>0?'不睦':'有隙')));
+      return `<span class="relpill p-bad">${esc(tag)}</span><span class="rel-v num">${num==null?'':num}</span>`;
+    }
     const cls=num==null?'p-mid':(num>=50?'p-good':(num>0?'p-mid':'p-bad'));
     const tag=num==null?'—':(num>=50?'往来密切':(num>=20?'相熟':(num>0?'相识':(num===0?'初识':'有隙')))); // 只按数值客观描述熟悉程度：不用友善/敌意等感情词，也不采信模型自填的 type/note 标签
     return `<span class="relpill ${cls}">${esc(tag)}</span><span class="rel-v num">${num==null?'':num}</span>`;
@@ -5459,7 +5466,7 @@ const Game={
     if(place==='养心殿'){this.visitNpc('皇帝');return}
     if(place==='六宫'){UI.openSheet('六宫');return}       // 不关宫城图：面板浮在图上，拜访落定由 settle 收图
     if(place==='太医院'){UI.openSheet('太医院');return}
-    if(place==='藏书阁'){UI.openSheet('藏书阁');return}   // 暂未编目：先给入口，内容后补
+    if(place==='藏书阁'){UI.openSheet('藏书阁');return}   // 面板浮在图上：借阅、寻书、研读都在阁内办
     if(place==='御花园'){
       if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
       if((state.energy??0)<=0){$('#mapview').classList.remove('on');this.collapse();return}
