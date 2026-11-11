@@ -4848,12 +4848,23 @@ function buildOpeningWorld(proto){
   const restPalaces=wlShuffle(allPalaces.filter(p=>p.name!=='椒房殿'));
 
   const consorts=[];
-  const highTitles=wlPickN(['贵妃','贤妃','良妃','淑妃','德妃','妃','贵嫔','嫔','嫔','贵嫔'],wlInt(3,5));
+  const highTitles=wlPickN(['贵妃','贤妃','良妃','淑妃','德妃','妃','贵嫔','嫔','嫔','贵嫔'],wlInt(4,6));
   let palaceIdx=0;
+  /* 性情发牌：整副词表洗一次、逐人发牌（用尽再重洗）——一局之内性情覆盖面广、不扎堆撞车 */
+  let personaDeck=[];
+  const dealPersona=n=>{
+    const out=[];
+    while(out.length<(n||2)){
+      if(!personaDeck.length)personaDeck=wlShuffle(PERSONA_ALL);
+      const t=personaDeck.pop();
+      if(personaCompatible(out,t))out.push(t);
+    }
+    return out;
+  };
   if(hasQueen){
     const surname=wlPick(otherSurnames.filter(x=>x!==proto.name.slice(0,1)));
     const realName=takeName(()=>surname+wlPick(WORLD_LIB.givenNames));
-    const queenTraits=rollPersona(wlInt(1,2));
+    const queenTraits=dealPersona(wlInt(2,3));
     const queen={name:takeName(()=>'皇后'+surname+'氏'), realName, rank:'正一品 皇后', short:'皇后',
       age:wlInt(21,29), palace:jiaofang, isQueen:true, faction:'',
       traits:queenTraits,
@@ -4866,7 +4877,7 @@ function buildOpeningWorld(proto){
     if(!palace)break;
     const rank=WL_HIGH_RANKS[short];
     const {name,realName}=makeConsortName(short);
-    const traits=rollPersona(wlInt(1,3));
+    const traits=dealPersona(wlInt(2,3));
     consorts.push({name, realName, rank, short, age:wlInt(18,30), palace, isQueen:false, faction:'',
       traits,
       family:wlPick(WORLD_LIB.highFamilies),
@@ -4878,13 +4889,13 @@ function buildOpeningWorld(proto){
   }
 
   /* 低位妃嫔：分居各宫侧殿 */
-  const lowTitles=wlPickN(Object.keys(WL_LOW_RANKS),wlInt(5,7));
+  const lowTitles=wlPickN(Object.keys(WL_LOW_RANKS),wlInt(6,8));
   const highForLow=consorts.filter(c=>!c.isQueen);
   for(const short of lowTitles){
     const rank=WL_LOW_RANKS[short];
     const {name,realName}=makeConsortName(short);
     const main=wlPick(highForLow);
-    const traits=rollPersona(wlInt(1,2));
+    const traits=dealPersona(wlInt(2,3));
     consorts.push({name, realName, rank, short, age:wlInt(15,27), palace:main.palace, isQueen:false,
       faction:'', mainName:main.name,
       traits,
@@ -4908,7 +4919,7 @@ function buildOpeningWorld(proto){
       goal:leader.isQueen?'稳住中宫':wlPick(WORLD_LIB.factionGoals),members:[]};
     leader.faction=name;
     const memberPool=consorts.filter(x=>x!==leader&&!x.isQueen&&!leaders.includes(x));
-    for(const c of wlPickN(memberPool,wlInt(1,2))){
+    for(const c of wlPickN(memberPool,wlInt(2,3))){
       if(!c.faction){c.faction=name;f.members.push(c.name)}
     }
     factions.push(f);
