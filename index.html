@@ -1917,7 +1917,7 @@ const STALE_PLOT_XUN=4;      // 无期限在途线悬置 N 旬未推进即"发�
 const STALE_AUTO_EXPIRE=3;   // 发酵后连续 N 旬被裁决列出仍无回写：前端自动作废（机会流失）
 const ECHO_MISS_MAX=2;       // 同一引线连续被散步/拜访呼应 N 次却无台账回写：此后不再借行动硬凑交集，留待旬首发酵处置
 const ECHO_LEAD_TOTAL=3;     // 同一引线被呼应的总次数硬上限（无论有无回写）：到顶不再主动提示——防"每次改个说法"无限续命、散步永远撞同一件事
-const GARDEN_MEET_CHANCE=0.7; // 御花园散步偶遇概率：前端代码掷骰硬约束，不交给提示词"随缘"；帝单独按恩宠掷骰，其余熟人在普通池
+const GARDEN_MEET_CHANCE=0.6; // 御花园散步偶遇概率：掷不中（四成）就只演风物见闻，谁都不遇；帝单独按恩宠掷骰，其余熟人在普通池
 const EMPEROR_VISIT_BASE=0.22;    // 旬首帝主动相见基础概率：恩宠≥40、无缺席、上旬未有相处才掷；一旬一骰
 const EMPEROR_VISIT_OVERDUE=0.65; // 恩宠账逾期（距上次相处超过每N旬上限）：他主动来/召的概率大增——宠爱须兑现成动静，不兑现则无感
 function focusEnergyCost(focus){ // 各类行动精力消耗
@@ -5611,8 +5611,12 @@ const Game={
     const rel=rels[empRelKey]||rels['皇帝'];
     const favor=typeof rel==='number'?rel:(Number(rel&&rel.value)||0);
     const absence=String((state&&state.emperor&&state.emperor.absence)||'').trim(); // 避嫌/病中/前朝缠身：园中不该撞见他
-    const empChance=absence?0:(favor>=75?0.55:favor>=60?0.42:favor>=40?0.28:0.12);
-    if(empId&&!absence&&Math.random()<empChance)return empId;
+    let empChance=favor>=75?0.32:favor>=60?0.24:favor>=40?0.16:0.07; // 偶遇命中后再分给帝的占比：高恩宠约三成，不至于回回都撞上
+    const lastGarden=Number(state&&state.emperor&&state.emperor.lastGardenTurn); // 上次园中撞见帝的旬号
+    if(lastGarden===state.turn)empChance=0; // 同旬已见过：再逛也不重复
+    else if(lastGarden===state.turn-1)empChance*=0.5; // 上旬刚见过：减半
+    if(absence)empChance=0;
+    if(empId&&empChance>0&&Math.random()<empChance)return empId;
     const pool=Object.keys(npcs).filter(id=>{const n=npcs[id];if(!n||UI.isEmperorId(id))return false;
       if(/太后/.test(id+(n.rank||'')))return true;
       return !!n.known});
@@ -5846,6 +5850,7 @@ const Game={
       // 相关的待续琐事：挂账计旬是否重置只看本轮 statePatch 是否真改/真删（见 applyPatch 的 pending 分支），不再"提过即刷新"，免得一条琐事被每旬顺口一提就永不过期
       const meta=ensurePlotMeta();
       if(p.hasEvent||adj.due.length||adj.overdue.length||adj.mainPub||adj.gardenMeet||adj.fest)meta.lastEventTurn=state.turn;
+      if(adj.gardenMeet&&UI.isEmperorId(adj.gardenMeet))(state.emperor=state.emperor||{}).lastGardenTurn=state.turn; // 记下园中撞见帝的旬号：同旬不再重复、下旬减半
       if(adj.mainPub||(opts&&opts._mainPubPop))meta._mainMissed=!activePlots().some(x=>x.line==='主线'); // 新主线是否落账：未落账则下轮裁决加重语气（含旬首断档直弹）
       if(isMajorTurn(p.statePatch,p))meta.lastBigTurn=state.turn;
       if(adj.hit){meta.rollHit=false;meta.rollTargetId=null} // 本旬骰子已用毕，同旬后续行动不再重复强制
