@@ -1351,7 +1351,8 @@ function sanitizePlot(p){ // 单条台账归一；字段缺失时给默认值（
     earliest:numOrNull(p.earliest),latest:numOrNull(p.latest),
     dueText:String(p.dueText||'').slice(0,40),note:String(p.note||'').slice(0,140),
     touch:numOrNull(p.touch),staleMiss:numOrNull(p.staleMiss)||0, // touch=最近推进旬号（xunSerial 单位，与裁决一致）；staleMiss=发酵后连续被无视次数
-    echo:numOrNull(p.echo),echoMiss:numOrNull(p.echoMiss)||0 // echo=最近被呼应的旬号；echoMiss=连续被呼应却无台账回写的次数
+    echo:numOrNull(p.echo),echoMiss:numOrNull(p.echoMiss)||0, // echo=最近被呼应的旬号；echoMiss=连续被呼应却无台账回写的次数
+    echoTotal:numOrNull(p.echoTotal)||0 // echoTotal=被呼应的总次数（到 ECHO_LEAD_TOTAL 后不再主动提示）
   };
 }
 function mergePlots(base,incoming,nowTurn){ // 增量回写：模型只给变化条目，未提及的保持不变；凡回写即记 touch=本旬
@@ -1496,8 +1497,10 @@ function matchLeads(ctxList){ // 与给定语境（人名/地名/事由）相关
   const cvs=(ctxList||[]).map(s=>String(s||'').trim()).filter(s=>s.length>=2);
   if(!cvs.length||!state)return[];
   const now=xunSerial(state.time);
+  const rank={主线:0,敌对:1,支线:2,引线:3,目标:4};
   return activePlots().filter(p=>{
     if((p.echoMiss||0)>=ECHO_MISS_MAX)return false; // 连续呼应无回写：不再借散步拜访硬凑交集，留待旬首发酵强制处置
+    if((p.echoTotal||0)>=ECHO_LEAD_TOTAL)return false; // 总呼应次数到顶：交回旬首发酵/到期裁决，散步不再永远撞同一件事
     if(p.echo===now)return false; // 本旬已呼应过：同一引线不连演两场，免得每次闲逛都撞同一件事
     const hay=`${p.title||''}｜${p.note||''}`;
     if(!hay||hay==='｜')return false;
@@ -1506,7 +1509,7 @@ function matchLeads(ctxList){ // 与给定语境（人名/地名/事由）相关
       for(let i=0;i+2<=cv.length;i++)if(hay.includes(cv.slice(i,i+2)))return true; // 名讳取连续二字（如"砚秋"），防止全名对不上
       return false;
     });
-  });
+  }).sort((a,b)=>(rank[a.line]??9)-(rank[b.line]??9)); // 主线/敌对排前：同场多条时先带要紧的
 }
 function autoSettleDuePlots(adj){ // 模型漏写台账时由前端结账；只有模型明确改写期限才放过
   if(!adj||!state)return [];
@@ -1655,7 +1658,7 @@ const PLOTS_MODULE = [
 '无期限（缓图）条目并非永久挂账：悬置超过 4 旬未推进即"发酵"，会在裁决块以【须处理·搁置发酵】列出，当旬必须择一处理——兑现为剧情（旬首直接弹出，hasEvent=true）、改写期限（note 说明理由并给新 dueText）或作废（注明发酵后果）；连续 3 旬不回写前端自动作废。',
 '每轮结算（第一、二轮皆然）只经 statePatch.plots 回写【发生变化的条目】（新增、更新、兑现、作废）；只回写发生变化的条目，前端按 id 合并，漏写视为不变。',
 '兑现与"改备注"是两回事：条目条件已满足——所托之事办成、所求之物送到并被收下、当众献艺达成等——必须把该条目 stage 改为"已兑现"，可另附积分（protagonist.points）与"本旬变化"中的任务进度；只改写 note 而 stage 留在"进行中"，一律视为未办结，任务继续挂账。任务兑现不拘形式：亲手做的成品相赠、拜托旁人代办、旧约当面履行皆可；手作成品对应任务时的兑现规则另见手作模块。',
-'玩家主动拜访某人、或往御花园散步时，请求可能附【呼应引线】块：所列在途引线与该人/该地相关，须借此次行动实质推进（兑现、或产生新信息/态度变化并经 statePatch.plots 更新 note）；已条件满足的条目直接兑现（stage 改"已兑现"），不要只写进展。只演绎不回写不算推进——同一引线连续两次被呼应却无回写，前端不再提示它，并交回旬首"发酵"强制处置。若此番确无新进展，照实写一两句无获即可，不要为凑交集硬编事件。',
+'玩家主动拜访某人、或往御花园散步时，请求可能附【呼应引线】块：所列在途引线与该人/该地相关，须借此次行动实质推进（兑现、或产生新信息/态度变化并经 statePatch.plots 更新 note）；已条件满足的条目直接兑现（stage 改"已兑现"），不要只写进展。只演绎不回写不算推进——同一引线连续两次被呼应却无回写、或呼应总次数达 3 次，前端不再主动提示它，并交回旬首"发酵"强制处置；多条引线同场命中时可一并带出，挑真相关的演，不必每条都塞进对话。若此番确无新进展，照实写一两句无获即可，不要为凑交集硬编事件。',
 'pending（待续琐事）与引线同生命周期：挂账超 4 旬未办即"发酵"，旬首以【须处理·琐事发酵】列入裁决块，须当旬择一处理——本旬办掉（从 statePatch.pending 移除）、升级为剧情引线（移入 statePatch.plots）或改写文本说明现状（回写即重置计旬）；连续 3 旬不理前端自动清除。'
 ].join('\n');
 
@@ -1812,6 +1815,7 @@ const PLOT_NEW_LEAD_CHANCE=0.3; // 骰中后开全新引子的概率（其余为
 const STALE_PLOT_XUN=4;      // 无期限在途线悬置 N 旬未推进即"发酵"：旬首强制处理（兑现/改写/作废），不许干挂
 const STALE_AUTO_EXPIRE=3;   // 发酵后连续 N 旬被裁决列出仍无回写：前端自动作废（机会流失）
 const ECHO_MISS_MAX=2;       // 同一引线连续被散步/拜访呼应 N 次却无台账回写：此后不再借行动硬凑交集，留待旬首发酵处置
+const ECHO_LEAD_TOTAL=3;     // 同一引线被呼应的总次数硬上限（无论有无回写）：到顶不再主动提示——防"每次改个说法"无限续命、散步永远撞同一件事
 const GARDEN_MEET_CHANCE=0.7; // 御花园散步偶遇概率：前端代码掷骰硬约束，不交给提示词"随缘"；帝、太后也在偶遇池（撞见即初识的入口）
 const EMPEROR_VISIT_BASE=0.22;    // 旬首帝主动相见基础概率：恩宠≥40、无缺席、上旬未有相处才掷；一旬一骰
 const EMPEROR_VISIT_OVERDUE=0.65; // 恩宠账逾期（距上次相处超过每N旬上限）：他主动来/召的概率大增——宠爱须兑现成动静，不兑现则无感
@@ -5450,7 +5454,7 @@ const Game={
       if((state.energy??0)<=0){$('#mapview').classList.remove('on');this.collapse();return}
       const hits=matchLeads(['御花园','花园','散步']);
       const phits=matchPending(['御花园','花园','散步']);
-      const leadHint=hits.length?`\n【呼应引线】园中散步与在途引线相关：${hits.map(p=>`「${p.title}」（${p.line}）`).join('；')}。请让此番闲逛与之产生实质交集（撞见、听闻、想起要办的事），能推进的推进并回写台账；暂不能的也在 note 留一笔现状。若确无新进展，照实写一两句无获即可，勿为凑交集硬编；连续两次无回写的引线前端不再提示，交由旬首发酵处置。`:'';
+      const leadHint=hits.length?`\n【呼应引线】园中散步与在途引线相关（按要紧程度排序）：${hits.map(p=>`「${p.title}」（${p.line}）`).join('；')}。可同场一并带出：挑与本旬情境真相关的演（撞见、听闻、想起要办的事），能兑现的当旬兑现并回写台账；不必每条都塞进对话，无新进展的不提也罢。每条引线散步/拜访最多被提示 ${ECHO_LEAD_TOTAL} 次，到顶后交回旬首处置，勿为凑交集硬编。`:'';
       const pendHint=phits.length?`\n【呼应待续】园中散步与待续琐事相关：${phits.map(x=>pendText(x)).join('；')}。请顺势办理或想起此事，办妥的从 statePatch.pending 移除，未办妥的更新现状。`:'';
       const walkNo=(Number(state.walkCount)||0)+1;state.walkCount=walkNo; // 康健收益每旬至多结算一次
       const ti=Number(state.protagonist&&state.protagonist.attributes&&state.protagonist.attributes['体质'])||0;
@@ -5476,7 +5480,7 @@ const Game={
     const npc=(state.npcs&&state.npcs[who]&&(state.npcs[who].name||who))||who;
     const hits=matchLeads([who,npc]);
     const phits=matchPending([who,npc]);
-    const leadHint=hits.length?`\n【呼应引线】此人与在途引线相关：${hits.map(p=>`「${p.title}」（${p.line}）`).join('；')}。请借此次会面推进或了结它：能兑现的当旬兑现并回写台账；暂不能了结的，也要让会面与之产生实质关联（新信息、态度变化、埋下下一步），并更新 note。若确无新进展，照实写一两句无获即可，勿为凑交集硬编；连续两次无回写的引线前端不再提示，交由旬首发酵处置。`:'';
+    const leadHint=hits.length?`\n【呼应引线】此人与在途引线相关（按要紧程度排序）：${hits.map(p=>`「${p.title}」（${p.line}）`).join('；')}。可同场一并带出：挑真相关的推进或了结——能兑现的当旬兑现并回写台账；暂不能的让会面与之产生实质关联（新信息、态度变化、埋下下一步）即可，不必每条都演到。每条引线最多被提示 ${ECHO_LEAD_TOTAL} 次，到顶后交回旬首处置，勿为凑交集硬编。`:'';
     const pendHint=phits.length?`\n【呼应待续】此次行动与待续琐事相关：${phits.map(x=>pendText(x)).join('；')}。请在本旬演绎中顺手办理或问起此事，办妥的从 statePatch.pending 移除；未办妥的更新一句现状（回写即重置挂账计旬）。`:'';
     const msg=`第${xunNo()}旬第一轮：玩家主动出门拜访「${npc}」。依双方关系、位份、情理与时机如实演接待结果——接见、婉拒、不在宫中都可能，吃闭门羹也是有效结果，见面与否顺其自然。若接见，用剧情对话 scene 结构呈现此次会面（scene.who 填「${npc}」，scene.where 写对方所在宫室而不是本宫住处；scene.parts 按语义分段，act 写对方动作神态、say 写对方台词、quote 写转述他人原话、narr 只写其他人物与客观场面，台词都不带引号；对方说话、玩家接话，多轮后 resolve 收尾结算）；若未见到，安静结算本旬。${leadHint}${pendHint}`;
     this.round1(msg,'拜访·'+npc,focusEnergyCost('社交拜访'),{skipDice:true,leadIds:hits.map(p=>p.id),pendTexts:phits.map(pendText),whoHint:npc});
@@ -5655,6 +5659,7 @@ const Game={
         const written=new Set((Array.isArray(p.statePatch&&p.statePatch.plots)?p.statePatch.plots:[p.statePatch&&p.statePatch.plots]).map(x=>x&&String(x.id)));
         for(const id of opts.leadIds){const pl=(state.plots||[]).find(x=>x.id===id&&x.stage==='进行中');if(!pl)continue;
           pl.echo=now;
+          pl.echoTotal=(pl.echoTotal||0)+1; // 总呼应次数+1：到 ECHO_LEAD_TOTAL 后散步/拜访不再主动提示
           if(written.has(String(id)))pl.echoMiss=0; // 有回写：实质推进
           else pl.echoMiss=(pl.echoMiss||0)+1; // 无回写：落空一次；满 ECHO_MISS_MAX 后不再呼应，交由旬首发酵处置
         }
