@@ -1917,7 +1917,7 @@ const STALE_PLOT_XUN=4;      // 无期限在途线悬置 N 旬未推进即"发�
 const STALE_AUTO_EXPIRE=3;   // 发酵后连续 N 旬被裁决列出仍无回写：前端自动作废（机会流失）
 const ECHO_MISS_MAX=2;       // 同一引线连续被散步/拜访呼应 N 次却无台账回写：此后不再借行动硬凑交集，留待旬首发酵处置
 const ECHO_LEAD_TOTAL=3;     // 同一引线被呼应的总次数硬上限（无论有无回写）：到顶不再主动提示——防"每次改个说法"无限续命、散步永远撞同一件事
-const GARDEN_MEET_CHANCE=0.7; // 御花园散步偶遇概率：前端代码掷骰硬约束，不交给提示词"随缘"；帝、太后也在偶遇池（撞见即初识的入口）
+const GARDEN_MEET_CHANCE=0.7; // 御花园散步偶遇概率：前端代码掷骰硬约束，不交给提示词"随缘"；帝单独按恩宠掷骰，其余熟人在普通池
 const EMPEROR_VISIT_BASE=0.22;    // 旬首帝主动相见基础概率：恩宠≥40、无缺席、上旬未有相处才掷；一旬一骰
 const EMPEROR_VISIT_OVERDUE=0.65; // 恩宠账逾期（距上次相处超过每N旬上限）：他主动来/召的概率大增——宠爱须兑现成动静，不兑现则无感
 function focusEnergyCost(focus){ // 各类行动精力消耗
@@ -5603,15 +5603,25 @@ const Game={
   openFocus(){if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}UI.openSheet('吩咐')}, // 吩咐：自拟本旬要做的事
   hsGoOut(){if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}$('#mapClock').textContent=fmtTime();$('#mapview').classList.add('on')}, // 出门＝宫城图选目的地
   mapBack(){$('#mapview').classList.remove('on')},
-  _gardenMeetPick(){ // 御花园偶遇人选：已认识的宫中人物随机一位；帝、太后不受结识限制——游园撞见正是初识途径，相熟之后再走正式觐见。恩宠≥40起帝在池中的权重上调（≥70再翻倍）——恩宠越高，越容易在园中撞见他
+  _gardenMeetPick(){ // 御花园偶遇人选：帝单独按恩宠掷骰，不与known人物挤同一个池子（池子越大越撞不见帝）；其余为太后与已认识的宫中人物
     const npcs=(state&&state.npcs)||{};
-    const pool=Object.keys(npcs).filter(id=>{const n=npcs[id];if(!n)return false;
-      if(/皇帝|皇上|陛下|太后|帝/.test(id+(n.rank||'')))return true;
+    const rels=(state&&state.relationships)||{};
+    const empRelKey=Object.keys(rels).find(k=>UI.isEmperorId(k)); // 帝的存档键可能是「皇帝」，也可能是本名
+    const empId=Object.keys(npcs).find(k=>UI.isEmperorId(k))||empRelKey||'皇帝'; // 档案缺帝时仍可撞见，按「皇帝」兜底
+    const rel=rels[empRelKey]||rels['皇帝'];
+    const favor=typeof rel==='number'?rel:(Number(rel&&rel.value)||0);
+    const absence=String((state&&state.emperor&&state.emperor.absence)||'').trim(); // 避嫌/病中/前朝缠身：园中不该撞见他
+    const empChance=absence?0:(favor>=75?0.55:favor>=60?0.42:favor>=40?0.28:0.12);
+    if(empId&&!absence&&Math.random()<empChance)return empId;
+    const pool=Object.keys(npcs).filter(id=>{const n=npcs[id];if(!n||UI.isEmperorId(id))return false;
+      if(/太后/.test(id+(n.rank||'')))return true;
       return !!n.known});
-    if(!pool.length)return null;
-    const favor=Number((state.relationships&&state.relationships['皇帝']||{}).value)||0;
-    if(favor>=40)for(const id of pool){if(/皇帝|皇上|陛下|帝/.test(id+(npcs[id].rank||''))&&!/太后/.test(id)){pool.push(id);if(favor>=70)pool.push(id);break}}
-    return pool[Math.floor(Math.random()*pool.length)];
+    if(!pool.length)return absence?null:(empId||null);
+    const deck=[];
+    for(const id of pool){const n=npcs[id]||{};
+      const w=/皇嗣/.test(n.rank||'')?1:(/太后/.test(id+(n.rank||''))?1:2); // 皇嗣、太后各一份，其余熟人两份：别让公主/太后把偶遇占满
+      for(let i=0;i<w;i++)deck.push(id)}
+    return deck[Math.floor(Math.random()*deck.length)];
   },
   mapGo(place){ // 宫城图目的地：养心殿见驾、六宫访妃嫔、太医院问医、藏书阁寻书、御花园散步闲逛；出宫暂留空
     if(place==='养心殿'){this.visitNpc('皇帝');return}
