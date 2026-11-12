@@ -250,6 +250,14 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
 .npcrow .nr-role{flex:0 1 auto;min-width:0;font-size:11px;color:var(--ink-soft);opacity:.7;letter-spacing:.06em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transform:translateY(-1px)}
 .npcrow .nr-depth{flex:none;font-size:11px;color:var(--gold);border:1px solid var(--gold);border-radius:999px;padding:1px 8px;letter-spacing:.1em}
 .npcrow .nr-rel{margin-left:auto;font-size:12px;color:var(--ink-soft)}
+/* 承宠选项：两行，长说明不挤成小字签 */
+.nightopt{display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;padding:9px 2px;border-bottom:1px dashed var(--line);color:var(--ink)}
+.nightopt:last-of-type{border-bottom:0}
+.nightopt .no-main{font-size:15px;letter-spacing:.06em}
+.nightopt .no-sub{font-size:12px;color:var(--ink-soft);line-height:1.65}
+.nightopt.on .no-main{color:var(--cinnabar)}
+.nightopt.on .no-sub{color:var(--cinnabar);opacity:.8}
+.nightopt:disabled{opacity:.45}
 .nr-av{width:34px;height:34px;font-size:14px}
 .nd-head{display:flex;align-items:center;gap:14px;margin:2px 0 12px}
 .nd-av{width:64px;height:64px;border-radius:16px;font-size:26px}
@@ -535,6 +543,14 @@ button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:cente
     <div class="rm-title" id="restTitle">歇下一旬</div>
     <div class="rm-body" id="restBody">灯花渐暗，夜色四合。就此歇下，精力尽复，醒来又是新的一旬。</div>
     <div class="rm-ops"><button class="btn btn-line" onclick="Game.dismissRest()">再撑一撑</button><button class="btn btn-primary" onclick="Game.restNow()">休息，进入下一旬</button></div>
+  </div>
+</div>
+<!-- 晨报：旬首的敬事房记档（前端生成，不调模型） -->
+<div class="restmodal" id="dawnModal">
+  <div class="rm-card">
+    <div class="rm-title" id="dawnTitle">晨报 · 昨夜</div>
+    <div class="rm-body" id="dawnBody" style="max-height:56vh;overflow:auto"></div>
+    <div class="rm-ops"><button class="btn btn-primary" onclick="Game.closeDawn()">记下了</button></div>
   </div>
 </div>
 <!-- 行事结果弹窗（本地即时结算） -->
@@ -1238,7 +1254,7 @@ const ENERGY_MODULE = [
 '## 七、精力与旬制（本条覆盖世界书一切冲突表述）',
 '1. 每月只分上旬、下旬两旬：上旬为初一至十五，下旬为十六至月末。日历一律由前端推进（上旬→同月下旬；下旬→次月正月，跨年自动），time 键由前端维护；正文与状态一律以存档中的年月旬次为准。',
 '2. 每旬主控精力值 0—100，旬首自动回满（存档 energy 字段为当前剩余精力）。',
-'3. 一旬内玩家可消耗精力依次安排多件事；每件事按第一轮（可能含第二轮应对）完整结算。精力消耗由前端自结：才艺修习 20、社交拜访 20、宫务经营 20、子女教育 20、外出散步闲逛 10、家族书信 10、使用道具 5；精力由前端结算。',
+'3. 一旬内玩家可消耗精力依次安排多件事；每件事按第一轮（可能含第二轮应对）完整结算。精力消耗由前端自结：才艺修习 20、社交拜访 20、宫务经营 20、子女教育 20、外出散步闲逛 10、家族书信 10、承宠争取 10、使用道具 5；精力由前端结算。',
 '4. 传膳（前端自结：每旬至多三次，菜色随菜单而定，耗银与回精力各不相同，最贵一味另加属性；菜单每三旬轮换）与精力扣减、昏迷只在剧情本身需要时写入正文与 statePatch。',
 '5. 精力≤20 前端会弹窗建议休息；精力归零主控当场昏迷、体质 -5 并被抬回寝殿强制休息——皆为前端已结算事实，正文写感受与场面。',
 '6. 同旬内第二件事起，玩家指令为「第N旬又一轮：玩家再安排……」，照常先演绎该事过程再检查剧情；时间保持本旬不变。',
@@ -1659,6 +1675,357 @@ const EMPEROR_MODULE = [
 '5. 每旬请求附【恩宠账】行（含注意力落点：后台给帝安排一处注意力去向，主控可感知的部分写入 haremNews，与主控相处则不必单写）。列【恩宠账·到期】时，该相处成本旬主要剧情（hasEvent=true，scene 呈现，2—4 个接话选项后停止）；列【并账】时并入当旬已须触发的剧情或 narrative；列【搁置】时本旬必须推进所记原因（接近真相、化解误会或发酵为剧情线）。'
 ].join('\n');
 
+/* ============================================================ 承宠与子嗣（前端裁决）
+   侍寝、晨报、孕事、生产都由前端结算：模型只写戏，不得改写招幸对象、日期、孕事与皇嗣性别。
+   每旬一次「帝召谁」：主控可在【吩咐】里争取／静候／避宠，旬末结账，次旬晨报呈现。 */
+const CHAMBER_MODULE = [
+'## 十四、承宠与子嗣（bedchamber / pregnancy / heirs；前端裁决，覆盖世界书冲突处）',
+'1. 每旬的侍寝由前端结算：存档 bedchamber 记最近若干旬「帝召幸谁」的公开记档，last 为最近一夜；晨报由前端在旬首呈现。模型写正文时须与之相符，不得改写招幸对象、时间与结果。帝召幸他人是六宫可见的公开消息，可写入 haremNews 与宫人议论；主控不可知的私下细节不得写。',
+'2. 主控的侍寝场面点到为止：只写事前准备、帷帐之外与次日余波；不写露骨过程。侍寝不自动涨知心；晨报中已由前端结算的恩宠（如“恩宠 +1”）不得在同一夜重复加恩；其余宠爱变化以 statePatch["relationships.皇帝.value"] 回写为准，不得凭空大幅加恩。',
+'3. 有孕、胎象、小产与生产由前端结算（存档 pregnancy）。模型不得自行判定主控有孕、小产、生产或皇嗣性别；可写太医请脉、胎象、保胎与孕中反应，结果以存档为准。剧情要伤胎，只能通过体质下降与风险，不得直接改写 pregnancy。',
+'4. 皇嗣出生后由前端建档（存档 heirs：姓名、性别、生母、年龄、学识/礼仪/体魄/依赖）。模型写皇嗣须符合这些事实；皇嗣教育按世界书 §6E，前端给底、模型演过程。',
+'5. 主控本旬若已争取承宠，正文可写递牌子、打点、宫人议论与等待的心绪；结果已在晨报中给出，不得另编一次召幸。避宠同样是一种选择，须写出安全与失宠之间的代价。'
+].join('\n');
+const CHAMBER_RANKS=/皇后|皇贵妃|贵妃|贤妃|良妃|淑妃|德妃|妃|贵嫔|嫔|昭仪|昭容|昭媛|修仪|修容|修媛|充仪|充容|充媛|贵人|美人|才人|宝林|常在|答应|选侍|更衣|采女|官女子/;
+const CHAMBER_BLOCK=/皇嗣|皇子|皇女|公主|太后|太妃|太嫔|宫女|太监|太医|侍卫|掌事|姑姑|女官|女史|乳母/;
+function isConsortNpc(id,n){
+  if(!n||!n.rank)return false;
+  const s=String(id||'')+' '+String(n.rank||'');
+  if(CHAMBER_BLOCK.test(s))return false;
+  return CHAMBER_RANKS.test(String(n.rank||''));
+}
+function favorOf(who){
+  const r=(state.relationships||{})[who];
+  const v=r&&typeof r==='object'?r.value:r;
+  const n=Number(v);
+  return Number.isFinite(n)?n:0;
+}
+function nightCharmActive(){ // 子嗣缘符：佩戴中才有效（长期之物 equipped!==false）
+  return (state.inventory||[]).some(it=>it&&it.name==='子嗣缘符'&&it.durable&&it.equipped!==false&&(Number(it.count)||0)>0);
+}
+function chamberFavorKey(){return Object.keys(state.relationships||{}).find(k=>UI.isEmperorId(k))||'皇帝'}
+function chamberFavor(){return favorOf(chamberFavorKey())}
+function chamberRankTier(rank){
+  const r=String(rank||'');
+  if(/皇后/.test(r))return 2.2;
+  if(/皇贵妃|贵妃|贤妃|良妃|淑妃|德妃|妃/.test(r))return 1.7;
+  if(/贵嫔|嫔|昭仪|昭容|昭媛|修仪|修容|修媛|充仪|充容|充媛/.test(r))return 1.35;
+  if(/贵人|美人|才人/.test(r))return 1.1;
+  return 1;
+}
+function nightNpcWeight(id,n){
+  let w=chamberRankTier(n.rank);
+  const v=favorOf(id);if(v>0)w+=Math.min(2.2,v/45);
+  if(v<0)w*=0.6;
+  const tr=String((state.world&&state.world.emperor&&state.world.emperor.traits)||'');
+  if(/勤政|励精|冷|寡情|端方|清冷/.test(tr))w*=0.9;
+  if(/荒|昏|好色|多情|风流/.test(tr))w*=1.25;
+  const last=(state.bedchamber&&state.bedchamber.log||[]).slice().reverse().find(x=>x&&x.who===id);
+  if(last){const gap=(state.turn||0)-(Number(last.turn)||0);if(gap<=1)w*=0.35;else if(gap<=2)w*=0.6}
+  return Math.max(0.05,w);
+}
+function nightAloneWeight(){
+  let w=2.4;
+  const tr=String((state.world&&state.world.emperor&&state.world.emperor.traits)||'');
+  if(/勤政|励精|端方|清冷/.test(tr))w+=0.7;
+  if(/荒|昏|好色|多情|风流/.test(tr))w*=0.7;
+  if((Number(state.world&&state.world.emperor&&state.world.emperor.age)||0)>=28)w+=0.2;
+  return w;
+}
+function nightMeWeight(intent){
+  const p=state.protagonist||{},at=p.attributes||{};
+  const favor=Math.max(0,chamberFavor());
+  let w=0.35+favor/45;
+  if((state.turn||0)<12)w+=0.8; // 新入宫：帝对新人有几分好奇
+  const looks=Number(at['外貌'])||50,social=Number(at['交际'])||50;
+  w*=0.85+looks/200;
+  w*=0.9+social/250;
+  w*=chamberRankTier(p.rank);
+  if(favor>=75)w*=1.15;
+  if(intent&&intent.mode==='strive')w*=1.5;
+  if(intent&&intent.mode==='strive'&&intent.paid)w*=1.12;
+  return Math.max(0,w);
+}
+function nightSummonAllowed(){
+  if(state.pregnancy)return false;
+  if((Number(state.postpartumUntil)||0)>(state.turn||0))return false;
+  const ti=Number((state.protagonist&&state.protagonist.attributes||{})['体质'])||0;
+  return ti>=30;
+}
+function pickNightPartner(intent){
+  const entries=[];
+  if(nightSummonAllowed()&&(!intent||intent.mode!=='avoid')){
+    const w=nightMeWeight(intent);if(w>0)entries.push({kind:'me',w});
+  }
+  for(const id in (state.npcs||{})){
+    const n=state.npcs[id];
+    if(!isConsortNpc(id,n))continue;
+    if(state.protagonist&&id===state.protagonist.name)continue;
+    entries.push({kind:'npc',id,w:nightNpcWeight(id,n)});
+  }
+  const alone=nightAloneWeight();
+  entries.push({kind:'alone',w:alone});
+  const total=entries.reduce((a,x)=>a+x.w,0);
+  let r=Math.random()*total;
+  for(const x of entries){r-=x.w;if(r<=0)return x}
+  return entries[entries.length-1];
+}
+function chamberRecord(rec){
+  const b=state.bedchamber=state.bedchamber||{log:[],last:null,seq:0};
+  b.seq=(Number(b.seq)||0)+1;rec.seq=b.seq;
+  b.last=rec;b.log=Array.isArray(b.log)?b.log:[];
+  b.log.push(rec);if(b.log.length>30)b.log=b.log.slice(-30);
+  return rec;
+}
+function nightRecordText(rec){
+  if(!rec)return '尚无记档';
+  if(rec.kind==='me')return '帝召你侍寝';
+  if(rec.kind==='npc')return `帝召${rec.who}侍寝`;
+  if(rec.kind==='none')return '帝未召人';
+  return '帝未召人';
+}
+function nightGossip(id,n){
+  const rank=String(n&&n.rank||'');
+  const pool=/皇后/.test(rank)?[
+    '今早各宫请安，中宫比平日早开了一刻钟的门。',
+    '皇后宫里赏了当值的宫人，说是昨夜伺候得好。'
+  ]:/贵妃|妃|贵嫔|嫔/.test(rank)?[
+    '今早她宫里换了新供的花，宫人走路都带风。',
+    '听说她昨夜留帝用了早膳，别宫去请安的人都多等了一会儿。'
+  ]:[
+    '今早她门前的宫人多提了两盏灯，像是怕人看不见。',
+    '她宫里传出话，说昨夜帝夸了她一句针线。'
+  ];
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+function conceptionChance(){
+  const p=state.protagonist||{},at=p.attributes||{};
+  let c=0.10+(Number(at['孕率'])||50)*0.0035;
+  if(nightCharmActive())c+=0.14;
+  if((Number(p.age)||18)<=20)c+=0.04;
+  const ti=Number(at['体质'])||50;
+  if(ti<50)c-=0.08;if(ti<35)c-=0.07;
+  if(chamberFavor()>=70)c+=0.03;
+  return Math.max(0.02,Math.min(0.75,c));
+}
+function startPregnancy(){
+  const doctor=((state.world&&state.world.keyServants)||[]).find(x=>/太医|林守拙|院判/.test(String(x)))||'太医';
+  state.pregnancy={startTurn:state.turn,dueTurn:(state.turn||0)+19,month:1,health:'平稳',doctor};
+  state.postpartumUntil=0;
+}
+function losePregnancy(report){
+  const p=state.pregnancy;if(!p)return;
+  const at=state.protagonist.attributes||(state.protagonist.attributes={});
+  at['体质']=clamp01_100((Number(at['体质'])||50)-3);
+  const month=Math.min(10,Number(p.month)||1);
+  state.pregnancy=null;
+  state.postpartumUntil=(state.turn||0)+3;
+  const text=`${fmtTime()}，孕${month}月小产，太医令静养。`;
+  state.chronicle=Array.isArray(state.chronicle)?state.chronicle:[];
+  state.chronicle.push({time:fmtTime(),text});
+  (state.pending=state.pending||[]).push({t:'小月调养，查清缘由',touch:state.turn});
+  report.loss={month,text};
+}
+function advancePregnancy(report){
+  const p=state.pregnancy;if(!p)return;
+  const turn=Number(state.turn)||0;
+  const month=Math.min(10,Math.floor((turn-(Number(p.startTurn)||turn))/2)+1);
+  p.month=month;
+  if(turn>=Number(p.dueTurn)){birthChild(report);return}
+  const ti=Number((state.protagonist.attributes||{})['体质'])||50;
+  let risk=0;
+  if(ti<30)risk=0.18;else if(ti<40)risk=0.06;else if(ti<50)risk=0.02;
+  if(Math.random()<risk){losePregnancy(report);return}
+  p.health=ti<45?'偏弱':month>=7?'沉重':'平稳';
+  report.pregnancy={month,health:p.health};
+}
+function heirSurname(){
+  const w=state.world||{};
+  return String(w.surname||((w.emperor&&w.emperor.name)||'').slice(0,1)||'李');
+}
+function newHeirName(){
+  const used=new Set([...Object.keys(state.npcs||{}),...(state.heirs||[]).map(h=>h&&h.name)]);
+  const pool=(typeof WORLD_LIB!=='undefined'&&Array.isArray(WORLD_LIB.heirGiven))?WORLD_LIB.heirGiven:['承瑾','昭宁'];
+  const sur=heirSurname();
+  for(let i=0;i<60;i++){const n=sur+pool[Math.floor(Math.random()*pool.length)];if(!used.has(n))return n}
+  return sur+'承'+(10+Math.floor(Math.random()*90));
+}
+function heirAgeOf(h,turn){
+  const bt=Number(h&&h.birthTurn);
+  if(Number.isFinite(bt))return Math.max(0,Math.floor(((turn??state.turn)-bt)/24));
+  return Math.max(0,Number(h&&h.age)||0);
+}
+function refreshHeirAges(s){
+  s=s||state;if(!s||!Array.isArray(s.heirs))return;
+  for(const h of s.heirs)if(h)h.age=heirAgeOf(h,s.turn);
+}
+function heirSummary(s){
+  s=s||state;const list=Array.isArray(s.heirs)?s.heirs:[];
+  return list.length?list.map(h=>`${h.gender}${h.name}（${h.age}岁，生母${h.mother}）`).join('；'):'暂无皇嗣';
+}
+function birthChild(report){
+  const p=state.protagonist||{};
+  const gender=Math.random()<0.5?'皇子':'皇女';
+  const name=newHeirName();
+  const pool=(typeof WORLD_LIB!=='undefined'&&Array.isArray(WORLD_LIB.heirTraits))?WORLD_LIB.heirTraits:['懂事'];
+  const trait=pool[Math.floor(Math.random()*pool.length)];
+  const ti=Number((p.attributes||{})['体质'])||50;
+  const weak=ti<35;
+  const heir={id:'h-'+(state.turn||0)+'-'+Math.floor(Math.random()*900+100),name,gender,age:0,birthTurn:state.turn,
+    mother:p.name,raisedBy:p.name,traits:[trait],health:weak?'偏弱':'康健',
+    学识:Math.floor(Math.random()*8),礼仪:Math.floor(Math.random()*8),
+    体魄:weak?Math.floor(Math.random()*6):10+Math.floor(Math.random()*8),依赖:70+Math.floor(Math.random()*21)};
+  state.heirs=Array.isArray(state.heirs)?state.heirs:[];
+  state.heirs.push(heir);
+  state.world=state.world||{};
+  refreshHeirAges(state);
+  state.world.heirs=heirSummary(state);
+  const cat=gender==='皇子'?'prince':'princess';
+  const npc={known:true,metAt:fmtTime(),name,rank:'皇嗣',faction:'',realName:'',age:0,
+    profile:{traits:[trait],biography:[{time:fmtTime(),text:`${fmtTime()}生于${(state.world&&state.world.residence)||state.location||'宫中'}，生母${p.name}`,src:'亲见'}],impressions:{},recent:[],depth:'初识'},
+    hidden:{生母:p.name,性情:[trait],对主控:'依赖'},avatarCat:cat};
+  npc.avatar=giveAvatar(state,name,'皇嗣',[trait],0,cat);
+  state.npcs[name]=npc;
+  state.relationships[name]={type:'亲子',value:85};
+  if(p.attributes)p.attributes['体质']=clamp01_100((Number(p.attributes['体质'])||50)-(weak?5:2));
+  const rel=state.relationships[chamberFavorKey()];
+  if(rel&&typeof rel==='object')rel.value=Math.min(100,(Number(rel.value)||0)+2+Math.floor(Math.random()*3));
+  state.emperor=state.emperor||{};
+  state.emperor.memories=Array.isArray(state.emperor.memories)?state.emperor.memories:[];
+  state.emperor.memories.push({xun:fmtTime(),text:`${p.name}诞下${gender}${name}`,type:'共历',open:false});
+  trimEmperorMemories(state.emperor);
+  state.pregnancy=null;
+  state.postpartumUntil=(state.turn||0)+3;
+  state.chronicle=Array.isArray(state.chronicle)?state.chronicle:[];
+  state.chronicle.push({time:fmtTime(),text:`诞下${gender}${name}，生母${p.name}。`});
+  (state.pending=state.pending||[]).push({t:`皇嗣${name}洗三与满月礼`,touch:state.turn});
+  report.birth={name,gender,health:heir.health,weak,trait};
+}
+function resolveNight(prevTurn){
+  const report={turn:state.turn,time:fmtTime(),kind:'alone',who:'',rank:'',intent:'wait'};
+  state.bedchamber=state.bedchamber&&typeof state.bedchamber==='object'?state.bedchamber:{log:[],last:null,seq:0};
+  if(!Array.isArray(state.bedchamber.log))state.bedchamber.log=[];
+  revivePregnancy(); // 旧档/读档后孕月对齐
+  if(state.pregnancy)advancePregnancy(report);
+  refreshHeirAges(state);
+  const intent=(state.xunIntent&&state.xunIntent.turn===prevTurn)?state.xunIntent:{mode:'wait'};
+  report.intent=intent.mode;
+  const e=state.emperor||(state.emperor={});
+  if(e.absence&&e.absence.reason){
+    report.kind='none';report.reason=String(e.absence.reason).slice(0,60);
+    chamberRecord({turn:state.turn,time:fmtTime(),kind:'none',who:'',note:'帝未召人：'+report.reason,intent:intent.mode,paid:!!intent.paid});
+    state.xunIntent=null;
+    return report;
+  }
+  const pick=pickNightPartner(intent);
+  if(pick.kind==='me'){
+    report.kind='me';
+    const rel=state.relationships[chamberFavorKey()];
+    if(rel&&typeof rel==='object'){
+      const add=1+(Math.random()<0.35?1:0);
+      rel.value=Math.min(100,(Number(rel.value)||0)+add);
+      report.favor=add;
+    }
+    e.lastContact=xunSerial(state.time);
+    e.absence=null;
+    e.memories=Array.isArray(e.memories)?e.memories:[];
+    e.memories.push({xun:fmtTime(),text:intent.mode==='strive'?'承宠：你递了牌子，帝召了你':'承宠：帝召你侍寝',type:'共历',open:false});
+    trimEmperorMemories(e);
+    report.where=Math.random()<0.5?'养心殿':((state.world&&state.world.residence)||state.location||'你的住处');
+    chamberRecord({turn:state.turn,time:fmtTime(),kind:'me',who:state.protagonist.name,note:'帝召主控侍寝',favor:report.favor||0,intent:intent.mode,paid:!!intent.paid});
+    if(!state.pregnancy&&Math.random()<conceptionChance()){startPregnancy();report.conceived=true}
+  }else if(pick.kind==='npc'){
+    const id=pick.id,n=state.npcs[id]||{};
+    report.kind='npc';report.who=n.name||id;report.rank=n.rank||'';
+    unlockNpc(id,'听说');
+    const rel=state.relationships[id];
+    if(rel&&typeof rel==='object'&&typeof rel.value==='number')rel.value=Math.min(100,rel.value+1);
+    report.gossip=nightGossip(id,n);
+    chamberRecord({turn:state.turn,time:fmtTime(),kind:'npc',who:id,rank:n.rank||'',note:`帝召${id}侍寝`,intent:intent.mode,paid:!!intent.paid});
+  }else{
+    report.kind='alone';
+    chamberRecord({turn:state.turn,time:fmtTime(),kind:'alone',who:'',note:'帝未召人',intent:intent.mode,paid:!!intent.paid});
+  }
+  if(intent.mode==='avoid'&&report.kind!=='me'){
+    const rel=state.relationships[chamberFavorKey()];
+    if(rel&&typeof rel==='object'&&(Number(rel.value)||0)>=40){
+      rel.value=Math.max(0,(Number(rel.value)||0)-1);report.avoided=true;
+    }
+  }
+  state.xunIntent=null;
+  return report;
+}
+function revivePregnancy(s){ // 读档/旧档：补孕月与产期；字段残缺则按月份推算
+  const st=s||state;
+  const p=st.pregnancy;
+  if(!p||typeof p!=='object'){st.pregnancy=null;return}
+  p.startTurn=Number.isFinite(Number(p.startTurn))?Number(p.startTurn):(st.turn||0);
+  p.dueTurn=Number.isFinite(Number(p.dueTurn))?Number(p.dueTurn):p.startTurn+19;
+  const m=Math.min(10,Math.max(1,Math.floor(((st.turn||0)-p.startTurn)/2)+1));
+  p.month=Math.max(m,Math.min(10,Number(p.month)||1));
+  p.health=String(p.health||'平稳');
+}
+function migrateChamber(s){ // 旧档接入：建承宠账/皇嗣册，旧档 world.heirs 文本尽量解析成档案
+  if(!s.bedchamber||typeof s.bedchamber!=='object'||!Array.isArray(s.bedchamber.log)){
+    s.bedchamber={log:[],last:null,seq:0};
+  }
+  if(!Array.isArray(s.heirs)){
+    s.heirs=[];
+    const txt=String((s.world&&s.world.heirs)||'');
+    if(txt&&!/暂无皇嗣|无皇嗣/.test(txt)){
+      const re=/皇(子|女)([^（(]+)[（(](\d+)岁，生母([^）)]+)[）)]/g;let m;
+      while((m=re.exec(txt))!==null){
+        const h={id:'h-old-'+s.heirs.length,name:String(m[2]||'').trim(),gender:'皇'+m[1],age:+m[3],
+          birthTurn:(Number(s.turn)||0)-(+m[3])*24,mother:String(m[4]||'').trim(),raisedBy:String(m[4]||'').trim(),
+          traits:[],health:'康健',学识:40,礼仪:40,体魄:40,依赖:50,legacy:true};
+        s.heirs.push(h);
+        if(h.name&&s.npcs&&!s.npcs[h.name]){ // 旧档皇嗣补人物档：人物谱与对话里认得出人
+          s.npcs[h.name]={known:true,metAt:fmtTime(s.time),name:h.name,rank:'皇嗣',faction:'',realName:h.name,age:h.age,
+            profile:{traits:[],biography:[{time:fmtTime(s.time),text:`生母${h.mother}`,src:'听说'}],impressions:{},recent:[],depth:'初识'},
+            hidden:{生母:h.mother,对主控:'尚不熟悉'}};
+        }
+      }
+    }
+  }
+  if(s.pregnancy&&typeof s.pregnancy!=='object')s.pregnancy=null;
+  if(typeof s.postpartumUntil!=='number')s.postpartumUntil=0;
+  if(!s.xunIntent||typeof s.xunIntent!=='object'||s.xunIntent.turn!==s.turn)s.xunIntent=null; // 跨旬旧打算作废
+  s.chamberV1=true;
+}
+function dawnReportHtml(r){
+  const rows=[];
+  let head='';
+  if(r.kind==='me'){
+    head=`昨夜，敬事房的记档上添了你的名字。帝召你侍寝${r.where?`，在${r.where}`:''}。`;
+    rows.push('晨起你回到住处，宫人看你的眼神比往日多了几分小心。');
+    if(r.favor)rows.push(`恩宠 +${r.favor}。`);
+    if(r.conceived)rows.push('敬事房照例记了档；至于有没有喜信，还要过些日子才知。');
+  }else if(r.kind==='npc'){
+    head=`昨夜，帝翻了「${r.who}」的牌子。`;
+    if(r.intent==='strive')rows.push('你的牌子也递上去了，到底落到了旁人手里。');
+    if(r.intent==='avoid')rows.push('你称病避了牌子；帝便召了旁人。');
+    if(r.gossip)rows.push('今早六宫都在传：'+r.gossip);
+  }else if(r.kind==='none'){
+    head=`帝近来${r.reason}，昨夜未召任何人。`;
+    if(r.intent==='strive')rows.push('你的牌子递上去了，帝未召人。');
+    if(r.intent==='avoid')rows.push('你称病避了牌子。');
+  }else{
+    head='昨夜，帝宿在御书房，未召任何人。';
+    if(r.intent==='strive')rows.push('你的牌子递上去了，帝没有翻。');
+    if(r.intent==='avoid')rows.push('你称病避了牌子，帝也未召旁人。');
+  }
+  if(r.pregnancy)rows.push(`太医请脉：已孕${r.pregnancy.month}月，胎象${r.pregnancy.health}。`);
+  if(r.loss)rows.push(`<b style="color:var(--cinnabar)">小月</b>　${esc(r.loss.text)}`);
+  if(r.birth)rows.push(`<b style="color:var(--cinnabar)">生产</b>　你诞下${r.birth.gender}「${esc(r.birth.name)}」，${esc(r.birth.health)}${r.birth.weak?'，太医嘱咐仔细将养':''}。`);
+  if(r.kind==='me'&&!r.pregnancy&&!r.birth&&!r.conceived)rows.push('敬事房问要不要留档；你让人记下了。');
+  const recent=(state.bedchamber&&state.bedchamber.log||[]).slice(-5,-1).reverse();
+  const recentHtml=recent.length?`<div class="sheet-note" style="margin-top:12px">承宠录 · 近旬</div>`+recent.map(x=>`<div class="itemrow"><span>第${xunNoOf(x.turn)}旬</span><span class="cnt">${esc(nightRecordText(x))}</span></div>`).join(''):'';
+  return `<div style="font-size:14px;line-height:1.9;color:var(--ink)">${esc(head)}</div>`
+    +(rows.length?`<div style="font-size:13px;line-height:1.85;color:var(--ink-soft);margin-top:8px">${rows.map(x=>`<div>${x}</div>`).join('')}</div>`:'')
+    +recentHtml
+    +`<div class="sheet-note" style="margin-top:12px">晨报只记敬事房的明面记档与宫人议论；帝私下说了什么，不入此报。想争一争，可在【吩咐】里递牌子；想避，也可称病。</div>`;
+}
+
 /* 帝设：玩家亲撰的皇帝人设（开局捏主控时自定义，商城「移性符」可改一次）。覆盖世界书与随机性情中对帝的默认描写。 */
 const EMPEROR_PERSONA_MODULE = [
 '## 十二·补、帝设（world.emperor.persona；本条覆盖世界书、world.emperor.traits 与人物档中对帝的随机性情描写）',
@@ -1845,7 +2212,7 @@ function presenceNote(p){ // 面板「属性」里的一行说明
 /* ============================================================ 工具 */
 const $=s=>document.querySelector(s);
 const MONTHS=['','正月','二月','三月','四月','五月','六月','七月','八月','九月','十月','冬月','腊月'];
-const BUILD='2026-11-11·言行仪态'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
+const BUILD='2026-11-12·承宠晨报'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
 /* 月俸：按位份每月下旬末由前端自动入账（单位：两） */
 const SALARY_BY_GRADE={'正一品':220,'从一品':150,'正二品':110,'从二品':80,'正三品':60,'从三品':45,'正四品':36,'从四品':28,'正五品':20,'从五品':15,'正六品':12,'从六品':10,'正七品':8,'从七品':6,'正八品':5,'从八品':4,'正九品':3,'从九品':2};
 const SALARY_TITLES=[[/皇后/,220],[/皇贵妃/,150],[/贵妃/,110],[/贤妃|良妃|淑妃|德妃/,80],[/昭仪|昭容|昭媛|修仪|修容|修媛|充仪|充容|充媛/,45],[/贵嫔/,36],[/嫔/,28],[/贵人/,20],[/才人/,15],[/美人/,12],[/宝林/,10],[/常在/,8],[/答应/,6],[/选侍/,5],[/更衣/,4],[/采女/,3],[/官女子/,2],[/妃/,60]];
@@ -2734,6 +3101,8 @@ function normalizeState(s){
   for(const it of s.inventory)itemFlags(it); // 补齐缺失词条
   ensureCraftState(s); // 手作：补 craft 状态；旧档首次接入补一份入门材料
   migrateEmperor(s); // 恩宠账：旧档补知心/上次接触/共同经历（内部一次性守卫）
+  migrateChamber(s); // 承宠账/孕事/皇嗣册：旧档补字段并从 world.heirs 文本尽量建档
+  revivePregnancy(s); refreshHeirAges(s);
   if(!Array.isArray(s.plots))s.plots=[];
   if(!s.readMindV1){const sys=s.system=s.system||{};const shop=sys.shop=Array.isArray(sys.shop)?sys.shop:[];if(!shop.some(it=>it&&it.name==='读心笺'))shop.push({name:'读心笺',cost:15});s.readMindV1=true} // 旧档商城补读心笺
   refreshShop(s); // 商城货色按旬轮换：旧档读入即对齐到当前轮次
@@ -2934,7 +3303,7 @@ function compactState(s,focusMsg){ // 只压缩送入模型的那一份，localS
   const out=Object.assign({},s);
   out.turn=xunNoOf(s.turn); // 对外统一 1 起旬号，与指令里的「第N旬」一致
   // 前端内部标记与展示字段不送模型
-  for(const k of ['avatarMap','plotMeta','xunBook','saveVersion','plotLedgerV1','pawnFix1','itemFlagV1','readMindV1','energyWarned','mealCount','lastSalaryMonth','lastFestSerial','items','craftV1'])delete out[k];
+  for(const k of ['avatarMap','plotMeta','xunBook','saveVersion','plotLedgerV1','pawnFix1','itemFlagV1','readMindV1','energyWarned','mealCount','lastSalaryMonth','lastFestSerial','items','craftV1','chamberV1','xunIntent','postpartumUntil'])delete out[k];
   if(out.protagonist&&typeof out.protagonist==='object'){
     out.protagonist=Object.assign({},s.protagonist);
     delete out.protagonist.avatar; // 头像由前端按身份分配
@@ -2980,6 +3349,14 @@ function compactState(s,focusMsg){ // 只压缩送入模型的那一份，localS
     e.hisState=String(e.hisState||'').slice(0,90);
     out.emperor=e;
   }
+  // 承宠与子嗣：只带最近六夜与孕事/皇嗣简档，晨报细节留在前端
+  if(s.bedchamber&&typeof s.bedchamber==='object'){
+    const b=s.bedchamber;
+    out.bedchamber={last:b.last||null,log:Array.isArray(b.log)?b.log.slice(-6).map(x=>({turn:x.turn,time:x.time,kind:x.kind,who:x.who,rank:x.rank||'',note:String(x.note||'').slice(0,40),favor:x.favor||0,intent:x.intent||'',paid:!!x.paid})):[]};
+  }
+  out.pregnancy=s.pregnancy?{month:Number(s.pregnancy.month)||1,health:String(s.pregnancy.health||'平稳'),doctor:String(s.pregnancy.doctor||'').slice(0,20)}:null;
+  if(Array.isArray(s.heirs))out.heirs=s.heirs.map(h=>({name:h.name,gender:h.gender,age:h.age,mother:h.mother,health:h.health,
+    traits:Array.isArray(h.traits)?h.traits.slice(0,3):[],学识:h['学识'],礼仪:h['礼仪'],体魄:h['体魄'],依赖:h['依赖']}));
   // 待续与大事记：只留近期，文本截断
   if(Array.isArray(s.pending))out.pending=s.pending.map(x=>typeof x==='string'?x.slice(0,90):(x&&typeof x==='object'?Object.assign({},x,{t:String(x.t||'').slice(0,90)}):x));
   if(Array.isArray(s.chronicle))out.chronicle=s.chronicle.slice(-3).map(e=>({time:e.time,text:String(e.text||'').slice(0,100)}));
@@ -3043,7 +3420,7 @@ function buildStaticSystem(){
       .replace('{{世界书全文：02-世界书.md}}',WORLD_BOOK_RUNTIME)
       .replace('{{叙事文风全文：03-叙事文风.md}}',STYLE_GUIDE)
       .replace('{{当前存档 JSON：04-当前存档-v36.json 或玩家当前档}}','（见本提示词末尾「当前存档」段，动态存档在最后）')
-      +'\n\n'+NPC_MODULE+'\n\n'+ENERGY_MODULE+'\n\n'+PLOTS_MODULE+'\n\n'+FESTIVAL_MODULE+'\n\n'+EMPEROR_MODULE+'\n\n'+EMPEROR_PERSONA_MODULE+'\n\n'+SCENE_MODULE+'\n\n'+SKILL_MODULE+'\n\n'+CRAFT_MODULE+'\n\n'+PERSONA_MODULE+'\n\n'+LENGTH_MODULE+'\n\n'+PRESENCE_MODULE;
+      +'\n\n'+NPC_MODULE+'\n\n'+ENERGY_MODULE+'\n\n'+PLOTS_MODULE+'\n\n'+FESTIVAL_MODULE+'\n\n'+EMPEROR_MODULE+'\n\n'+EMPEROR_PERSONA_MODULE+'\n\n'+CHAMBER_MODULE+'\n\n'+SCENE_MODULE+'\n\n'+SKILL_MODULE+'\n\n'+CRAFT_MODULE+'\n\n'+PERSONA_MODULE+'\n\n'+LENGTH_MODULE+'\n\n'+PRESENCE_MODULE;
   }
   return _staticSystem;
 }
@@ -3357,6 +3734,7 @@ function applyPatch(patch){
     }
     if(k==='inventory')continue; // 行囊只走 inventory.add，整表覆盖会把已合并的件数冲掉
     if(k==='statePatch')continue;
+    if(/^(pregnancy|heirs|bedchamber)(\.|$)|^protagonist\.pregnancy(\.|$)/.test(k)||k==='world.heirs')continue; // 孕事/皇嗣/承宠账由前端结算：模型不得直接改写
     if(/(^|\.)(__proto__|constructor|prototype)(\.|$)/.test(k))continue;
     let v=patch[k];
     if(v===undefined||v===null)continue; // 空值不参与结算，避免整块字段被 null 冲掉
@@ -3679,9 +4057,44 @@ const UI={
     const maidRows=maids.map(m=>`<button class="npcrow" onclick="Game.maidTalk('${esc(m)}')"><span class="nr-name">${esc(m)}</span><span class="nr-depth">配属宫女</span></button>`).join('');
     const fest=festivalOf(state.time);
     const festNote=fest?`<div class="sheet-note" style="margin:0 0 8px">本旬节宴：<b>${esc(fest.name)}</b>（${esc(fest.scale)}）——座次、仪注与席上机缘见「局面」。</div>`:'';
-    return `<div class="focus-cap">— 吩咐 · 精力 ${state.energy}／${ENERGY_MAX} —</div>`+festNote+
+    return `<div class="focus-cap">— 吩咐 · 精力 ${state.energy}／${ENERGY_MAX} —</div>`+festNote+this.nightIntentHtml()+
       (pend?`<div class="sheet-note" style="margin:0 0 8px">临期引线：${esc(pend)}</div>`:'')+
       (maidRows?`<div class="sec"><div class="sec-cap">召宫人问话</div>${maidRows}<div class="sheet-note" style="margin-top:6px">进对话、开口问话都不耗精力：交代差事、打听消息、问办差进度皆可，吩咐下去的事日后兑现。</div></div>`:'<div class="sheet-note">暂无配属宫人。</div>');
+  },
+  nightIntentHtml(){ // 承宠：本旬争/候/避；结果在旬末结算，次旬晨报呈现
+    const turn=state.turn||0;
+    const cur=state.xunIntent&&state.xunIntent.turn===turn?state.xunIntent:null;
+    const mode=cur?cur.mode:null;
+    const preg=!!state.pregnancy;
+    const pp=(Number(state.postpartumUntil)||0)>turn;
+    const lowE=(Number(state.energy)||0)<10;
+    const canStrive=!preg&&!pp&&!lowE;
+    const opt=(m,label,desc,dis)=>`<button class="nightopt${mode===m?' on':''}" ${dis?'disabled':''} onclick="Game.setNightIntent('${m}')"><span class="no-main">${esc(label)}</span><span class="no-sub">${esc(desc)}</span></button>`;
+    let status='尚未打算；不选则按静候。';
+    if(mode==='strive')status=`已递牌子${cur&&cur.paid?'，敬事房已打点':'，银两不足未打点'}。`;
+    else if(mode==='avoid')status='已称病避宠。';
+    else if(mode==='wait')status='本旬静候。';
+    const hint=preg?'有孕在身，太医嘱咐静养，本旬不宜承宠。':pp?'产后调养中，暂不宜承宠。':lowE&&!preg?'精力不足十点，本旬无法打点争取。':'';
+    return `<div class="sec"><div class="sec-cap">承宠 · 本旬打算</div>
+      <div class="sheet-note" style="margin:0 0 6px">${esc(status)}${hint?'　'+esc(hint):''}</div>
+      ${opt('strive','争取','耗精力10 · 打点10两（银两不足则只递牌子）',!canStrive)}
+      ${opt('wait','静候','不耗精力 · 听凭敬事房安排',preg||pp)}
+      ${opt('avoid','避宠','不耗精力 · 免去争宠风险，但恩宠会缓跌',preg||pp)}
+      <div class="sheet-note" style="margin-top:6px">结果在歇下一旬时结算，次旬晨报呈现。帝召幸他人属公开记档，会记入承宠录。</div>
+    </div>`;
+  },
+  nightLedgerHtml(){ // 状态页：昨夜记档、孕事、皇嗣、近旬承宠录
+    const b=state.bedchamber||{log:[]};
+    const last=b.last?nightRecordText(b.last):'尚无记档';
+    const preg=state.pregnancy?(()=>{const p=state.pregnancy,m=Math.max(1,Math.min(10,Number(p.month)||1)),left=Math.max(0,(Number(p.dueTurn)||state.turn)-state.turn);return `<div class="meter m-cinnabar"><span class="meter-nm">孕期</span><span class="meter-track"><span class="meter-fill" style="width:${m*10}%"></span></span><span class="meter-v num">${m}/10</span></div><div class="itemrow"><span>胎象</span><span class="cnt">${esc(p.health||'平稳')}${p.doctor?` · ${esc(p.doctor)}请脉`:''} · 约${left}旬后临盆</span></div>`})():'';
+    const heirs=(state.heirs||[]).map(h=>`<div class="itemrow"><span>${esc(h.gender)}${esc(h.name)}</span><span class="cnt">${h.age}岁 · 生母${esc(h.mother||'—')}${h.health==='偏弱'?' · 体弱':''}</span></div>`).join('');
+    const recent=(b.log||[]).slice(-4).reverse().map(x=>`<div class="itemrow"><span>第${xunNoOf(x.turn)}旬</span><span class="cnt">${esc(nightRecordText(x))}</span></div>`).join('');
+    return `<div class="sec"><div class="sec-cap">承宠与子嗣</div>
+      <div class="itemrow"><span>昨夜</span><span class="cnt">${esc(last)}</span></div>
+      ${preg}
+      ${heirs||'<div class="sheet-note">尚无皇嗣。</div>'}
+      ${recent?`<div class="sheet-note" style="margin-top:10px">承宠录</div>${recent}`:''}
+    </div>`;
   },
   sheetState(){ // 局面：当前处境 + 剧情到期 + 剧情账 + 待续（原"本旬纪事"的信息归此）
     const adj=(state.plots&&state.plots.length)?adjudicatePlots():{due:[],overdue:[],stale:[],pendStale:[]};
@@ -3918,6 +4331,11 @@ const UI={
     $('#restModal').classList.add('on');
   },
   hideRestTip(){$('#restModal').classList.remove('on')},
+  dawnReport(r){
+    $('#dawnTitle').textContent='晨报 · 昨夜';
+    $('#dawnBody').innerHTML=dawnReportHtml(r);
+    $('#dawnModal').classList.add('on');
+  },
   actResult(title,flavor,deltas){
     const list=Array.isArray(deltas)?deltas.filter(Boolean):[];
     $('#actTitle').textContent=title;
@@ -3986,6 +4404,7 @@ const UI={
         <div class="itemrow"><span>月俸</span><span class="cnt num">每月 ${esc(salary)} 两</span></div>
         <div class="sheet-note">按位份发放，每月下旬末自动入账；位份升降后随新月俸结算。</div></div>
       <div class="sec"><div class="sec-cap">才艺</div>${skills||'<div class="sheet-note">—</div>'}${talent}</div>
+      ${this.nightLedgerHtml()}
       <div class="sec"><div class="sec-cap">剧情账</div>${plotRows}</div>
       <div class="sec"><div class="sec-cap">待续事项</div>${pend}</div>`;
   },
@@ -5207,6 +5626,10 @@ function buildOpeningWorld(proto){
     game:'带着系统去宫斗', saveVersion:'web-2', turn:0,
     time, location, lastNode:`选秀入宫，居${location}`,
     energy:100, energyWarned:false, mealCount:0,
+    bedchamber:{log:[],last:null,seq:0}, pregnancy:null, postpartumUntil:0, xunIntent:null,
+    heirs:heirs.map((h,i)=>({id:'h-init-'+i,name:h.name,gender:h.gender,age:h.age,birthTurn:-h.age*24,
+      mother:h.mother,raisedBy:h.mother,traits:[h.traits],health:'康健',
+      学识:h['学识'],礼仪:h['礼仪'],体魄:h['体魄'],依赖:h['依赖']})),
     world:{
       dynasty:d.name, surname:d.surname, era, year:eraYear, years:d.years, flavor:d.flavor,
       emperor, dowager: dowager?{title:dowager.title, family:dowager.family, personality:dowager.personality, health:dowager.health, stance:dowager.stance}:null,
@@ -5546,6 +5969,7 @@ const Game={
         Game._tutorialSteps=built.tutorial;
         UI.hideBusy();
         UI.updateStatusbar();
+        UI.goHome(); // 新档先排一次热区：否则开局面板收起后房间没有可点的地方
         UI.renderTurnCard({narrative:built.text,haremNews:built.news,changes:built.changes,todo:built.todo,hasEvent:true},{focus:'入宫'});
         persistCurrent();
         saveToSlot(0,true); // 新档立即入自动档
@@ -5599,7 +6023,7 @@ const Game={
   /* 进入主界面 */
   enterMain(){
     UI.hideBusy();
-    ['errModal','incidentModal','restModal','actModal','tutorialModal','collapseModal'].forEach(id=>{
+    ['errModal','incidentModal','restModal','actModal','tutorialModal','collapseModal','dawnModal'].forEach(id=>{
       const el=document.getElementById(id);if(el)el.classList.remove('on');
     });
     $('#chatview').classList.remove('on');
@@ -5631,6 +6055,44 @@ const Game={
     return true;
   },
   openFocus(){if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}UI.openSheet('吩咐')}, // 吩咐：自拟本旬要做的事
+  setNightIntent(mode){ // 承宠打算：争取（耗精力10、打点10两）/ 静候 / 避宠；结果在歇下一旬时结算
+    if(!state||phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
+    if(state.pregnancy){toast('有孕在身，太医嘱咐静养，不宜承宠');return}
+    if((Number(state.postpartumUntil)||0)>(state.turn||0)){toast('产后调养未满，暂不宜承宠');return}
+    const turn=state.turn||0;
+    const cur=state.xunIntent&&state.xunIntent.turn===turn?state.xunIntent:null;
+    if(cur&&cur.mode==='strive'&&mode!=='strive'&&!confirm('已递了牌子、花了打点，改口也不退；仍要改吗？'))return;
+    if(mode==='strive'){
+      if(cur&&cur.mode==='strive'){toast('本旬已经递过牌子了');return}
+      if((state.energy??0)<10){toast('精力不足：递牌子打点要耗 10 精力');return}
+      const p=state.protagonist,silver=Number(p.silver)||0,pay=silver>=10;
+      state.energy=Math.max(0,Math.round((state.energy??0)-10));
+      if(pay)p.silver=silver-10;
+      state.xunIntent={turn,mode:'strive',paid:pay};
+      logXunAction('承宠·争取');
+      persistCurrent();markSafe();UI.updateStatusbar();UI.renderSheet('吩咐');
+      toast(pay?'牌子递上去了，敬事房也打点过了':'银两不足，只递了牌子；敬事房那边未必肯上心',3000);
+      if(state.energy<=0){UI.closeSheet();this.collapse();return}
+      checkRestWarn();
+    }else if(mode==='avoid'){
+      state.xunIntent={turn,mode:'avoid',paid:false};
+      logXunAction('承宠·避宠');
+      persistCurrent();markSafe();UI.renderSheet('吩咐');
+      toast('你称病避了牌子：这一旬图个安稳，恩宠会缓跌');
+    }else{
+      state.xunIntent={turn,mode:'wait',paid:false};
+      persistCurrent();markSafe();UI.renderSheet('吩咐');
+      toast('本旬静候敬事房安排');
+    }
+  },
+  closeDawn(){
+    $('#dawnModal').classList.remove('on');
+    if(Game._dawnPending){
+      Game._dawnPending=false;
+      this._xunStartPop();
+    }
+    UI.updateStatusbar();
+  },
   hsGoOut(){if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}$('#mapClock').textContent=fmtTime();$('#mapview').classList.add('on')}, // 出门＝宫城图选目的地
   mapBack(){$('#mapview').classList.remove('on')},
   _gardenMeetPick(){ // 御花园偶遇人选：帝单独按恩宠掷骰，不与known人物挤同一个池子（池子越大越撞不见帝）；其余为太后与已认识的宫中人物
@@ -5725,6 +6187,7 @@ const Game={
   },
   nextTurn(){ // 休息，进入下一旬：旬数+1，精力回满，日历按两旬制推进
     const prevTime=Object.assign({},state.time);
+    const prevTurn=state.turn||0;
     state.turn=(state.turn||0)+1;state.energy=ENERGY_MAX;state.energyWarned=false;state.mealCount=0;state.walkCount=0;state.time=advanceTime(state.time);
     {const L=state.library;if(L&&L.borrowed){const b=libBook(L.borrowed);L.borrowed=null;toast(`借期已满，${b?b.name:'书册'}已归还藏书阁`,2800)}}
     const salary=this._payMonthlySalary(prevTime); // 下旬→次月上旬：结算刚过完这个月的月俸
@@ -5734,6 +6197,7 @@ const Game={
       const cur=Number(at&&at['体质'])||0;
       if(at&&base>0&&cur>base)at['体质']=cur-1;
     }
+    const dawn=resolveNight(prevTurn); // 昨夜敬事房记档：侍寝、孕事推进、生产（前端自结）
     resetXunBook(); // 新的一旬从零开始记账
     if(salary&&state.xunBook)state.xunBook.salary=salary;
     refreshShop(state); // 商城三旬一换：跨入新一轮货色即重挑
@@ -5743,7 +6207,8 @@ const Game={
     UI.goHome();
     markSafe(); // 新旬落定：此后卡死只退回本旬开头
     xunMainQuestCheck(); // 旬首主线判定：主线了结通报＋逾期提醒
-    this._xunStartPop(); // 旬首检查：已发酵事项直接弹出强制处理；主线断档亦在此直接弹新主线，不待命
+    if(dawn){Game._dawnPending=true;UI.dawnReport(dawn)} // 先看晨报；关闭后再走旬首强制处置
+    else this._xunStartPop(); // 旬首检查：已发酵事项直接弹出强制处理；主线断档亦在此直接弹新主线，不待命
   },
   _payMonthlySalary(prevTime){ // 月俸前端自结：每月下旬末按位份入账，同一月只发一次
     if(!state||!state.protagonist||!prevTime||prevTime.xun!=='下旬')return null;
@@ -6326,7 +6791,7 @@ const Game={
     const before=cloneGameData(state);
     cancelInFlight(); // 晚到的模型回复一律作废
     UI.hideBusy();
-    ['errModal','incidentModal','restModal','actModal','tutorialModal','collapseModal'].forEach(id=>{
+    ['errModal','incidentModal','restModal','actModal','tutorialModal','collapseModal','dawnModal'].forEach(id=>{
       const el=document.getElementById(id);if(el)el.classList.remove('on');
     });
     $('#chatview').classList.remove('on');
