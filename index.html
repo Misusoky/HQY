@@ -550,7 +550,7 @@ button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:cente
   <div class="rm-card">
     <div class="rm-title" id="dawnTitle">晨报 · 昨夜</div>
     <div class="rm-body" id="dawnBody" style="max-height:56vh;overflow:auto"></div>
-    <div class="rm-ops"><button class="btn btn-primary" onclick="Game.closeDawn()">记下了</button></div>
+    <div class="rm-ops" id="dawnOps"><button class="btn btn-primary" onclick="Game.closeDawn()">记下了</button></div>
   </div>
 </div>
 <!-- 行事结果弹窗（本地即时结算） -->
@@ -1680,7 +1680,7 @@ const EMPEROR_MODULE = [
    每旬一次「帝召谁」：主控可在【吩咐】里争取／静候／避宠，旬末结账，次旬晨报呈现。 */
 const CHAMBER_MODULE = [
 '## 十四、承宠与子嗣（bedchamber / pregnancy / heirs；前端裁决，覆盖世界书冲突处）',
-'1. 每旬的侍寝由前端结算：存档 bedchamber 记最近若干旬「帝召幸谁」的公开记档，last 为最近一夜；晨报由前端在旬首呈现。模型写正文时须与之相符，不得改写招幸对象、时间与结果。帝召幸他人是六宫可见的公开消息，可写入 haremNews 与宫人议论；主控不可知的私下细节不得写。',
+'1. 每旬的侍寝由前端结算：存档 bedchamber 记最近若干旬「帝召幸谁」的公开记档，last 为最近一夜；晨报由前端在旬首呈现。主控若在晨报点「入帐相见」，会另开一段承宠夜话（scene 对话，只演那一夜，不结算本旬）；模型写正文时须与晨报和夜话相符，不得改写招幸对象、时间与结果。帝召幸他人是六宫可见的公开消息，可写入 haremNews 与宫人议论；主控不可知的私下细节不得写。',
 '2. 主控的侍寝场面点到为止：只写事前准备、帷帐之外与次日余波；不写露骨过程。侍寝不自动涨知心；晨报中已由前端结算的恩宠（如“恩宠 +1”）不得在同一夜重复加恩；其余宠爱变化以 statePatch["relationships.皇帝.value"] 回写为准，不得凭空大幅加恩。',
 '3. 有孕、胎象、小产与生产由前端结算（存档 pregnancy）。模型不得自行判定主控有孕、小产、生产或皇嗣性别；可写太医请脉、胎象、保胎与孕中反应，结果以存档为准。剧情要伤胎，只能通过体质下降与风险，不得直接改写 pregnancy。',
 '4. 皇嗣出生后由前端建档（存档 heirs：姓名、性别、生母、年龄、学识/礼仪/体魄/依赖）。模型写皇嗣须符合这些事实；皇嗣教育按世界书 §6E，前端给底、模型演过程。',
@@ -2023,7 +2023,7 @@ function dawnReportHtml(r){
   return `<div style="font-size:14px;line-height:1.9;color:var(--ink)">${esc(head)}</div>`
     +(rows.length?`<div style="font-size:13px;line-height:1.85;color:var(--ink-soft);margin-top:8px">${rows.map(x=>`<div>${x}</div>`).join('')}</div>`:'')
     +recentHtml
-    +`<div class="sheet-note" style="margin-top:12px">晨报只记敬事房的明面记档与宫人议论；帝私下说了什么，不入此报。想争一争，可在【吩咐】里递牌子；想避，也可称病。</div>`;
+    +`<div class="sheet-note" style="margin-top:12px">晨报只记敬事房的明面记档与宫人议论；${r.kind==='me'?'要入帐，点下面「入帐相见」；不想去，也可略过。':'想争一争，可在【吩咐】里递牌子；想避，也可称病。'}</div>`;
 }
 
 /* 帝设：玩家亲撰的皇帝人设（开局捏主控时自定义，商城「移性符」可改一次）。覆盖世界书与随机性情中对帝的默认描写。 */
@@ -2212,7 +2212,7 @@ function presenceNote(p){ // 面板「属性」里的一行说明
 /* ============================================================ 工具 */
 const $=s=>document.querySelector(s);
 const MONTHS=['','正月','二月','三月','四月','五月','六月','七月','八月','九月','十月','冬月','腊月'];
-const BUILD='2026-11-12·承宠晨报'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
+const BUILD='2026-11-12·承宠夜话'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
 /* 月俸：按位份每月下旬末由前端自动入账（单位：两） */
 const SALARY_BY_GRADE={'正一品':220,'从一品':150,'正二品':110,'从二品':80,'正三品':60,'从三品':45,'正四品':36,'从四品':28,'正五品':20,'从五品':15,'正六品':12,'从六品':10,'正七品':8,'从七品':6,'正八品':5,'从八品':4,'正九品':3,'从九品':2};
 const SALARY_TITLES=[[/皇后/,220],[/皇贵妃/,150],[/贵妃/,110],[/贤妃|良妃|淑妃|德妃/,80],[/昭仪|昭容|昭媛|修仪|修容|修媛|充仪|充容|充媛/,45],[/贵嫔/,36],[/嫔/,28],[/贵人/,20],[/才人/,15],[/美人/,12],[/宝林/,10],[/常在/,8],[/答应/,6],[/选侍/,5],[/更衣/,4],[/采女/,3],[/官女子/,2],[/妃/,60]];
@@ -4332,8 +4332,12 @@ const UI={
   },
   hideRestTip(){$('#restModal').classList.remove('on')},
   dawnReport(r){
+    Game._chamberReport=r&&r.kind==='me'?r:null;
     $('#dawnTitle').textContent='晨报 · 昨夜';
     $('#dawnBody').innerHTML=dawnReportHtml(r);
+    $('#dawnOps').innerHTML=r&&r.kind==='me'
+      ? `<button class="btn btn-line" onclick="Game.closeDawn()">略过</button><button class="btn btn-primary" onclick="Game.openChamberScene()">入帐相见</button>`
+      : `<button class="btn btn-primary" onclick="Game.closeDawn()">记下了</button>`;
     $('#dawnModal').classList.add('on');
   },
   actResult(title,flavor,deltas){
@@ -6087,11 +6091,43 @@ const Game={
   },
   closeDawn(){
     $('#dawnModal').classList.remove('on');
+    Game._chamberReport=null;
     if(Game._dawnPending){
       Game._dawnPending=false;
       this._xunStartPop();
     }
     UI.updateStatusbar();
+  },
+  chamberOpening(where){
+    const e=(state.world&&state.world.emperor)||{};
+    const persona=String(e.persona||''),tr=String(e.traits||'');
+    let narr=/养心殿/.test(where)
+      ?'养心殿的灯只留了一盏。帝坐在榻边，听见你进来，没有立刻抬头，只把手里那卷书合上，搁在案上。'
+      :'夜漏过了三更，帝才到。他掀帘进来，身上还带着夜里的凉气，先抬手把随侍都遣了出去。';
+    let line='过来。';
+    if(/先皇后|元后|旧梦|菀菀|故人/.test(persona)){narr+='他看你的眼神有一瞬不像在看你，很快又移开了。';line='把灯挪近些。'}
+    else if(/冷|端方|高岭|寡情|清冷/.test(persona||tr)){narr+='他没有笑，只抬手示意你近前。';line='过来。'}
+    else if(/暴|昏|怒|戾|荒/.test(persona||tr)){narr+='他半靠在榻上，酒气未散，抬眼看你时像在掂量什么。';line='怕什么？过来。'}
+    else narr+='烛影晃了一下，他才开口。';
+    return {narr,line};
+  },
+  openChamberScene(){ // 晨报里点「入帐相见」：单独进剧情对话，演承宠夜话；不占精力、不结算本旬
+    const r=Game._chamberReport;
+    if(!r||r.kind!=='me'){this.closeDawn();return}
+    $('#dawnModal').classList.remove('on');
+    const where=r.where||'养心殿',opening=this.chamberOpening(where);
+    this.openScene({
+      eventSource:'皇帝',narrative:opening.narr,
+      options:[
+        {id:'a',text:'垂首谢恩，按着礼数来'},
+        {id:'b',text:'替他把外袍解了，低声问一句累不累'},
+        {id:'c',text:'先说一件自己的事，不急着入正题'}
+      ],
+      scene:{state:'ongoing',who:'皇帝',line:opening.line,when:'昨夜',where}
+    });
+    if(sceneCtx){sceneCtx.chamber=true;sceneCtx.standalone=true;sceneCtx.chamberWhere=where}
+    $('#chatTitle').textContent='承宠 · 帝';
+    Game._chamberReport=null;
   },
   hsGoOut(){if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}$('#mapClock').textContent=fmtTime();$('#mapview').classList.add('on')}, // 出门＝宫城图选目的地
   mapBack(){$('#mapview').classList.remove('on')},
@@ -6709,14 +6745,16 @@ const Game={
   sceneRound(choice){
     if(!sceneCtx)return;
     sceneCtx.resolveRetried=false;
-    if(sceneCtx.standalone&&!sceneCtx.logged){logXunAction('问话·'+sceneCtx.who);sceneCtx.logged=true}
+    if(sceneCtx.standalone&&!sceneCtx.logged){logXunAction(sceneCtx.chamber?'承宠·夜话':'问话·'+sceneCtx.who);sceneCtx.logged=true}
     this.recordLine('me',choice);
     sceneCtx.round++;
     const r=sceneCtx.round;
     const maidPend=sceneCtx.maid?matchPending([sceneCtx.who]):[]; // 她名下挂账的差事/琐事：每轮提醒模型回话
     const maidPendNote=maidPend.length?`她名下还挂着这些待办：${maidPend.map(x=>pendText(x)).join('；')}。主控问起办差时她须逐条回进度——办妥的交货、回话并从 statePatch.pending 移除；未妥的说清缘由与预计何时能成；不得反问一堆或佯装忘记。`:'';
     const maidNote=sceneCtx.maid?'本场是主控在住处吩咐宫女：scene.state 只写 "ongoing"，不得自行 resolve 或 wrap 收场；只有玩家点「结束对话」时才结算。'+maidPendNote+'主控交代具体差事（采买、传话、留意动静等）时：她至多提一句现实顾虑，随即领命应下、复述要领，不得反复追问请示；主控已解答她的顾虑后，她应领命，不得再抛新问题。':'';
-    const msg=`第${xunNo()}旬剧情对话第${r}轮：玩家应对「${choice}」。只演绎${sceneCtx.who}的当即反应与场面变化：输出 scene.parts（2—5 段，act 写对方动作神态并会并入她的对话气泡，say 写对方台词，quote 写转述他人原话，narr 只写其他人物与客观场面，台词都不带引号，按语义分段而非按标点硬切；总长 ≤70 字）、scene.where/when（有变化才写）与 2—3 个接话选项；此阶段不结算数值。scene.state 一律写 "ongoing"——不要写 resolve 或 wrap，不要替玩家结束对话；她必须回应玩家这句话，哪怕只是拒绝、反问或转移话题，也不能不作答就走。对话对象当场换手（被传入阁面圣、正主登场等）：把 scene.who 改写为新对象，过渡写进 parts 的 narr 段，新对象的言行照常写 act/say，scene.state 用 "ongoing" 继续对谈，不得就此 resolve。${maidNote}`+this.sceneContextBlock();
+    const chamberNote=sceneCtx.chamber?'本场是帝召主控侍寝的夜话：镜头点到为止，只写帷帐之外的动作、言语、沉默与次日余波，不写露骨过程；帝的言行须合帝设、性情与当晚情境；此阶段不结算数值，scene.state 只写 "ongoing"。':'';
+    let msg=`第${xunNo()}旬剧情对话第${r}轮：玩家应对「${choice}」。只演绎${sceneCtx.who}的当即反应与场面变化：输出 scene.parts（2—5 段，act 写对方动作神态并会并入她的对话气泡，say 写对方台词，quote 写转述他人原话，narr 只写其他人物与客观场面，台词都不带引号，按语义分段而非按标点硬切；总长 ≤70 字）、scene.where/when（有变化才写）与 2—3 个接话选项；此阶段不结算数值。scene.state 一律写 "ongoing"——不要写 resolve 或 wrap，不要替玩家结束对话；她必须回应玩家这句话，哪怕只是拒绝、反问或转移话题，也不能不作答就走。对话对象当场换手（被传入阁面圣、正主登场等）：把 scene.who 改写为新对象，过渡写进 parts 的 narr 段，新对象的言行照常写 act/say，scene.state 用 "ongoing" 继续对谈，不得就此 resolve。${maidNote}${chamberNote}`+this.sceneContextBlock();
+    if(sceneCtx.chamber)msg=msg.replace(/她/g,'帝');
     this.requestScene(msg,choice,MAX_OUTPUT_TOKENS,true,true); // 正常接话轮永不结算：聊多久由玩家决定，点「结束对话」才收场
   },
   sceneEnd(){ // 玩家主动结束：对方应声简短收尾，统一结算（不耗精力）；本地开场且一言未发则不调 API、不结算
@@ -6731,9 +6769,17 @@ const Game={
       $('#chatOpts').innerHTML='<button class="btn btn-primary" style="letter-spacing:.2em;text-indent:.2em" onclick="Game.sceneDone()">继续</button>';
       return;
     }
-    const settle=sceneCtx.standalone
+    if(sceneCtx.chamber&&!said){
+      phase='RESOLVING';
+      this.sayNarrative('帘帐落下，烛火渐暗。你没有多话，他也没有再问。天将明时，你起身告退。');
+      $('#chatOpts').innerHTML='<button class="btn btn-primary" style="letter-spacing:.2em;text-indent:.2em" onclick="Game.sceneDone()">继续</button>';
+      return;
+    }
+    const settle=sceneCtx.chamber
+      ?'这是帝召主控侍寝的夜话，不是本旬养成重心：不结算本旬养成、不写 changes 与 statePatch；只写一两句收场旁白（帘帐落下、烛尽、天将明、你告退等），不写露骨过程。'
+      :(sceneCtx.standalone
       ?'这只是一位宫中人在旬中回话，并非本旬养成重心：只结算这场问话实际带来的关系、情报、交办差事与行囊变化；主角才艺与属性成长留到旬末小结，修习、散步等无关收益也留到那时。没有变化就不写 changes。'
-      :'并完整结算本旬养成与剧情（changes、statePatch，含 statePatch.plots 的变动条目）；收场旁白只写一两句、不复述已演的场面与台词。'+craftQuestHint();
+      :'并完整结算本旬养成与剧情（changes、statePatch，含 statePatch.plots 的变动条目）；收场旁白只写一两句、不复述已演的场面与台词。'+craftQuestHint());
     const msg=`第${xunNo()}旬剧情对话：玩家示意话已说完，结束与${sceneCtx.who}的对话。请收尾：scene.state="resolve"，补一段简短的收场演绎（narrative 一两句旁白即可，如各自散去、欠身告退；不写引号对白），${settle}收场只写本场已发生的事：结算只认本场实际发生的，不是让你复述；narrative 一句带过收场即可，不得复述 scene.parts 已演的场面与台词。`+this.sceneContextBlock();
     this.requestScene(msg,'（结束对话）',undefined,undefined,undefined,true); // endReq：响应必须收场结算，宫女问话亦不例外
   },
@@ -6746,16 +6792,26 @@ const Game={
       if(parts)this.sayParts(parts); // 收尾前若有最后一句对白，先按语义段渲染
       if(p.narrative)this.sayNarrative(p.narrative,!!parts); // 有 parts 时收尾 narrative 整段当旁白
     }
+    if(sceneCtx&&sceneCtx.chamber){ // 侍寝夜话：只收场、不结算本旬，也不写纪事卡
+      body.scrollTop=body.scrollHeight;
+      $('#chatOpts').innerHTML='<button class="btn btn-primary" style="letter-spacing:.2em;text-indent:.2em" onclick="Game.sceneDone()">继续</button>';
+      return;
+    }
     finalize(p,{focus:Game._lastFocus||'剧情',choice:'剧情应对',adj:Game._lastAdj});
     body.scrollTop=body.scrollHeight;
     $('#chatOpts').innerHTML='<button class="btn btn-primary" style="letter-spacing:.2em;text-indent:.2em" onclick="Game.sceneDone()">继续</button>';
   },
   sceneDone(){
     phase='FOCUS_SELECT'; // 剧情收尾后必须复位，否则主界面所有行动都会被"请先结束当前旬务"挡下
+    const wasChamber=!!(sceneCtx&&sceneCtx.chamber);
     this.backHome(); // 戏散了人就回殿：别让本场地名留在存档里
     sceneCtx=null;currentEvent=null;
     $('#chatview').classList.remove('on');
-    UI.goHome();toast('本旬事了');
+    UI.goHome();toast(wasChamber?'天光渐亮，你回到住处':'本旬事了');
+    if(Game._dawnPending){ // 晨报里进了承宠夜话：聊完再走旬首强制处置
+      Game._dawnPending=false;
+      this._xunStartPop();
+    }
   },
   pickOpening(i){
     if(phase!=='FOCUS_PICK'&&phase!=='FOCUS_SELECT')return;
@@ -6783,6 +6839,7 @@ const Game={
   errRetry(){$('#errModal').classList.remove('on');this.retry()},
   errBackHome(){ // 请求失败后退出错误弹窗：不让玩家困在 NARRATING/RESOLVING 的死状态
     $('#errModal').classList.remove('on');
+    Game._dawnPending=false;Game._chamberReport=null;
     phase='FOCUS_SELECT';sceneCtx=null;currentEvent=null;
     $('#chatview').classList.remove('on');$('#mapview').classList.remove('on');$('#chatOpts').innerHTML='';
     UI.hideBusy();UI.goHome();
@@ -6790,6 +6847,7 @@ const Game={
   escapeStuck(){ // 脱离卡死：中止请求、清掉所有临时界面，退回本次操作前的落定点
     const before=cloneGameData(state);
     cancelInFlight(); // 晚到的模型回复一律作废
+    Game._dawnPending=false;Game._chamberReport=null;
     UI.hideBusy();
     ['errModal','incidentModal','restModal','actModal','tutorialModal','collapseModal','dawnModal'].forEach(id=>{
       const el=document.getElementById(id);if(el)el.classList.remove('on');
