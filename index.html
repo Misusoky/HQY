@@ -427,6 +427,10 @@ button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:cente
 .chat-act{display:flex;gap:8px}
 .chat-act input{flex:1;min-height:44px;border:1px solid var(--line);border-radius:999px;background:var(--paper);padding:0 16px;font-size:15px;outline:none}
 .chat-act .go{flex:none;min-width:64px;min-height:44px;border-radius:999px;background:var(--indigo);color:#f5efe3;font-size:14px;letter-spacing:.1em}
+.chat-tools{display:flex;gap:10px}
+.chat-tool{flex:1;min-height:44px;border-radius:12px;border:1px solid var(--line);background:var(--paper);font-size:14px;letter-spacing:.14em;text-indent:.14em;color:var(--ink-soft)}
+.chat-tool.gift{border-color:var(--line-gold);color:var(--gold)}
+.chat-tool:active{border-color:var(--cinnabar);color:var(--cinnabar)}
 /* 宫城图：全屏目的地选择 */
 .mapview{position:fixed;inset:0;z-index:30;display:none;flex-direction:column;background:var(--paper)}
 .mapview.on{display:flex}
@@ -2140,6 +2144,16 @@ const STUDIO_MODULE = [
 '5. 墨妙斋不是藏书阁：阁中借阅、抄录、研读另循其规；斋中只写字作画，不算本旬才艺修习，也不替代修习收益。'
 ].join('\n');
 
+/* 赠礼：对话中的独立行动，收下判定与关系结算由前端按模型回写入账 */
+const GIFT_MODULE = [
+'## 十九、赠礼（剧情对话中的独立行动）',
+'1. 玩家可在与人物对话时点「赠礼」，从行囊择一件递给对方。礼物是否收下由模型判定（giftAccepted），前端按判定扣减或保留；正文只演对方看见礼物后的反应，不重复扣物。',
+'2. 本轮只结算这次赠礼：关系、恩宠、任务、待续的变化可写入 statePatch；不得借赠礼结算才艺、属性成长或与礼物无关的数值。赠礼带来的好感变化已在前端当场入账，收场结算不得重复计算。',
+'3. 收不收、加不加好感，由物品品质与来历、双方关系、性情、场合与礼制决定；品质只提供更好的起点，不保证收下、好感或宠爱。关系差、礼过重、犯忌、来路可疑时可以推辞、起疑、反感或转赠他人。',
+'4. 御赐、禁物、信物、剧毒之物不可转赠，前端已从可赠列表中滤去；正文不得让这类东西经由赠礼流转。',
+'5. 若赠出的正是剧情账所系之物，对方收下时须同轮把对应 plots 条目 stage 改为"已兑现"，并完成任务积分与任务进度；只写"收下了"而漏账，视为未兑现。'
+].join('\n');
+
 /* 言行态度：外貌与忌惮如何影响 NPC 的说话方式；本旬档位由 presenceBrief 动态追加进系统提示 */
 const PRESENCE_MODULE = [
 '## 十七、言行态度（外貌 × 忌惮，优先级高于旧例）',
@@ -3200,6 +3214,22 @@ function addToInventory(list){ // 入库：按 名+备注 合并件数，件数�
     if(it.count>0)acquiredThisTurn.push({name:it.name,usable:it.usable,pawnable:it.pawnable});
   }
 }
+function giftAllowed(it){ // 可赠与：囊中尚存、非御赐/禁物/信物/毒物，当票不算
+  if(!it||!it.name||(Number(it.count)||0)<=0)return false;
+  const blob=String(it.name)+' '+String(it.note||'')+' '+String(it.src||'')+' '+((Array.isArray(it.traits)?it.traits:[]).join(''));
+  if(/御赐|禁物|剧毒|信物/.test(blob))return false;
+  if(/^当票/.test(String(it.name)))return false;
+  return true;
+}
+function consumeInventoryRef(ref){ // 按对象引用扣一件；用尽即除名
+  if(!state||!Array.isArray(state.inventory)||!ref)return false;
+  const idx=state.inventory.indexOf(ref);
+  if(idx<0)return false;
+  const it=state.inventory[idx];
+  it.count=(Number(it.count)||0)-1;
+  if(it.count<=0)state.inventory.splice(idx,1);
+  return true;
+}
 function pawnPrice(it){ // 典卖估价：按质地分档（本地即时结算，通报主持人）
   if(it&&it.crafted){ // 手作成品：按生成时记下的估价与品质走
     const v=Number(it.craftValue);
@@ -3441,7 +3471,7 @@ function buildStaticSystem(){
       .replace('{{世界书全文：02-世界书.md}}',WORLD_BOOK_RUNTIME)
       .replace('{{叙事文风全文：03-叙事文风.md}}',STYLE_GUIDE)
       .replace('{{当前存档 JSON：04-当前存档-v36.json 或玩家当前档}}','（见本提示词末尾「当前存档」段，动态存档在最后）')
-      +'\n\n'+NPC_MODULE+'\n\n'+ENERGY_MODULE+'\n\n'+PLOTS_MODULE+'\n\n'+FESTIVAL_MODULE+'\n\n'+EMPEROR_MODULE+'\n\n'+EMPEROR_PERSONA_MODULE+'\n\n'+CHAMBER_MODULE+'\n\n'+SCENE_MODULE+'\n\n'+SKILL_MODULE+'\n\n'+CRAFT_MODULE+'\n\n'+STUDIO_MODULE+'\n\n'+PERSONA_MODULE+'\n\n'+LENGTH_MODULE+'\n\n'+PRESENCE_MODULE;
+      +'\n\n'+NPC_MODULE+'\n\n'+ENERGY_MODULE+'\n\n'+PLOTS_MODULE+'\n\n'+FESTIVAL_MODULE+'\n\n'+EMPEROR_MODULE+'\n\n'+EMPEROR_PERSONA_MODULE+'\n\n'+CHAMBER_MODULE+'\n\n'+SCENE_MODULE+'\n\n'+SKILL_MODULE+'\n\n'+CRAFT_MODULE+'\n\n'+STUDIO_MODULE+'\n\n'+GIFT_MODULE+'\n\n'+PERSONA_MODULE+'\n\n'+LENGTH_MODULE+'\n\n'+PRESENCE_MODULE;
   }
   return _staticSystem;
 }
@@ -4477,6 +4507,7 @@ const UI={
     else if(name==='行囊')B.innerHTML=this.sheetItems();
     else if(name==='才艺修习')B.innerHTML=this.sheetSkills();
     else if(name==='求艺')B.innerHTML=this.sheetUnlock(param);
+    else if(name==='赠礼')B.innerHTML=this.sheetGift();
     else if(name==='藏书阁')B.innerHTML=this.sheetLibrary();
     else if(name==='墨妙斋')B.innerHTML=this.sheetStudio();
     else if(name==='传膳')B.innerHTML=this.sheetMeal();
@@ -4618,6 +4649,20 @@ const UI={
         }).join('')+`</div>`;
     }
     return h||'<div class="sheet-note">囊中空空。</div>';
+  },
+  sheetGift(){
+    const who=sceneCtx?sceneCtx.who:'';
+    const ta=npcSexOf(state,who)==='m'?'他':'她';
+    const rows=(state.inventory||[]).map((it,i)=>({it,i})).filter(({it})=>giftAllowed(it));
+    const list=rows.map(({it,i})=>{
+      const sub=[it.note,it.quality,Array.isArray(it.traits)&&it.traits.length?it.traits.join('、'):''].filter(Boolean).join(' · ');
+      return `<button class="npcrow" onclick="Game.giftItem(${i})">
+        <span class="nr-main"><span class="nr-name">${esc(it.name)}</span>${sub?`<span class="nr-role">${esc(sub)}</span>`:''}</span>
+        <span class="nr-rel num">×${esc(it.count)}</span></button>`;
+    }).join('');
+    return `<button class="backbtn" onclick="UI.closeSheet()">◀ 返回对话</button>
+      <div class="sheet-note" style="margin-top:0">从囊中取一件递给${esc(dispName(who)||'对方')}。收不收、回什么话，由${ta}的性情、与你的交情和眼前场合定，不保证得脸。御赐、禁物与信物不可转赠，故不列在此。</div>
+      ${list?`<div class="sec"><div class="sec-cap">可赠之物（${rows.length}）</div>${list}</div>`:'<div class="sec"><div class="sheet-note">囊中没有可赠之物。</div></div>'}`;
   },
   sheetItemDetail(i){
     const it=(state.inventory||[])[i];
@@ -6352,7 +6397,7 @@ const Game={
       ],
       scene:{state:'ongoing',who:'皇帝',line:opening.line,when:'昨夜',where}
     });
-    if(sceneCtx){sceneCtx.chamber=true;sceneCtx.standalone=true;sceneCtx.chamberWhere=where}
+    if(sceneCtx){sceneCtx.chamber=true;sceneCtx.standalone=true;sceneCtx.chamberWhere=where;this.renderSceneOpts(sceneCtx.lastOptions)} // 夜话不结算，重排操作栏隐去赠礼
     $('#chatTitle').textContent='承宠 · 帝';
     Game._chamberReport=null;
   },
@@ -6913,9 +6958,10 @@ const Game={
     phase='EVENT_CHOICE';
     if(sceneCtx)sceneCtx.lastOptions=options||[]
     const box=$('#chatOpts');
+    const giftBtn=(sceneCtx&&sceneCtx.chamber)?'':`<button class="chat-tool gift" onclick="Game.openGift()">赠礼</button>`;
     box.innerHTML=`<div class="cap">— 接话或行动 —</div>`+
       (options||[]).map((o,i)=>`<button class="chat-opt" onclick="Game.scenePick(${i})">${esc(o.text||o)}</button>`).join('')+
-      `<button class="chat-opt" onclick="Game.sceneEnd()">结束对话</button>`+
+      `<div class="chat-tools">${giftBtn}<button class="chat-tool" onclick="Game.sceneEnd()">结束对话</button></div>`+
       `<div class="chat-act"><input id="chatInput" placeholder="接句话、或描述你的动作" onkeydown="if(event.key==='Enter')Game.sceneCustom()"><button class="go" onclick="Game.sceneCustom()">发送</button></div>`;
   },
   scenePick(i){
@@ -6930,14 +6976,84 @@ const Game={
     this.bubble('me','',v);
     this.sceneRound(v);
   },
+  /* 赠礼：从行囊取一件递给眼前的人；前端扣物，模型演反应并结算关系 */
+  openGift(){
+    if(phase!=='EVENT_CHOICE'||!sceneCtx){toast('此刻不便赠礼');return}
+    if(sceneCtx.chamber){toast('夜话不必献物');return}
+    if(sceneCtx.giftBusy)return;
+    UI.openSheet('赠礼');
+  },
+  giftItem(i){
+    if(phase!=='EVENT_CHOICE'||!sceneCtx){toast('此刻不便赠礼');return}
+    if(sceneCtx.giftBusy)return;
+    const it=(state.inventory||[])[i];
+    if(!it||!giftAllowed(it)){toast('此物不便相赠');return}
+    const who=sceneCtx.who;
+    sceneCtx.giftBusy=true;
+    UI.closeSheet();
+    this.bubble('me','',`（取出「${it.name}」，递给${dispName(who)}）`);
+    this.recordLine('me',`（取出一件「${it.name}」递给${who}）`);
+    this.requestScene(this.giftMsg(it,who),`赠礼·${it.name}`,MAX_OUTPUT_TOKENS,true,true,false,{item:it,who});
+  },
+  giftMsg(it,who){
+    const ta=npcSexOf(state,who)==='m'?'他':'她';
+    const bits=[
+      it.quality?`品质：${it.quality}`:'',
+      it.category?`类别：${it.category}`:'',
+      Array.isArray(it.traits)&&it.traits.length?`特质：${it.traits.join('、')}`:'',
+      it.description?`形貌：${String(it.description).slice(0,120)}`:'',
+      it.note?`备注：${String(it.note).slice(0,80)}`:'',
+      it.effect?`效用：${String(it.effect).slice(0,80)}`:'',
+      it.src?`来历：${it.src}`:''
+    ].filter(Boolean).join('；');
+    const prevGifts=(sceneCtx&&Array.isArray(sceneCtx.gifts))?sceneCtx.gifts.length:0;
+    const prevNote=prevGifts?`本场此前已赠出 ${prevGifts} 次；连续受礼未必更亲近，礼物轻贱或过频可被视为刻意逢迎，好感也可能不增反减。`:'';
+    return `第${xunNo()}旬剧情对话（赠礼）：玩家从行囊中取出一件东西，亲手递给「${who}」——「${it.name}」${bits?`（${bits}）`:''}。请只演${ta}看见这件东西后的即时反应与场面（细看、问来历、推辞、收下、回礼、起疑、转赠皆可），用 scene.parts 呈现（1—4 段，act/say/quote/narr 规则同前，总长 ≤70 字），并给 2—3 个接话选项；scene.state 必须写 "ongoing"，不得替玩家结束对话。`+
+      `本轮只结算这次赠礼，且必须结算：用 giftAccepted 写${ta}是否收下（true/false）；statePatch 只写这次赠礼引起的关系/恩宠/任务/待续变化（如 relationships 中对${who}的那一条、emperor.contact、plots），不得写才艺、属性成长或与赠礼无关的数值；changes 只列这次赠礼的实际变化。narrative 可写空字符串。`+
+      `收不收、加不加好感，由物品品质与来历、双方关系、性情与场合决定；品质只提供更好的起点，不保证收下与好感；关系差、礼过重、犯忌或来路可疑时可以推辞、起疑甚至反感。`+
+      `若此物是主控亲手所做且正是剧情账所系之物，${ta}收下时须同轮以 statePatch.plots 把对应条目 stage 改为"已兑现"，并完成任务积分（protagonist.points）与"本旬变化"中的任务进度。${prevNote}`+
+      this.sceneContextBlock();
+  },
+  _giftResolve(p,gift){
+    if(!sceneCtx)return;
+    p=stripStandaloneGrowth(p); // 赠礼只结算关系/任务，不结算才艺与属性成长
+    const sc=p.scene||{};
+    const parts=this.sceneParts(sc);
+    const narr=filterText(p.narrative||'').trim();
+    const rawAcc=p.giftAccepted;
+    const accepted=!(rawAcc===false||rawAcc===0||/^(false|no|否|不收|拒|退回|婉拒|谢绝)/i.test(String(rawAcc)));
+    const gname=(gift&&gift.item&&gift.item.name)||'礼物';
+    const removed=accepted?consumeInventoryRef(gift.item):false;
+    try{
+      applyPatch(p.statePatch||{});
+      applyDossier(p.dossier);
+    }catch(e){console.warn('[赠礼] 结算失败',e)}
+    sceneCtx.giftBusy=false;
+    this.sceneMeta(sc);
+    if(parts)this.sayParts(parts);
+    else if(sc.line)this.sayLine(sc.line);
+    else if(narr)this.sayNarrative(narr,true);
+    const ch=(Array.isArray(p.changes)?p.changes:[]).filter(Boolean).map(String);
+    const head=accepted?(removed?`赠礼 · 收下「${gname}」`:`赠礼 · 收下「${gname}」（行囊中已无此物）`):`赠礼 · 未收「${gname}」`;
+    this.bubble('sys','',head+(ch.length?'｜'+ch.join('；'):''));
+    if(accepted){
+      sceneCtx.gifts=Array.isArray(sceneCtx.gifts)?sceneCtx.gifts:[];
+      sceneCtx.gifts.push({turn:state.turn,name:gname});
+      logXunAction(`赠礼·${gname}`);
+    }
+    const sopts=(Array.isArray(p.options)&&p.options.length)?p.options:(Array.isArray(sc.options)?sc.options:[]);
+    this.renderSceneOpts(sopts.length?sopts:(sceneCtx.lastOptions||[]));
+    $('#chatBody').scrollTop=$('#chatBody').scrollHeight;
+    persistCurrent();markSafe();UI.updateStatusbar();
+  },
   sceneContextBlock(){ // 本场已发生对话，供模型承接；只取最近 10 句且每句截断
     if(!sceneCtx||!sceneCtx.lines.length)return '';
     const lines=sceneCtx.lines.slice(-10).map(l=>`${l.who==='me'?'玩家':l.who==='npc'?(l.name||sceneCtx.who):l.who==='quote'?'转述'+(l.name?'·'+l.name:''):'旁白'}：${String(l.text||'').slice(0,80)}`).join('\n');
     return `\n【本场对话记录】\n${lines}\n请承接以上对话，不要重复已说过的话。`;
   },
-  requestScene(msg,choice,maxTokens,noHistory,compact,endReq){ // 场景请求统一出口：失败可重试；endReq=主控点「结束对话/就此告辞」的收尾请求，响应必须结算收场
+  requestScene(msg,choice,maxTokens,noHistory,compact,endReq,gift){ // 场景请求统一出口：失败可重试；endReq=主控点「结束对话/就此告辞」的收尾请求，响应必须结算收场；gift=赠礼轮
     phase='RESOLVING';this.chatBusy(true);
-    lastRequest={type:'sc',msg,choice,maxTokens,noHistory,compact,endReq};
+    lastRequest={type:'sc',msg,choice,maxTokens,noHistory,compact,endReq,gift:gift||null};
     const req={};if(maxTokens)req.maxTokens=maxTokens;
     if(compact)req.messages=[{role:'system',content:buildSceneSystem(sceneCtx?sceneCtx.who:'')},{role:'user',content:msg}]; // ongoing：精简提示词，不结算
     else if(noHistory)req.noHistory=true; // 收尾轮保留完整提示词，只省历史正文
@@ -6948,6 +7064,7 @@ const Game={
       const parts=this.sceneParts(sc);
       const narr=filterText(p.narrative||'').trim();
       if(endReq){this._sceneResolve(p);return} // 只有玩家点「结束对话」才结算收场
+      if(gift){this._giftResolve(p,gift);return} // 赠礼轮：当场结算关系与任务，对话继续
       if(sc.state==='resolve'&&sceneCtx&&!sceneCtx.resolveRetried){ // 模型擅自收场：先纠正一次，要求先回应玩家这句话
         sceneCtx.resolveRetried=true;
         const fix=msg+'\n【纠正】你刚才把 scene.state 写成了 resolve，但玩家这句话还没有得到回应，玩家也没有点「结束对话」。请重新输出本轮：scene.state 只写 "ongoing"；scene.parts 必须先回应玩家这句话（可拒绝、反问、转移话题或明确婉拒），不得直接收场结算。';
@@ -6968,6 +7085,7 @@ const Game={
     }).catch(e=>{
       this.chatBusy(false);
       if(e.name==='AbortError')return; // 脱困/取消已经复位界面，晚到的失败不再改状态
+      if(gift&&sceneCtx)sceneCtx.giftBusy=false; // 赠礼未成：礼物不曾扣下，原样留在囊中
       phase='EVENT_CHOICE';
       this.renderSceneOpts(sceneCtx?sceneCtx.lastOptions||[]:[]);
       this.handleCallErr(e);
@@ -7011,7 +7129,10 @@ const Game={
       :(sceneCtx.standalone
       ?'这只是一位宫中人在旬中回话，并非本旬养成重心：只结算这场问话实际带来的关系、情报、交办差事与行囊变化；主角才艺与属性成长留到旬末小结，修习、散步等无关收益也留到那时。没有变化就不写 changes。'
       :'并完整结算本旬养成与剧情（changes、statePatch，含 statePatch.plots 的变动条目）；收场旁白只写一两句、不复述已演的场面与台词。'+craftQuestHint());
-    const msg=`第${xunNo()}旬剧情对话：玩家示意话已说完，结束与${sceneCtx.who}的对话。请收尾：scene.state="resolve"，补一段简短的收场演绎（narrative 一两句旁白即可，如各自散去、欠身告退；不写引号对白），${settle}收场只写本场已发生的事：结算只认本场实际发生的，不是让你复述；narrative 一句带过收场即可，不得复述 scene.parts 已演的场面与台词。`+this.sceneContextBlock();
+    const giftNote=(sceneCtx.gifts&&sceneCtx.gifts.length)
+      ?`本场已赠出并当场结算：${sceneCtx.gifts.map(g=>`「${g.name}」`).join('、')}——这些赠礼的关系/恩宠与任务变化已在前端入账，收场时不得重复计算；若赠礼已使剧情账条目条件满足而尚未改 stage，收场时补写 plots 兑现。`
+      :'';
+    const msg=`第${xunNo()}旬剧情对话：玩家示意话已说完，结束与${sceneCtx.who}的对话。请收尾：scene.state="resolve"，补一段简短的收场演绎（narrative 一两句旁白即可，如各自散去、欠身告退；不写引号对白），${settle}${giftNote}收场只写本场已发生的事：结算只认本场实际发生的，不是让你复述；narrative 一句带过收场即可，不得复述 scene.parts 已演的场面与台词。`+this.sceneContextBlock();
     this.requestScene(msg,'（结束对话）',undefined,undefined,undefined,true); // endReq：响应必须收场结算，宫女问话亦不例外
   },
   _sceneResolve(p){
@@ -7063,7 +7184,7 @@ const Game={
     if(!lastRequest)return;
     const r=lastRequest;
     if(r.type==='r1')this.round1(r.msg,r.focus,r.cost,r.opts);
-    else if(r.type==='sc')this.requestScene(r.msg,r.choice,r.maxTokens,r.noHistory,r.compact,r.endReq);
+    else if(r.type==='sc')this.requestScene(r.msg,r.choice,r.maxTokens,r.noHistory,r.compact,r.endReq,r.gift);
     else if(r.type==='craft')this.craftRun(r.input);
     else if(r.type==='newgame'){if(this._createdProtagonist)this.startWorldGen();else this.askNewGame()}
   },
