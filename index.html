@@ -214,15 +214,18 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
 /* 设置/存档 */
 .restmodal{position:fixed;inset:0;z-index:80;display:none;align-items:center;justify-content:center;background:rgba(30,24,18,.45);padding:32px}
 .restmodal.on{display:flex}
-.rm-card{background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:20px;max-width:330px;width:100%}
-.rm-title{font-size:16px;letter-spacing:.15em;text-align:center}
-.rm-body{font-size:13px;line-height:1.8;color:var(--ink-soft);margin:12px 0 18px}
+.rm-card{background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:20px;max-width:330px;width:100%;max-height:calc(100vh - 64px);max-height:calc(100dvh - 64px);display:flex;flex-direction:column}
+.rm-title{font-size:16px;letter-spacing:.15em;text-align:center;flex:none}
+.rm-body{font-size:13px;line-height:1.8;color:var(--ink-soft);margin:12px 0 18px;min-height:0;flex:1 1 auto;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--line-strong) transparent}
+.rm-body::-webkit-scrollbar{width:6px}
+.rm-body::-webkit-scrollbar-track{background:transparent}
+.rm-body::-webkit-scrollbar-thumb{background:var(--line-strong);border-radius:3px}
 .xunsum{margin:2px 0 10px}
 .xunsum .xs-cap{font-size:12px;letter-spacing:.15em;color:var(--gold);margin:12px 0 4px}
 .xunsum .xs-row{font-size:13px;line-height:1.85;color:var(--ink);word-break:break-word}
 .xunsum .xs-none{font-size:13px;line-height:1.85;color:var(--ink-soft)}
 .act-note{font-size:11px;color:var(--ink-soft);line-height:1.7;margin-top:12px;padding-top:8px;border-top:1px dashed var(--line)}
-.rm-ops{display:flex;gap:10px}
+.rm-ops{display:flex;gap:10px;flex:none}
 .rm-ops .btn{flex:1;min-height:44px;font-size:14px}
 .setnav{display:flex;gap:8px;margin:2px 0 14px}
 .setnav button{flex:1;min-height:40px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink-soft);font-size:14px;letter-spacing:.08em}
