@@ -2473,8 +2473,12 @@ SCENE_PARTS_RULES,
 '- 对话长短由玩家决定，不设轮数上限：即使事情看似说尽、对方乏了或该告退，也只写一句带情绪或去意的回应（如"改日再叙""我先去当值了"），scene.state 仍为 "ongoing" 并给接话选项；不得自行收场、不得用 "wrap" 或 "resolve" 结束对话，只有玩家点「结束对话」才收尾。'
 ,'每轮必须让事情实质推进：对方要么给出实质答复、承诺或行动，要么明确拒绝、反问或转移话题（但人仍留在场，不得起身走人）；不得连续两轮以上只用客套或重复已有顾虑来拖延。主控意图已明时（要办什么、问什么已说清楚），直接照办、照答或婉拒，不再层层请示追问。',
 '- 信息必须落地：玩家直接问到对方知道的事，对方须当场给出具体名目、缘由或明确去处；可以害怕、压低声音、提条件，但不得只用“谁提谁落不是”“只当没听见”之类空话吊着。确实不能说时，须给出具体缘由与下一步能问的人或能查之处；同一件事不得连续两轮含糊。不得凭空发明与存档无关的禁忌或旧案；若引入新的忌讳，必须同时讲清它是什么、为何犯忌、与谁相关。',
-'- 不得重复盘问：对方问过并得到回答的事，不得再问或换说法重问；玩家答过即视为已交代，只能追问新的细节或给出处置。每轮至少推进一项：新信息、决定、态度/关系变化、后果或新的具体行动。不要为凑对话制造无意义的盘问、试探或临时加码的审查。',
-'- 接话选项每轮必须换新：不得重复上一轮的原句或同义改写，玩家已经选过、答过的方向不再作为选项；当前话题问尽时，转向处置、条件、人情或下一步行动，不得靠重复提问拖长对话。',
+'- 不得重复盘问：对方问过并得到回答的事，不得再问或换说法重问；玩家答过即视为已交代，只能追问影响得失的关键点，或直接给出处置。每轮至少推进一项：新信息、决定、态度/关系变化、后果或新的具体行动。不要为凑对话制造无意义的盘问、试探或临时加码的审查。',
+'- 本场戏核：一场戏只回答一个核心问题——玩家要得到/保住什么，谁在阻止，失败会失去什么。开场前先自问这三件事；答不上来就不要开 scene，写成日常旁白或直接结算。每轮只能推进这个核心问题，不得另起无关的小问题。核对簿册、传话、礼数、花色、茶点等琐事，除非直接牵连位份/恩宠/银钱/子嗣/性命/把柄/派系/任务，否则不得单独成场。',
+'- 一场戏至少发生一件可叙述的“事”：有人来、传旨、搜检、夺物、当众发难、宴上出事、证据出现、条件变化等。不能只有来回问答；对话必须改变事态（谁得了什么、谁失了面子、谁被迫表态），否则拆成一句日常旁白。',
+'- 不挤牙膏：对方知道的关键信息，一轮内给足；不得把同一件事拆成多轮追问。问完必须给出自己的立场、条件或处置；不能只问不答。',
+'- 新冲突必须落地：谁受益、谁受损、代价是什么、为什么是现在；答不上来就不要写。',
+'- 接话选项每轮必须换新：不得重复上一轮的原句或同义改写，玩家已经选过、答过的方向不再作为选项；每个选项须是不同的决定或策略（答应、拒绝、拖延、反将、求助、交换条件等），不是同一问题的不同问法，并至少写出一项当下可见的机会或代价；当前话题问尽时，转向处置、条件、人情或下一步行动，不得靠重复提问拖长对话。',
 '- 台词中的帝称：scene.parts 的 say/quote 里，人物提到天子一律称「陛下」，不得写「帝」；narr 与 narrative 等叙述仍称「帝」。',
 '- 玩家每轮可点选项，也可自定义输入一句话或一个动作；接话不扣精力，玩家随时可选"结束对话"，你应声简短收尾（narrative 一两句即可）。自定义内容符合世界规则即认真承接。',
 '- 若不适合对话形式（突发事态、文书、独自发现等），可不用 scene，按原有 hasEvent+options 两轮制输出。'
@@ -3888,9 +3892,13 @@ SCENE_PARTS_RULES,
 '【约束】本轮 scene.state 必须是 "ongoing"，不得写 "wrap" 或 "resolve"；narrative 必须为空字符串，changes=[]，statePatch={}；options 给 2—3 个方向不同的接话，只写当下可见的机会或代价。scene.where 只有场景确实移动时才写，在本宫说话就写本宫住处，不要重复上一场的地点。不得替玩家结束对话：即使话已说尽、对方乏了或有事欲别，也只写一句带情绪或去意的回应（如"改日再叙""我先去当值了"），仍给接话选项；玩家点「结束对话」后前端才会另发收尾请求。对方必须回应玩家这句话，哪怕只是拒绝、反问或转移话题，不能不作答就走。对话对象当场换手（被传入阁面圣、正主登场等）：把 scene.who 改写为新对象（档案在册的称谓），过渡写进 parts 的 narr 段，新对象的言行照常写 act/say，scene.state 用 "ongoing" 继续对谈。引见场景：太监或宫人把人引到后，正主开口的那一轮 scene.who 必须改为正主（帝写「皇帝」），本轮只写正主的言行，引见者的话放 narr 段；不得让引见者一直占着对话人。主次纪律：太监、宫女、嬷嬷只通传引路捧物，不得替主子发话、下令、代答；场上正主已到（人在殿中、已开口、已展卷、已落座）而本轮写的还是宫人的话，就是错的——必须交出 scene.who，让正主自己说。',
 '【承接】严格承接用户消息里的本场对话记录，把话题往前推；对方只依据自己的性情、目标、与主控的关系及已知信息回应。',
 '【信息】玩家直接问到对方知道的事，必须在本轮给出实质信息：具体名目、缘由、时间、经手人或明确去处。可以害怕、压低声音、提条件，但不能用“谁提谁落不是”“只当没听见”这类空话把话吊住；确实不能说时，须给出具体缘由与下一步可问的人或可查之处。同一件事不得连续两轮只含糊拖延，玩家追问必须推进。不得凭空发明与存档无关的禁忌或旧案；若引入新的忌讳，必须同时讲清它是什么、为何犯忌、与谁相关。',
+'【戏核】本场信息里的 brief 是这场戏的核心问题：玩家要得到/保住什么、谁在阻止、失败失去什么。每轮都必须让这个问题前进一步；不得另起无关的小问题。若本场确实没有明确得失，只写一句交代，不要用追问硬撑。',
+'【有事】每轮至少让事态变一点：有人来、物被拿走、传旨、搜检、当众发难、证据出现、条件变化；不能只有问答。',
+'【不挤牙膏】对方知道的关键信息一轮内给足；不得把同一件事拆成多轮追问。问完必须给出自己的立场、条件或处置；不能只问不答。',
+'【琐事不成场】核对簿册、传话、礼数、花色、茶点等，除非直接牵连位份/恩宠/银钱/子嗣/性命/把柄/派系/任务，否则不得单独成场。',
 '【称谓】scene.parts 的 say/quote 中，人物提到天子一律称「陛下」，不得写「帝」；narr 与 narrative 等叙述仍称「帝」。',
-'【推进】不得原地盘问：对方问过并得到回答的事，不得再问或换个说法重问；玩家答过即视为已交代，只能追问新的细节或给出处置。每轮至少推进一项：新信息、决定、态度/关系变化、后果或新的具体行动。不要为凑对话制造无意义的盘问、试探或临时加码的审查。',
-'【选项】本轮 options 必须与上一轮不同，不得原句或同义改写；玩家已选过、答过的方向不再作为选项。当前话题问尽时，转向处置、条件、人情或下一步行动，不得靠重复提问拖长对话。',
+'【推进】不得原地盘问：对方问过并得到回答的事，不得再问或换个说法重问；玩家答过即视为已交代，只能追问影响得失的关键点，或直接给出处置。每轮至少推进一项：新信息、决定、态度/关系变化、后果或新的具体行动。不要为凑对话制造无意义的盘问、试探或临时加码的审查。',
+'【选项】本轮 options 必须与上一轮不同，不得原句或同义改写；玩家已选过、答过的方向不再作为选项。每个选项必须是不同的决定或策略（答应、拒绝、拖延、反将、求助、交换条件等），不是同一问题的不同问法；每个选项至少写出一项当下可见的机会或代价。当前话题问尽时，转向处置、条件、人情或下一步行动，不得靠重复提问拖长对话。',
 '【言行】protagonist.stance 是主控当下的外貌与忌惮档位：对方的措辞、眼神、称呼分寸须据此与位份、关系统一；外貌档位高可写多看一瞬、语气放软，忌惮档位高可写斟酌用词、不敢对视；不报数值与档位。',
 '【帝设】若【本场信息】中 world.emperor.persona 非空，那是玩家亲撰的帝设：凡与帝相关的演绎（本场对话及一切正文），他的言行、口味与待主控的态度都须严格符合帝设，其优先级高于性情词表与既有印象；persona 中的 <player> 已替换为主控姓名，正文里主控仍称“你”。'
 ].join('\n');
@@ -3914,6 +3922,7 @@ function buildSceneSystem(who){
       recent:Array.isArray(prof.recent)?prof.recent.slice(-2):[]},
     world:{dynasty:w.dynasty,emperor:w.emperor?{name:w.emperor.name,age:w.emperor.age,traits:w.emperor.traits,persona:String(w.emperor.persona||'').split('<player>').join(String(p.name||'主控'))}:null,factions:w.factions},
     activePlots:(state.plots||[]).filter(x=>x.stage==='进行中').slice(0,6).map(x=>({title:x.title,line:x.line,note:String(x.note||'').slice(0,100)})),
+    brief:(typeof sceneCtx!=='undefined'&&sceneCtx&&sceneCtx.brief)?sceneCtx.brief:null, // 本场戏核：目标/阻碍/得失
     recentFacts:(state.recentConfirmedFacts||[]).slice(-3)
   };
   return SCENE_RULES+'\n\n【本场信息】\n'+JSON.stringify(payload);
@@ -6844,7 +6853,11 @@ const Game={
       ],
       scene:{state:'ongoing',who:'皇帝',line:opening.line,when:'昨夜',where}
     });
-    if(sceneCtx){sceneCtx.chamber=true;sceneCtx.standalone=true;sceneCtx.chamberWhere=where;this.renderSceneOpts(sceneCtx.lastOptions)} // 夜话不结算，重排操作栏隐去赠礼
+    if(sceneCtx){
+      sceneCtx.chamber=true;sceneCtx.standalone=true;sceneCtx.chamberWhere=where; // 夜话不结算，重排操作栏隐去赠礼
+      sceneCtx.brief={kind:'chamber',question:`与${dispName(sceneCtx.who)}的这一夜：主控想从他那里得到什么（一句话、一个态度、一个承诺），他愿意给多少，分寸与后果是什么？`,stake:'',opponent:sceneCtx.who,note:'',source:''};
+      this.renderSceneOpts(sceneCtx.lastOptions);
+    }
     $('#chatTitle').textContent='承宠 · 帝';
     Game._chamberReport=null;
   },
@@ -6942,7 +6955,10 @@ const Game={
       {id:'c',text:'问话：之前交代的事办得如何'},
       {id:'d',text:'闲聊几句，看看她的心思'}
     ],scene:{state:'ongoing',line:greet,when:fmtTime(),where:home}});
-    if(sceneCtx){sceneCtx.local=true;sceneCtx.standalone=true;sceneCtx.maid=true} // 本地开场：一言未发即结束不结算；问话想聊多久聊多久，只有玩家点「结束对话」才收场
+    if(sceneCtx){
+      sceneCtx.local=true;sceneCtx.standalone=true;sceneCtx.maid=true; // 本地开场：一言未发即结束不结算；问话想聊多久聊多久，只有玩家点「结束对话」才收场
+      sceneCtx.brief={kind:'maid',question:`${name}来回话：主控要问清什么、要她办什么；她会不会推诿、提条件或带来新消息？`,stake:'',opponent:name,note:'',source:name};
+    }
   },
   nextTurn(){ // 休息，进入下一旬：旬数+1，精力回满，日历按两旬制推进
     const prevTime=Object.assign({},state.time);
@@ -7429,6 +7445,20 @@ const Game={
     sceneCtx={who:canonicalSceneWho(who0)||who0,round:1,lastOptions:Array.isArray(p.options)?p.options:(Array.isArray(sc.options)?sc.options:[]),offered:[],lines:[],meta:{when:'',where:''},resolveRetried:false,
       scheme:Game._pendingScheme||null,check:null,schemeDone:false};
     Game._pendingScheme=null; // 只认本场：下一场不继承
+    { // 戏核：每轮都带上"要争什么、谁在阻止、失败失去什么"，模型才不会靠琐事续命
+      const adj=Game._lastAdj||{};
+      const plot=adj.target||[...(adj.overdue||[]),...(adj.due||[]),...(adj.stale||[])][0]||null;
+      const sch=sceneCtx.scheme, fest=adj.fest||null;
+      const kind=sch?'scheme':plot?'plot':fest?'festival':adj.gardenMeet?'encounter':'social';
+      const stake=sch?(SCHEME_TARGET_TEXT[sch.target]||sch.target||''):'';
+      let question='',opponent='';
+      if(kind==='scheme'){opponent=sch.who;question=`面对${sch.who}的${sch.methodName||'发难'}，主控要保住${stake||'自身'}：她为什么现在出手，主控愿意或必须付出什么代价？`}
+      else if(kind==='plot'){question=`「${plot.title}」：主控要推进或了结此事；谁在阻止，失败会失去什么？`}
+      else if(kind==='festival'){opponent=fest.host||'';question=`「${fest.name}」：主控要在宴上得到或保住什么，谁在暗处使绊子，失仪会失去什么？`}
+      else if(kind==='encounter'){opponent=who0;question=`与${who0}的这次偶遇：主控想弄清什么、留下什么印象，对方的态度如何；说错话会失去什么？`}
+      else{opponent=p.eventSource||sceneCtx.who;question=`与${opponent}的这次交涉：主控要问清什么、办成什么，对方要什么，谈崩会失去什么？`}
+      sceneCtx.brief={kind,question,stake,opponent,note:plot?String(plot.note||'').slice(0,120):'',source:p.eventSource||''};
+    }
     sceneWhoHint=null; // 说话人已定，兜底提示不再外溢到下一场
     const parts=this.sceneParts(sc);
     const ho=applySceneHandoff(parts,p.narrative,sceneCtx.who); // 开场就是引见/通传：正主已开口就当场交人
@@ -7647,17 +7677,20 @@ const Game={
         (sceneCtx.scheme?`\n这是${sceneCtx.scheme.who}的暗流发难：若败，须把「${SCHEME_TARGET_TEXT[sceneCtx.scheme.target]||sceneCtx.scheme.target}」受损写实；若胜，须写她的布置如何败露、她如何自处，不得让她全身而退。`:'')+
         (fail?'\n失手/大败必须留下真损失，不得写成虚惊一场；statePatch 里要能看见至少一项下调。':'');
     }
+    const b=sceneCtx.brief;
+    const strongBrief=b&&(b.kind==='scheme'||b.kind==='plot'||b.kind==='festival');
+    const briefNote=b&&b.question?`【本场戏核】${b.question}${b.note?`（背景：${b.note}）`:''}${b.stake?`（得失：${b.stake}）`:''}${strongBrief?'本轮必须让这个核心问题前进一步：给出新信息、条件、决定、代价或后果；不得转向簿册、花色、茶点等无关细节，也不得另起无关的小问题。':'本场不必强行制造冲突；每轮必须让关系、信息或态度有实际变化，没有新内容就一句交代，不要用追问硬撑。'}`:'';
     const prevOffered=(sceneCtx.offered||[]).slice(-8);
     const optNote=prevOffered.length?`此前已给过的接话选项：${prevOffered.map(t=>`「${t}」`).join('；')}。本轮必须换新的方向，不得重复这些原句或同义改写；玩家已选过、答过的方向不再作为选项。`:'';
     const asked=(sceneCtx.lines||[]).filter(l=>l.who==='npc'&&/[？?]/.test(String(l.text||''))).slice(-5).map(l=>`「${String(l.text||'').slice(0,40)}」`).join('；');
-    const askedNote=asked?`本场对方已经问过的问句：${asked}。这些已经得到回答，不得再问或换说法重问；只能追问新的细节，或直接给出处置、条件与下一步行动。`:'';
+    const askedNote=asked?`本场对方已经问过的问句：${asked}。这些已经得到回答，不得再问或换说法重问；只能追问影响得失的关键点，或直接给出处置、条件与下一步行动。`:'';
     let handoffNote='';
     if(isServantWho(sceneCtx.who)){ // 通传引路的宫人占着对话人：正主一到就得交人，别让她一直代言
       const heard=sceneCtx.lines.map(l=>String(l.text||'')).join(' ');
       const inRoom=/陛下|皇上|圣上|御前|御案|御笔|御览|龙颜|主子|娘娘|太后|贵妃|贵人/.test(heard);
       handoffNote=`本场对话人${sceneCtx.who}只是通传、引路、捧物的宫人${inRoom?'，场上已有正主（帝、后、贵妃等）在场、甚至已经开口':''}：正主一到就由正主自己说话——把 scene.who 改写为正主（帝写「皇帝」），正主的话写进 say 并标 who，${sceneCtx.who}这一轮至多一句通传或一个陪衬动作；不得替正主发话、替正主下令，也不得把正主的意思吞下去只写她自己的反应。`+(inRoom?'本场已拖了几轮没让正主开口，这一轮必须交人。':'');
     }
-    let msg=`第${xunNo()}旬剧情对话第${r}轮：玩家应对「${choice}」。演绎场上人物的当即反应与场面变化（以${sceneCtx.who}为主；正主在场则由正主开口，按 who 分人）：输出 scene.parts（2—5 段，act 写人物动作神态并会并入其对话气泡，say 写人物台词，quote 写转述他人原话，narr 只写其他人物与客观场面，台词都不带引号，按语义分段而非按标点硬切；总长 ≤80 字）、scene.where/when（有变化才写）与 2—3 个接话选项；此阶段不结算数值。scene.state 一律写 "ongoing"——不要写 resolve 或 wrap，不要替玩家结束对话；${sceneCtx.who}（或当场的正主）必须回应玩家这句话，哪怕只是拒绝、反问或转移话题，也不能不作答就走。对话对象当场换手（被传入阁面圣、正主登场等）：把 scene.who 改写为新对象，过渡写进 parts 的 narr 段，新对象的言行照常写 act/say，scene.state 用 "ongoing" 继续对谈，不得就此 resolve。${handoffNote}${optNote}${askedNote}${maidNote}${chamberNote}${judgeNote}`+this.sceneContextBlock();
+    let msg=`第${xunNo()}旬剧情对话第${r}轮：玩家应对「${choice}」。演绎场上人物的当即反应与场面变化（以${sceneCtx.who}为主；正主在场则由正主开口，按 who 分人）：输出 scene.parts（2—5 段，act 写人物动作神态并会并入其对话气泡，say 写人物台词，quote 写转述他人原话，narr 只写其他人物与客观场面，台词都不带引号，按语义分段而非按标点硬切；总长 ≤80 字）、scene.where/when（有变化才写）与 2—3 个接话选项；此阶段不结算数值。scene.state 一律写 "ongoing"——不要写 resolve 或 wrap，不要替玩家结束对话；${sceneCtx.who}（或当场的正主）必须回应玩家这句话，哪怕只是拒绝、反问或转移话题，也不能不作答就走。对话对象当场换手（被传入阁面圣、正主登场等）：把 scene.who 改写为新对象，过渡写进 parts 的 narr 段，新对象的言行照常写 act/say，scene.state 用 "ongoing" 继续对谈，不得就此 resolve。${handoffNote}${briefNote}${optNote}${askedNote}${maidNote}${chamberNote}${judgeNote}`+this.sceneContextBlock();
     if(sceneCtx.chamber)msg=msg.replace(/她/g,'帝');
     this.requestScene(msg,choice,MAX_OUTPUT_TOKENS,true,true); // 正常接话轮永不结算：聊多久由玩家决定，点「结束对话」才收场
   },
