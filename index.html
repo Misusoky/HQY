@@ -1305,6 +1305,41 @@ function nextMonthFirstSerial(t,m){ // 同一处「m 月上旬」的旬号（与
   return nextMonthSerial(t,m)-1;
 }
 function dueTextFor(t,m){let y=Number(t.year)||1;if(m<Number(t.month)||(m===Number(t.month)&&t.xun==='下旬'))y+=1;return `${t.era||''}${y}年${MONTHS[m]}内`}
+/* 期限话术 → 旬号：模型只会写「九月内」「冬月上旬」「三旬内」这类人话，内部旬号必须由前端换算，
+   绝不让模型直接给数字（它不知道 serial 的起点，才会出现"起于九月下旬、限期冬月上旬"这种自相矛盾）。 */
+function cnNum(v){
+  const t=String(v||'').trim();
+  if(/^\d+$/.test(t))return +t;
+  const m={一:1,二:2,三:3,四:4,五:5,六:6,七:7,八:8,九:9,十:10};
+  if(/^十[一二]$/.test(t))return 10+m[t[1]];
+  return m[t]||null;
+}
+const DUE_FEST_MONTH=[['中秋',8],['上元',1],['元宵',1],['端午',5],['七夕',7],['重阳',9],['冬至',11],['岁末',12],['年关',12]]; // 节令落到对应月份
+function dueRangeFromText(txt){ // {earliest,latest}；认不出返回 null（宁可无期限，也不瞎编）
+  if(!state||!state.time)return null;
+  const s=String(txt||'').trim();if(!s)return null;
+  const now=xunSerial(state.time),curYear=Number(state.time.year)||1,curMonth=Number(state.time.month)||1;
+  if(/本旬/.test(s))return {earliest:now,latest:now};
+  if(/下(一)?旬/.test(s)&&!/(上旬|中旬|下旬)/.test(s))return {earliest:now+1,latest:now+1};
+  const rel=s.match(/(\d+|[一二三四五六七八九十]+)\s*旬\s*(?:之?内|以内)?/);
+  if(rel&&!/(上旬|中旬|下旬)/.test(s)){ // 「三旬内」「两旬之内」：本旬起算
+    const n=cnNum(rel[1]);
+    if(n)return {earliest:now,latest:now+Math.max(0,n-1)};
+  }
+  const ym=s.match(/(\d+)\s*年/);
+  let m=null;
+  for(let i=1;i<=12;i++)if(s.includes(MONTHS[i])){m=i;break}
+  if(!m)for(const w of DUE_FEST_MONTH)if(s.includes(w[0])){m=w[1];break}
+  if(!m)return null;
+  let y=ym?+ym[1]:curYear;
+  if(!ym&&(m<curMonth||(m===curMonth&&state.time.xun==='下旬')))y+=1;
+  let first=(y-1)*24+(m-1)*2;
+  let latest=/上旬/.test(s)?first:first+1; // 中旬/下旬/「月内」都按月末那一旬算
+  if(!ym&&latest<now){ // 话术里的日子今年已经过去：按本旬到期处理，别让它悬在明年
+    first=now;latest=now;
+  }
+  return {earliest:Math.min(first,now),latest};
+}
 
 /* ============================================================ 岁岁节宴（写死的固定日历）
    日期钉在月旬上：每年到这一旬必触发，不掷骰、不受剧情冷却影响，模型不得改期、略过或推到来旬。
@@ -1412,20 +1447,49 @@ function mergePlots(base,incoming,nowTurn){ // 增量回写：模型只给变化
     const old=byId.get(String(raw.id));
     if(!old){
       const p=sanitizePlot(raw);
-      if(p&&p.title){p.touch=nowTurn;list.push(p);byId.set(p.id,p)}
+      if(p&&p.title){
+        // 起于=建档这一旬；限期只从 dueText 换算，模型给的旬号一律不认
+        if(!p.schemeId){
+          const r=dueRangeFromText(raw.dueText);
+          p.earliest=nowTurn;
+          p.latest=r?Math.max(r.latest,nowTurn):null; // 话术写成过去了就是本旬到期，别让新条目一落地就逾期
+        }
+        p.touch=nowTurn;list.push(p);byId.set(p.id,p)
+      }
       continue;
     }
     const merged=Object.assign({},old);
-    for(const k of ['title','line','stage','earliest','latest','dueText','goal','note'])if(raw[k]!==undefined)merged[k]=raw[k];
+    for(const k of ['title','line','stage','dueText','goal','note'])if(raw[k]!==undefined)merged[k]=raw[k];
+    // 期限跟着 dueText 走：模型改期限话术才重算，没改就沿用旧旬号；它直接写的数字不作数
+    if(!merged.schemeId&&raw.dueText!==undefined&&String(raw.dueText||'')!==String(old.dueText||'')){
+      const r=dueRangeFromText(raw.dueText);
+      merged.latest=r?Math.max(r.latest,nowTurn):(raw.latest!=null?Number(raw.latest):old.latest);
+    } else if(merged.schemeId&&raw.latest!==undefined){
+      merged.latest=sanitizePlot(raw).latest; // 暗流钉死的时刻由暗流账写，照收
+    }
     const p=sanitizePlot(merged);
     if(p){
-      const progressed=(raw.stage!==undefined&&raw.stage!==old.stage)||(raw.latest!=null&&raw.latest!==old.latest)||(raw.earliest!=null&&raw.earliest!==old.earliest)||(raw.dueText!==undefined&&raw.dueText!==old.dueText); // 实质推进：兑现/作废/立改期限；原样重发期限或只改写 note 文案都不算（防止"每旬换个说法"架空发酵裁决）
+      const progressed=(raw.stage!==undefined&&raw.stage!==old.stage)||(p.latest!=null&&p.latest!==old.latest)||(raw.dueText!==undefined&&raw.dueText!==old.dueText); // 实质推进：兑现/作废/立改期限；原样重发期限或只改写 note 文案都不算（防止"每旬换个说法"架空发酵裁决）
       if(progressed){p.touch=nowTurn;p.staleMiss=0}else{p.touch=old.touch;p.staleMiss=old.staleMiss} // 敷衍回写：挂账时钟照走
       p.echoMiss=0;Object.assign(old,p)}
   }
   return list;
 }
 function activePlots(){return ((state&&state.plots)||[]).filter(p=>p.stage==='进行中')}
+function repairPlotTimes(){ // 旧档纠偏：起于不得晚于本旬；写明年月的期限以 dueText 为准（模型给的旬号常自相矛盾）
+  if(!state||!Array.isArray(state.plots))return;
+  const now=xunSerial(state.time);
+  for(const p of state.plots){
+    if(!p||p.stage!=='进行中'||p.schemeId)continue;
+    if(p.earliest!=null&&p.earliest>now)p.earliest=now;
+    const t=String(p.dueText||'');
+    if(/(正月|二月|三月|四月|五月|六月|七月|八月|九月|十月|冬月|腊月)|\d+\s*年/.test(t)){
+      const r=dueRangeFromText(t);
+      // 只纠「写得明明白白、又和限期对不上」的：不翻早已埋掉的旧账，也不把期限推到一年外
+      if(r&&r.latest!=null&&r.latest!==p.latest&&r.latest>=now-2&&r.latest<=now+6)p.latest=r.latest;
+    }
+  }
+}
 const GRACE_GUIDE=[ // 新入宫引导旬：缓冲期内每旬一项指引，借剧情带玩家认识玩法（融在叙事里，不说破系统与界面）
 '认住处——借掌事宫女之口带主控走一遍寝殿：何处可静养、何处吩咐本旬行事与召宫人问话、从哪儿出门往宫城去、何处可修习才艺；挑两处自然带入行文',
 '识宫人——把配属的掌事姑姑与宫女演活（姓名、性情、可靠与否的初印象），顺势演一场主仆对话，让主控试着吩咐一件小事，带出"吩咐下去、日后某旬兑现"的章法',
@@ -1450,6 +1514,7 @@ function matchPending(ctxList){ // 与给定语境相关的待续琐事（同 ma
   });
 }
 function adjudicatePlots(skipDice){ // 旬首裁决：到期强制兑现 + 前端剧情骰被动触发（每旬一次，冷却 gated；skipDice=玩家主动触发，骰子让位）
+  repairPlotTimes();
   const now=xunSerial(state.time);
   const meta=ensurePlotMeta();
   const fest=festivalOf(state.time); // 本旬固定节宴（月旬写死，不参与掷骰）
@@ -1495,14 +1560,14 @@ function adjudicatePlots(skipDice){ // 旬首裁决：到期强制兑现 + 前�
   if(pendStale.length)lines.push(`【须处理·琐事发酵】${pendStale.map(x=>pendText(x)).join('；')}。挂账超 ${STALE_PLOT_XUN} 旬未办，同样须在本旬逐一处理：①本旬办掉——演绎中顺手办完，从 statePatch.pending 移除；②升级为剧情——移入 statePatch.plots 立为引线（从 pending 移除，按引线规则走）；③仍需时日——改写文本说明现状（回写即重置计旬）。采买、传话、送物、回礼等举手之劳不得以"仍需时日"拖延，本旬办掉；连续 ${STALE_AUTO_EXPIRE} 旬列入仍无变动，前端自动清除。`);
   if(target)lines.push(`【触发·剧情骰命中】${describePlot(target)}。本轮必须触发该线的后续剧情，用剧情对话 scene 结构呈现（对方说话、玩家接话），让它推进或了结；本轮 hasEvent=true。`);
   else if(hit)lines.push('【触发·全新引子】剧情骰命中：本轮必须触发一条全新剧情引子，用 scene 对话结构呈现；引子须从主控本旬所选重心与当前处境自然长出（主控正在做的事、主控见过或将见的人）；事后为它立一条新引线写入 statePatch.plots（id 用 "p-" 加短标题）。');
-  else if(mainPub&&!schemeFire)lines.push(`【发布·新主线】剧情账中已无进行中的主线（前主线已兑现或作废）。本旬必须开立新主线：从主控位份、处境、派系、恩宠与既有伏笔自然长出（晋升之途、子嗣、旧案、母族、新敌皆可），与在途引线、发酵条目并行不悖——若本旬同时列有须处置的发酵条目，可同一场戏处置：了结旧事时引出新线头；新主线以剧情对话 scene 结构呈现，给 2—4 个接话选项后停止，不结算应对后果；无论如何都须以 statePatch.plots 新增一条 line="主线" 的台账条目（id 用 "p-" 加短标题，goal 写清要做什么、找谁、怎样算成，note 一句话写清走向，可给 dueText 期限）。${meta._mainMissed?'此前已要求开立新主线仍未见台账回写，本轮务必落账。':''}`);
+  else if(mainPub&&!schemeFire)lines.push(`【发布·新主线（可选）】剧情账中已无进行中的主线。若这两三旬里确有自然长出的线头（位份、子嗣、旧案、母族、新敌等已在演的伏笔），可开立一条新主线：从主控处境与既有伏笔长出来，与在途引线、发酵条目并行不悖——若本旬同时列有须处置的发酵条目，可同一场戏处置：了结旧事时引出新线头；新主线以剧情对话 scene 结构呈现，给 2—4 个接话选项后停止，不结算应对后果。若确无线头，就空着本轮不发布：不要为了填主线槽位硬编名字、硬挂期限，也不要拿不相干的在途支线改个标题充数。发布时以 statePatch.plots 新增一条 line="主线" 的台账条目（id 用 "p-" 加与内容相符的短标题，goal 写清要做什么、找谁、怎样算成，note 一句话写清走向；dueText 只写这一件事真正的期限，如「九月内」「三旬内」，没有期限就不写——起于与限期由前端按 dueText 换算，不要写 earliest/latest 数字）。${meta._mainMissed?'此前已提示开立新主线仍未见台账回写：仍无自然线头就继续空着，不必硬补。':''}`);
   else if(festNew&&!festSoft)lines.push('本旬剧情额度由节宴与上述条款共用一场：到期/发酵的事一并拿到宴上处置、散席后续接，不再另开新剧情；宴上了结的事照常回写台账，其余安排照常演绎养成。');
   else if(stale.length||pendStale.length)lines.push('【触发·发酵条目优先】本旬的主要剧情额度用于处理上述搁置发酵条目（含琐事），不再另开新剧情；处理完毕并回写台账后，本旬其余安排照常演绎养成。');
   else if(!due.length&&!overdue.length&&!schemeFire)lines.push(skipDice?'本轮为玩家主动触发，剧情骰不参与、不消耗；按上方指令照常演绎，相关剧情线变动仍须回写台账。':meta.graceOn?`新入宫·引导旬（第 ${(state.turn||0)+1}／${meta.graceTurn} 旬）：不触发需要应对的随机剧情，hasEvent 保持 false。请在演绎本旬重心的同时，自然带出一项入宫引导——${GRACE_GUIDE[Math.min(state.turn||0,GRACE_GUIDE.length-1)]}。`:`本旬剧情骰未命中（触发概率 ${Math.round(PLOT_TRIGGER_BASE*100)}%；冷却：距上次主要剧情 ${state.turn-(meta.lastEventTurn??-99)} 旬、距上次大事件 ${state.turn-(meta.lastBigTurn??-99)} 旬）。本旬不触发需要应对的剧情，只演绎养成过程；可酌情添加不占冷却的轻量日常碎事。`);
   if(due.length||overdue.length)lines.push('本旬至多突出一条主要剧情；到期剧情兑现时 hasEvent=true，给出选项或 scene 对话后停止，不结算应对后果。');
   else if(stale.length||pendStale.length)lines.push('发酵条目兑现时 hasEvent=true，给出选项或 scene 对话后停止，不结算应对后果；改写期限或作废（琐事办掉/升级/改写）则 hasEvent 可保持 false，但 statePatch.plots 与 statePatch.pending 必须回写。');
   else if(hit)lines.push('剧情骰命中的触发同样每旬至多一条；进入 scene 对话后给 2—4 个接话选项，等待玩家应对。');
-  else if(mainPub)lines.push('新主线发布每旬至多一条：scene 对话呈现，给 2—4 个接话选项，等待玩家应对；与发酵条目同场时 hasEvent 随那场处置戏；新主线条目必须随本轮 statePatch.plots 落账。');
+  else if(mainPub)lines.push('新主线是可选件：确有自然线头才发，每旬至多一条；没有就空着，不必硬编。发布时以 scene 对话呈现，给 2—4 个接话选项，等待玩家应对；与发酵条目同场时 hasEvent 随那场处置戏；条目随本轮 statePatch.plots 落账，标题要与 goal 说同一件事，dueText 只写真实期限或不写。');
   for(const l of emp.lines)lines.push(l);
   for(const l of sch.lines)lines.push(l);
   if(schemeFire)lines.push('本旬主戏是暗流发难：hasEvent=true，用 scene 开场，给 2—4 个应对选项。结果不掷骰：由你根据玩家选择、当前局势、她的性格与手段推断成败；收尾时在顶层写 schemeOutcome（win/draw/lose/defuse），并把实际后果写进 narrative/changes/statePatch。不要写成虚惊一场，也不要让出手的人无代价退走。');
@@ -2371,10 +2436,10 @@ const EMPEROR_PERSONA_MODULE = [
 const PLOTS_MODULE = [
 '## 八、剧情台账（plots；本条覆盖"待兑现事项"的既有写法）',
 '存档 plots 为结构化剧情账，是剧情触发与兑现的唯一依据；pending 只留非剧情琐事（当票、节令预备、回礼等），不再记剧情引线。',
-'条目字段：id（唯一，长期沿用）、line（主线/支线/引线/敌对/目标）、title、stage（进行中/已兑现/已作废）、goal（任务说明：要做什么、找谁、做到什么算成，80字内，新建时必写；追加新线索时可补写）、earliest/latest（内部旬号由前端维护，到期与否以每旬请求中的【剧情裁决】块为准）、dueText（人类可读期限）、note（一句话现状，随推进更新）。',
+'条目字段：id（唯一，长期沿用；不要把一条旧条目改写成另一件事，新事用新 id）、line（主线/支线/引线/敌对/目标）、title（与 goal 必须说同一件事）、stage（进行中/已兑现/已作废）、goal（任务说明：要做什么、找谁、做到什么算成，80字内，新建时必写；追加新线索时可补写）、dueText（人类可读期限，如「九月内」「三旬内」；没有期限就不写）、note（一句话现状，随推进更新）。earliest/latest 是前端按 dueText 换算的内部旬号，模型不要输出这两个字段。',
 '每旬第一轮请求附有【剧情裁决】块：是否触发剧情由前端掷骰并写明（剧情骰命中/未命中、命中哪条线），到期/超期条目必须当旬兑现，模型不再自行决定是否触发。每旬至多一条主要剧情（世界书既有纪律仍有效）。',
 '每旬裁决块附【自查·在途账目】：列出全部在途条目并附客观线索（近期手作记录、行囊相关之物、相关人面板数值）。主持人须逐条对照截至本旬已真实发生的剧情事实：条件其实已经满足的，当轮必须兑现（stage 改"已兑现"，附积分与任务进度），不得继续挂账；线索仅供对照、不作裁决，以剧情事实为准，不得无中生有地兑现。',
-'主线不断档：进行中的主线兑现或作废后清零，裁决块会以【发布·新主线】要求本旬剧情额度空出的常规回合开立新主线；新主线与在途引线、发酵条目并行共存（可与发酵处置同场：了结旧事时引出新线头）；模型须经 statePatch.plots 新增 line="主线" 条目（id 用 "p-" 加短标题），正文埋入落账亦可，不强求单独成戏。',
+'主线不是配额：进行中的主线兑现或作废后可以空着，空的旬数不设上限。裁决块顶多以【发布·新主线（可选）】提示一次，确有从当前处境与既有伏笔自然长出的线头才发；没有就不发，不得为了补槽位硬编名字、硬挂期限，也不得把不相干的支线改个标题充主线。标题必须与 goal 说同一件事（写中秋就管中秋，写某处线索就管那条线索），dueText 只写这件事真实的期限（如「九月内」「三旬内」），没有期限就不写；earliest/latest 由前端按 dueText 换算，模型不要写数字。发布时经 statePatch.plots 新增一条 line="主线" 条目（id 用 "p-" 加短标题），正文埋入落账亦可，不强求单独成戏。',
 '无期限（缓图）条目并非永久挂账：悬置超过 4 旬未推进即"发酵"，会在裁决块以【须处理·搁置发酵】列出，当旬必须择一处理——兑现为剧情（旬首直接弹出，hasEvent=true）、改写期限（note 说明理由并给新 dueText）或作废（注明发酵后果）；连续 3 旬不回写前端自动作废。',
 '每轮结算（第一、二轮皆然）只经 statePatch.plots 回写【发生变化的条目】（新增、更新、兑现、作废）；只回写发生变化的条目，前端按 id 合并，漏写视为不变。',
 '兑现与"改备注"是两回事：条目条件已满足——所托之事办成、所求之物送到并被收下、当众献艺达成等——必须把该条目 stage 改为"已兑现"，可另附积分（protagonist.points）与"本旬变化"中的任务进度；只改写 note 而 stage 留在"进行中"，一律视为未办结，任务继续挂账。任务兑现不拘形式：亲手做的成品相赠、拜托旁人代办、旧约当面履行皆可；手作成品对应任务时的兑现规则另见手作模块。',
@@ -3755,10 +3820,14 @@ function compactState(s,focusMsg){ // 只压缩送入模型的那一份，localS
     }
     out.relationships=rels;
   }
-  // 剧情台账：进行中的全留，已结的只留最近 5 条
+  // 剧情台账：进行中的全留，已结的只留最近 5 条（内部旬号不送：模型只会照抄出错的数字）
   if(Array.isArray(s.plots)){
     const done=s.plots.filter(p=>p.stage!=='进行中').slice(-5);
-    out.plots=[...done,...s.plots.filter(p=>p.stage==='进行中')].map(p=>Object.assign({},p,{note:String(p.note||'').slice(0,100)}));
+    out.plots=[...done,...s.plots.filter(p=>p.stage==='进行中')].map(p=>{
+      const c=Object.assign({},p,{note:String(p.note||'').slice(0,100)});
+      delete c.earliest;delete c.latest;delete c.touch;delete c.staleMiss;delete c.echo;delete c.echoMiss;delete c.echoTotal;
+      return c;
+    });
   }
   // 暗流账：只送在途图谋，够模型写出征兆与发难
   if(Array.isArray(s.schemes)){
@@ -4574,6 +4643,7 @@ const UI={
   },
   sheetPlotDetail(id){ // 剧情账详情：任务说明、期限、当前进展与相关记事
     const back='<button class="backbtn" onclick="UI.sheetBack()">◀ 返回</button>';
+    repairPlotTimes(); // 旧档里模型瞎写的「起于/限期」按 dueText 纠正后再显示
     const p=(state.plots||[]).find(x=>String(x.id)===String(id));
     if(!p)return back+'<div class="sec"><div class="sheet-note">这条已不在账上。</div></div>';
     const now=xunSerial(state.time);
@@ -4599,7 +4669,19 @@ const UI={
       </div>
       <div class="sec"><div class="sec-cap">任务说明</div>${goal||'<div class="sheet-note" style="margin:0">尚未写明说明；此后推进时补记。</div>'}</div>
       ${note}${logSec}
-      ${hint?`<div class="sheet-note">${esc(hint)}</div>`:''}`;
+      ${hint?`<div class="sheet-note">${esc(hint)}</div>`:''}
+      ${p.stage==='进行中'&&!p.schemeId?`<div class="setbtns"><button class="btn btn-line" onclick="UI.dropPlot('${esc(p.id)}')">与实情不符，作废此条</button></div>`:''}`;
+  },
+  dropPlot(id){ // 玩家自行作废一条剧情账：模型硬编出来的主线、与标题不符的旧条目，不必留着膈应自己
+    const p=(state.plots||[]).find(x=>String(x.id)===String(id));
+    if(!p||p.stage!=='进行中')return;
+    if(!confirm(`作废「${p.title}」？作废后不再出现在剧情账与到期裁决里。`))return;
+    p.stage='已作废';p.touch=xunSerial(state.time);
+    const meta=ensurePlotMeta();meta.ackedMain=(Array.isArray(meta.ackedMain)?meta.ackedMain:[]).concat([p.id]); // 玩家自己作废的，不再弹「主线了结」
+    chronicleAdd(`${p.line}「${p.title}」：由主控自行作罢`);
+    persistCurrent();markSafe();UI.updateStatusbar();
+    toast('已作废');
+    this.sheetBack();
   },
   sheetState(){ // 局面：当前处境 + 剧情到期 + 剧情账 + 待续（原"本旬纪事"的信息归此）
     const adj=(state.plots&&state.plots.length)?adjudicatePlots():{due:[],overdue:[],stale:[],pendStale:[]};
@@ -7111,7 +7193,7 @@ const Game={
     if(fest)msg+=`本旬逢固定节宴「${fest.name}」（${fest.scale}，${festWhen(fest)}必至），宴须当旬演出。`;
     if(items)msg+=`以下事项已搁置发酵，须立即处置：${items}。`;
     if(schemeHit)msg+=`暗流发难，就在本旬：${adj.schemeFire.map(s=>`${s.who}（${s.aim}，冲你的${SCHEME_TARGET_TEXT[s.target]||s.target}）`).join('；')}。这是当旬主戏，hasEvent=true，用 scene 开场；写清她怎么动的手、你被逼到哪一步；给 2—4 个应对选项，结果由你根据玩家选择、局势与她的人设推断，收尾写 schemeOutcome。${fest?'发难就摆在宴上，宴席同时是本场舞台。':''}`;
-    if(mainMiss)msg+=`${items?'同场处置（了结旧事时引出新线头）——':''}剧情账中已无进行中的主线任务，本旬旬首即须发布新主线：从主控位份、处境、派系、恩宠与既有伏笔自然长出（晋升之途、子嗣、旧案、母族、新敌皆可）。`;
+    if(mainMiss)msg+=`${items?'同场处置（了结旧事时引出新线头）——':''}剧情账中已无进行中的主线：这不等于必须发一条。若确有从当前处境与既有伏笔自然长出的线头（位份、子嗣、旧案、母族、新敌），可顺势开立；没有就空着，不要为了补槽位硬编名字与期限。若发布，标题须与 goal 说同一件事，dueText 只写真实期限或不写，earliest/latest 不要写数字。`;
     if(visitHit)msg+=`${items||mainMiss?'——同场带出帝线：':''}本旬旬首，帝主动与主控相见（恩宠所致，不必另寻由头）——${favor>=60?'夜访住处、遣高德全接入阁、游园时遣开随从说话皆可；宠爱 '+favor+'，他肯花心思，"主动记得、提前安排、破例"至少体现其一':'经高德全传召往养心殿、晨起问安遇驾、园中偶逢皆可；宠爱 '+favor+'，按"每 '+win+' 旬至少一次有内容相处"的账，这旬轮到他主动'}。`;
     if(fest)msg+=`这场宴就是本旬的剧情额度：${items||mainMiss?'上面列的事一并拿到宴上处置——':'不必另找由头，'}以宴席开场（来客通传、引至席上、席间有人搭话皆可），hasEvent=true；宴的场面、主宴者、席上机缘与分寸见下方【定例·本旬节宴】。`;
     msg+='请用剧情对话 scene 结构开场（state="ongoing"，对方的话或动作开场，嵌入主控当前处境自然发生：来人传话、事发、旧事被翻上门等皆可），给 2—4 个接话选项后停止，不结算应对后果；';
