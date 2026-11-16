@@ -2438,7 +2438,8 @@ const SCENE_PARTS_RULES = [
 '分辨：当前说话人的动作神态→act；当前说话人亲口说→say；他转述第三个人说的话→quote；其他人物与客观场面→narr。不要把当前说话人的动作神态写成 narr 旁白。',
 '例：{"parts":[{"type":"act","text":"她把茶盏搁下，声音放轻"},{"type":"say","text":"知道了"},{"type":"narr","text":"素心福身往正殿去，两刻才回"},{"type":"quote","who":"贵嫔","text":"回得干净"}]}',
 'act 与 say 相邻时合成一只气泡：动作在前就“（动作）台词”，动作在后就“台词（动作）”；不输出空段、纯标点段；同一句不要既写进 narr 又写进 act/say/quote。',
-'换人：act/say 若换人，在该段加 "who":"新说话人的称谓"，并把 scene.who 改写为此人；一轮里两人以上开口时，每段都标 who，前端会按人分气泡、换头像。引见/通传后正主开口，必须标 who 并改 scene.who，不得把正主的话算在太监或宫女名下。'
+'换人：act/say 若换人，在该段加 "who":"新说话人的称谓"，并把 scene.who 改写为此人；一轮里两人以上开口时，每段都标 who，前端会按人分气泡、换头像。引见/通传后正主开口，必须标 who 并改 scene.who，不得把正主的话算在太监或宫女名下。',
+'主次：太监、宫女、嬷嬷只通传、引路、回话、捧物，不能替主子发话、下令、代答。场上主子（帝、后、贵妃等）在场时，该谁开口就把 say 写在那人名下；宁可在 narr 里让宫人只做一件事、说一句"是"，也不能让宫人把主子的意思说完。若一轮里正主始终没开口，这一轮就不成立——必须重写。'
 ].join('\n');
 
 /* 剧情对话（scene）骨架协议：触发剧情时优先用 scene 结构输出；对话轮次不结算，玩家点「结束对话」后才由前端发收尾请求结算 */
@@ -2459,7 +2460,7 @@ const SCENE_MODULE = [
 SCENE_PARTS_RULES,
 '- 触发剧情的当旬，narrative 必须先交代主控正在何处做什么、此人如何出现（迎面、传唤、偶遇、遣人请去），只写完全旁白，到"只让人回了句"这类引出语为止；第一句台词放进 scene.parts 的 say 段。界面会先显示 narrative，再按 parts 顺序渲染。',
 '- narrative 只写完全旁白（主控所见、其他人物、场面与客观环节），人物台词一律放进 scene.parts；当前说话人的动作神态放进 act，不要写进 narrative，也不要在 narrative 里写引号对白。scene.line 可省略，仅作旧界面兜底。',
-'- 每轮只演绎对方当即反应与场面变化：scene.state 一律写 "ongoing"（继续对谈），scene.parts 总长不超过 70 字（act 写对方这一轮的动作神态，say 写对方的话；不写主控的动作心理、不铺环境）、2—3 个接话选项（放顶层 options）；此阶段 narrative 必须为空字符串，changes 与 statePatch 为空，不结算数值。',
+'- 每轮只演绎场上人物的当即反应与场面变化（以 scene.who 为主，位份更高者在其位主事时，由其开口并换手）：scene.state 一律写 "ongoing"（继续对谈），scene.parts 总长不超过 80 字（act 写动作神态，say 写话；不写主控的动作心理、不铺环境）、2—3 个接话选项（放顶层 options）；此阶段 narrative 必须为空字符串，changes 与 statePatch 为空，不结算数值。',
 '- 对话对象可当场换手（通传后被召入阁面圣、正主闻声出来等）：后续轮把 scene.who 改写为新对象（档案在册的称谓）；过渡与场面写进 parts 的 narr 段，新对象的言行照常写 act/say；scene.where 写新所在。换手用 "ongoing" 继续对谈，不得借换手 resolve 收场。引见场景尤其注意：太监或宫人把人引到后，正主开口的那一轮必须把 scene.who 改为正主（帝写「皇帝」，不要写太监/宫女的名字），本轮只写正主的言行，引见者的话放上一轮或 parts 的 narr 段；不得让引见者一直占着对话人。',
 '- scene.where 写本场真实所在：主控在住处说话就写本宫住处（存档 location／residence），在御花园就写园中具体处所；不要照抄上一场的地点，也不要写本场并未去的地方。scene.where/when 只在场景确实移动或换时辰时写，同一处说几轮不必重复。',
 '- 结算时 statePatch.location 写主控本场散去后的所在：回殿即本宫住处；只有确实留宿他处、被禁足或扣在某地时才写别处。一过性的散步、赴宴、拜访不留在 location 里。',
@@ -3870,12 +3871,12 @@ function buildMessages(userMsg,noHistory){
 /* 剧情对话 ongoing 轮次专用精简提示词：只带本场对方、主控与相关引线，不带整本世界书与全部存档。
    这些轮次不结算、不推进时间，模型只需要写好对方这一句话与接话选项。 */
 const SCENE_RULES=[
-'你是文字游戏《带着系统去宫斗》的主持人，现在只推进一段剧情对话里「对方这一句」。时间与数值留到收尾结算。只输出 JSON。',
-'【文风】架空盛唐，人物言语符合身份、性情与当下情绪；用古代语汇；只写对方的话与关键动作。',
+'你是文字游戏《带着系统去宫斗》的主持人，现在只推进一段剧情对话里「场上人物这一轮的反应」。时间与数值留到收尾结算。只输出 JSON。',
+'【文风】架空盛唐，人物言语符合身份、性情与当下情绪；用古代语汇；只写场上人物的话与关键动作，谁开口就写谁。',
 '【输出】{"narrative":"","changes":[],"hasEvent":true,"scene":{"state":"ongoing","who":"对方称谓","parts":[{"type":"act","text":"对方的动作神态"},{"type":"say","text":"对方原话，不带引号"}],"where":"有变化才写","when":"有变化才写"},"options":[{"id":"a","text":"≤70字"},{"id":"b","text":"≤70字"}]}　scene.state 只写 "ongoing"（继续对谈），不要写 "wrap" 或 "resolve"。',
 SCENE_PARTS_RULES,
 '【收尾】narrative 只写旁白，不写引号对白。',
-'【约束】本轮 scene.state 必须是 "ongoing"，不得写 "wrap" 或 "resolve"；narrative 必须为空字符串，changes=[]，statePatch={}；options 给 2—3 个方向不同的接话，只写当下可见的机会或代价。scene.where 只有场景确实移动时才写，在本宫说话就写本宫住处，不要重复上一场的地点。不得替玩家结束对话：即使话已说尽、对方乏了或有事欲别，也只写一句带情绪或去意的回应（如"改日再叙""我先去当值了"），仍给接话选项；玩家点「结束对话」后前端才会另发收尾请求。对方必须回应玩家这句话，哪怕只是拒绝、反问或转移话题，不能不作答就走。对话对象当场换手（被传入阁面圣、正主登场等）：把 scene.who 改写为新对象（档案在册的称谓），过渡写进 parts 的 narr 段，新对象的言行照常写 act/say，scene.state 用 "ongoing" 继续对谈。引见场景：太监或宫人把人引到后，正主开口的那一轮 scene.who 必须改为正主（帝写「皇帝」），本轮只写正主的言行，引见者的话放 narr 段；不得让引见者一直占着对话人。',
+'【约束】本轮 scene.state 必须是 "ongoing"，不得写 "wrap" 或 "resolve"；narrative 必须为空字符串，changes=[]，statePatch={}；options 给 2—3 个方向不同的接话，只写当下可见的机会或代价。scene.where 只有场景确实移动时才写，在本宫说话就写本宫住处，不要重复上一场的地点。不得替玩家结束对话：即使话已说尽、对方乏了或有事欲别，也只写一句带情绪或去意的回应（如"改日再叙""我先去当值了"），仍给接话选项；玩家点「结束对话」后前端才会另发收尾请求。对方必须回应玩家这句话，哪怕只是拒绝、反问或转移话题，不能不作答就走。对话对象当场换手（被传入阁面圣、正主登场等）：把 scene.who 改写为新对象（档案在册的称谓），过渡写进 parts 的 narr 段，新对象的言行照常写 act/say，scene.state 用 "ongoing" 继续对谈。引见场景：太监或宫人把人引到后，正主开口的那一轮 scene.who 必须改为正主（帝写「皇帝」），本轮只写正主的言行，引见者的话放 narr 段；不得让引见者一直占着对话人。主次纪律：太监、宫女、嬷嬷只通传引路捧物，不得替主子发话、下令、代答；场上正主已到（人在殿中、已开口、已展卷、已落座）而本轮写的还是宫人的话，就是错的——必须交出 scene.who，让正主自己说。',
 '【承接】严格承接用户消息里的本场对话记录，把话题往前推；对方只依据自己的性情、目标、与主控的关系及已知信息回应。',
 '【信息】玩家直接问到对方知道的事，必须在本轮给出实质信息：具体名目、缘由、时间、经手人或明确去处。可以害怕、压低声音、提条件，但不能用“谁提谁落不是”“只当没听见”这类空话把话吊住；确实不能说时，须给出具体缘由与下一步可问的人或可查之处。同一件事不得连续两轮只含糊拖延，玩家追问必须推进。不得凭空发明与存档无关的禁忌或旧案；若引入新的忌讳，必须同时讲清它是什么、为何犯忌、与谁相关。',
 '【言行】protagonist.stance 是主控当下的外貌与忌惮档位：对方的措辞、眼神、称呼分寸须据此与位份、关系统一；外貌档位高可写多看一瞬、语气放软，忌惮档位高可写斟酌用词、不敢对视；不报数值与档位。',
@@ -6311,6 +6312,46 @@ function sceneSpeaker(p,sc){ // 定对话对方：模型漏写 who 时，先认 
   if(hits.length===1)return hits[0];
   return sceneWhoHint||raw||'宫中来人'; // 主动拜访时用拜访对象兜底，别让对白挂到"宫中来人"名下
 }
+function isServantWho(who){ // 通传引路一类：太监、宫女、嬷嬷——能开场，但不能一直占着对话人
+  const w=String(who||'').trim();if(!w)return false;
+  const n=((state&&state.npcs)||{})[w]||{};
+  const name=String(n.realName||n.name||w),rank=String(n.rank||n.role||n.title||'');
+  const cls=avatarClassOf(name,rank);
+  if(cls==='eunuch'||cls==='maid'||cls==='matron')return true;
+  if(/公公|太监|内侍|宦官|宫女|宫人|侍女|姑姑|嬷嬷|首领/.test(name+' '+rank+' '+w))return true;
+  const lib=libAvatarCat(name);return lib==='eunuch'||lib==='maid'||lib==='matron';
+}
+function emperorSceneId(){ // 帝的存档键：档案、关系两处兜底，实在没有就用「皇帝」
+  const npcs=(state&&state.npcs)||{},rels=(state&&state.relationships)||{};
+  const isEmp=id=>(typeof UI!=='undefined'?UI.isEmperorId(id):/^(皇帝|皇上|陛下|圣上|圣人|天子|万岁|今上|官家|大家)$/.test(id));
+  return Object.keys(npcs).find(isEmp)||Object.keys(rels).find(isEmp)||'皇帝';
+}
+function sceneHandoffTarget(parts,narr,cur){ // 该不该把对话人交回正主：帝已开口或已到场，宫人却还占着位置
+  const curW=String(cur||'').trim();if(!curW)return '';
+  const isEmpId=w=>typeof UI!=='undefined'?UI.isEmperorId(w):/^(皇帝|皇上|陛下|圣上|圣人|天子|万岁|今上|官家|大家)$/.test(String(w||'').trim());
+  if(isEmpId(curW))return '';
+  if((parts||[]).some(p=>p&&p.who&&canonicalSceneWho(p.who)&&canonicalSceneWho(p.who)!==curW))return ''; // 模型自己标了换人：按它的标注分气泡，不猜
+  const says=(parts||[]).filter(p=>p&&p.type==='say').map(p=>String(p.text||'')).join(' ');
+  const acts=(parts||[]).filter(p=>p&&p.type==='act').map(p=>String(p.text||'')).join(' ');
+  const narrs=(parts||[]).filter(p=>p&&p.type==='narr').map(p=>String(p.text||'')).join(' ');
+  const strayEmp=(parts||[]).some(p=>p&&p.type==='say'&&/朕|寡人/.test(String(p.text||''))&&!isEmpId(p.who)); // 只有帝自称，却挂在旁人名下
+  if(strayEmp)return emperorSceneId();
+  if(!isServantWho(curW))return '';
+  const scene=String(narr||'')+' '+narrs+' '+acts;
+  const presence=/御案|御笔|御前|御览|御座|御书|御膳|龙颜|龙袍|上首|天子/.test(scene)||/(^|[。！？；\s])(陛下|皇上|圣上)[，,]/.test(says);
+  return presence?emperorSceneId():'';
+}
+function applySceneHandoff(parts,narr,cur){ // 交人：未标 who 的台词归正主，提到御用之物的动作也归正主，其余动作仍归原说话人
+  const to=sceneHandoffTarget(parts,narr,cur);
+  if(!to)return '';
+  for(const p of parts||[]){
+    if(!p)continue;
+    if(p.who&&p.type==='say'&&/朕|寡人/.test(String(p.text||''))&&canonicalSceneWho(p.who)!==to)p.who=to; // 帝自称的台词被错挂到旁人名下
+    if(p.who||(p.type!=='act'&&p.type!=='say'))continue;
+    p.who=p.type==='say'?to:(/御|龙|朕|陛下|皇上|圣上|天子/.test(String(p.text||''))?to:cur);
+  }
+  return to;
+}
 function canonicalSceneWho(who){ // 对话中换人守卫：只认档案在册的人物并归一到称谓 id；认不出返回 ''
   const w=String(who||'').trim();
   if(!w||/^(宫中来人|来人|某人|众人|宫人|宫女|太监|不详|事发)$/.test(w))return '';
@@ -7273,6 +7314,7 @@ const Game={
       if(!sp||!sceneCtx)return;
       const can=canonicalSceneWho(sp)||sp;
       if(can===sceneCtx.who)return;
+      if(sceneCtx.pinned&&can!==sceneCtx.pinned)return; // 本轮刚把话交回正主：旁人的陪衬动作不得再把对话人抢回去
       sceneCtx.who=can;
       const t=document.getElementById('chatTitle');if(t)t.textContent='剧情对话 · '+dispName(can);
       const a=document.getElementById('chatAva');if(a)a.innerHTML=avatarHtml(can);
@@ -7374,12 +7416,14 @@ const Game={
       scheme:Game._pendingScheme||null,check:null,schemeDone:false};
     Game._pendingScheme=null; // 只认本场：下一场不继承
     sceneWhoHint=null; // 说话人已定，兜底提示不再外溢到下一场
+    const parts=this.sceneParts(sc);
+    const ho=applySceneHandoff(parts,p.narrative,sceneCtx.who); // 开场就是引见/通传：正主已开口就当场交人
+    if(ho){sceneCtx.who=canonicalSceneWho(ho)||ho;sceneCtx.pinned=sceneCtx.who}
     $('#chatTitle').textContent='剧情对话 · '+dispName(sceneCtx.who);
     $('#chatAva').innerHTML=avatarHtml(sceneCtx.who);
     $('#chatClock').textContent=fmtTime();
     const body=$('#chatBody');body.innerHTML='';
     this.sceneMeta(sc);
-    const parts=this.sceneParts(sc);
     if(p.narrative){this.sayNarrative(p.narrative,!!parts);p._narrShown=true} // 有 parts 时 narrative 整段当旁白，不再按引号猜
     if(parts){this.sayParts(parts);p._narrShown=true} // 新协议：API 已按语义分好旁白与台词，直接渲染
     else{const opening=sc.line?filterText(sc.line):this.chatLead(p);this.sayLine(opening)} // 旧输出兜底：按引号拆
@@ -7520,6 +7564,10 @@ const Game={
         const pws=[...new Set((Array.isArray(sc.parts)?sc.parts:[]).filter(x=>x&&!/^(quote|quoted|cite|citation|refer|references|引用|转述|引述)$/i.test(String(x.type||x.t||x.role||''))).map(x=>canonicalSceneWho(x&&x.who)).filter(Boolean))];
         if(pws.length===1&&pws[0]!==sceneCtx.who)nw=pws[0];
       }
+      if(sceneCtx&&parts){
+        const ho=applySceneHandoff(parts,narr,nw||sceneCtx.who); // 引见/通传的人还占着对话人：正主已到就交回正主
+        if(ho){nw=ho;sceneCtx.pinned=ho}
+      }
       if(nw&&sceneCtx&&nw!==sceneCtx.who){sceneCtx.who=nw;$('#chatTitle').textContent='剧情对话 · '+dispName(nw);$('#chatAva').innerHTML=avatarHtml(nw)}
       this.sceneMeta(sc);
       if(parts)this.sayParts(parts);
@@ -7541,6 +7589,7 @@ const Game={
   sceneRound(choice,checkInfo){
     if(!sceneCtx)return;
     sceneCtx.resolveRetried=false;
+    sceneCtx.pinned=null; // 新一轮由模型重新定人：上一轮的交人不再锁标题
     if(sceneCtx.standalone&&!sceneCtx.logged){logXunAction(sceneCtx.chamber?'承宠·夜话':'问话·'+sceneCtx.who);sceneCtx.logged=true}
     this.recordLine('me',choice);
     sceneCtx.round++;
@@ -7561,7 +7610,13 @@ const Game={
         (sceneCtx.scheme?`\n这是${sceneCtx.scheme.who}的暗流发难：若败，须把「${SCHEME_TARGET_TEXT[sceneCtx.scheme.target]||sceneCtx.scheme.target}」受损写实；若胜，须写她的布置如何败露、她如何自处，不得让她全身而退。`:'')+
         (fail?'\n失手/大败必须留下真损失，不得写成虚惊一场；statePatch 里要能看见至少一项下调。':'');
     }
-    let msg=`第${xunNo()}旬剧情对话第${r}轮：玩家应对「${choice}」。只演绎${sceneCtx.who}的当即反应与场面变化：输出 scene.parts（2—5 段，act 写对方动作神态并会并入她的对话气泡，say 写对方台词，quote 写转述他人原话，narr 只写其他人物与客观场面，台词都不带引号，按语义分段而非按标点硬切；总长 ≤70 字）、scene.where/when（有变化才写）与 2—3 个接话选项；此阶段不结算数值。scene.state 一律写 "ongoing"——不要写 resolve 或 wrap，不要替玩家结束对话；她必须回应玩家这句话，哪怕只是拒绝、反问或转移话题，也不能不作答就走。对话对象当场换手（被传入阁面圣、正主登场等）：把 scene.who 改写为新对象，过渡写进 parts 的 narr 段，新对象的言行照常写 act/say，scene.state 用 "ongoing" 继续对谈，不得就此 resolve。${maidNote}${chamberNote}${judgeNote}`+this.sceneContextBlock();
+    let handoffNote='';
+    if(isServantWho(sceneCtx.who)){ // 通传引路的宫人占着对话人：正主一到就得交人，别让她一直代言
+      const heard=sceneCtx.lines.map(l=>String(l.text||'')).join(' ');
+      const inRoom=/陛下|皇上|圣上|御前|御案|御笔|御览|龙颜|主子|娘娘|太后|贵妃|贵人/.test(heard);
+      handoffNote=`本场对话人${sceneCtx.who}只是通传、引路、捧物的宫人${inRoom?'，场上已有正主（帝、后、贵妃等）在场、甚至已经开口':''}：正主一到就由正主自己说话——把 scene.who 改写为正主（帝写「皇帝」），正主的话写进 say 并标 who，${sceneCtx.who}这一轮至多一句通传或一个陪衬动作；不得替正主发话、替正主下令，也不得把正主的意思吞下去只写她自己的反应。`+(inRoom?'本场已拖了几轮没让正主开口，这一轮必须交人。':'');
+    }
+    let msg=`第${xunNo()}旬剧情对话第${r}轮：玩家应对「${choice}」。演绎场上人物的当即反应与场面变化（以${sceneCtx.who}为主；正主在场则由正主开口，按 who 分人）：输出 scene.parts（2—5 段，act 写人物动作神态并会并入其对话气泡，say 写人物台词，quote 写转述他人原话，narr 只写其他人物与客观场面，台词都不带引号，按语义分段而非按标点硬切；总长 ≤80 字）、scene.where/when（有变化才写）与 2—3 个接话选项；此阶段不结算数值。scene.state 一律写 "ongoing"——不要写 resolve 或 wrap，不要替玩家结束对话；${sceneCtx.who}（或当场的正主）必须回应玩家这句话，哪怕只是拒绝、反问或转移话题，也不能不作答就走。对话对象当场换手（被传入阁面圣、正主登场等）：把 scene.who 改写为新对象，过渡写进 parts 的 narr 段，新对象的言行照常写 act/say，scene.state 用 "ongoing" 继续对谈，不得就此 resolve。${handoffNote}${maidNote}${chamberNote}${judgeNote}`+this.sceneContextBlock();
     if(sceneCtx.chamber)msg=msg.replace(/她/g,'帝');
     this.requestScene(msg,choice,MAX_OUTPUT_TOKENS,true,true); // 正常接话轮永不结算：聊多久由玩家决定，点「结束对话」才收场
   },
