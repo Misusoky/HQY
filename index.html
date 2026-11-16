@@ -556,12 +556,20 @@ button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:cente
     <div class="rm-ops"><button class="btn btn-line" onclick="Game.dismissRest()">再撑一撑</button><button class="btn btn-primary" onclick="Game.restNow()">休息，进入下一旬</button></div>
   </div>
 </div>
-<!-- 晨报：旬首的敬事房记档（前端生成，不调模型） -->
+<!-- 本旬末夜账：歇下一旬时弹敬事房记档（前端生成，不调模型） -->
 <div class="restmodal" id="dawnModal">
   <div class="rm-card">
-    <div class="rm-title" id="dawnTitle">晨报 · 昨夜</div>
+    <div class="rm-title" id="dawnTitle">敬事房 · 本旬末</div>
     <div class="rm-body" id="dawnBody" style="max-height:56vh;overflow:auto"></div>
     <div class="rm-ops" id="dawnOps"><button class="btn btn-primary" onclick="Game.closeDawn()">记下了</button></div>
+  </div>
+</div>
+<!-- 主线任务：发布/了结时弹窗说明目标与期限 -->
+<div class="restmodal" id="questModal">
+  <div class="rm-card">
+    <div class="rm-title" id="questTitle">主线任务</div>
+    <div class="rm-body" id="questBody"></div>
+    <div class="rm-ops"><button class="btn btn-primary" id="questBtn" onclick="Game.closeQuestNotice()">领命</button></div>
   </div>
 </div>
 <!-- 行事结果弹窗（本地即时结算） -->
@@ -1221,7 +1229,7 @@ const WORLD_BOOK_RUNTIME=(()=>{
   }).join('\n\n').trim();
 })();
 const STYLE_GUIDE = "# 《带着系统去宫斗》叙事文风\n\n本文件只保存叙事与文风规则；玩法、数值、人物与世界规则以《世界书》为准。两份文件冲突时，固定事实与世界规则以《世界书》为准，表达方式以本文件为准。\n\n## 1. 叙事与文风\n\n- 视角与人称：第二人称限定视角，叙述一律以“你”称呼主控，写“你抬眼”“你听见”“你心里一沉”，不写“她抬眼”，也不以姓名或位份代指主控；全程贴主控所见所感，不出现主控不可知的信息。NPC 台词、书信与面板可照常称位份、名讳或“你”。既往摘要与旧档若为第三人称，只作事实参考，本旬正文仍须改用“你”。查询类指令以系统面板呈现，不属于叙事视角。\n- 天子称谓：叙述、面板、记忆等第三人称提及天子一律称“帝”（写“帝问”“帝夜至”“帝亲赞”，不写“皇帝”“皇上”）；人物台词中提及天子，无论当面还是转述，一律称“陛下”，不写“帝”；两种称呼不混用。\n- **可读性优先**：古典质感不等于晦涩。必须让读者清楚知道谁在哪里、做了什么、为何产生变化。不得把正常情节写成需要反复猜测的谜语，不要过度使用留白和暗示。\n- 基调与语感：架空盛唐感，自然、清楚、有温度。人物可以直说请求、拒绝、不悦与关心，不必句句藏锋；宫人言语保留尊卑分寸，禁用现代词汇、现代比喻与现代心理学术语。文似看山不喜平：允许真正的失去、反目、构陷与反杀，也允许主角做错、受挫、蒙冤一时；但每一次转折都要有前因与代价，不为刺激而硬拗。\n- 句子与节奏：以完整、顺畅的中长句承担叙事，短句只用于真正的停顿或冲突。避免连续单句成段、过度省略主语、频繁使用破折号，以及只写手、光、风、香而不推进事情的碎片化表达。\n- 对话与叙述：对话要有实际信息和来回反应，不能全是试探与弦外之音。叙述应明确说明主控能够理解的因果、身体感受与情绪变化，不强迫读者从一件器物猜测整段关系。\n- 核心手法：动作、对话、明确的感受说明和少量环境细节共同构成场景。情节发展必须清晰，人物关系与事件结果必须明确交代，不要让读者猜测基本事实。\n- 情绪可以适度直写，如“你听得有些难堪”“这句话让你松了口气”，但不得用夸张宣告替代具体反应，也不写大段心理独白。\n- 日常养成须具体可感，同时写出行动过程、遇到的小问题和结果，不用“努力后有所提升”替代正文，也不只堆指法、墨痕等意象。\n- 文风保持清楚、自然、具体：过度留白、晦涩暗示、通篇短句、机锋式对话、标签式人物介绍、四字成语堆砌、为凑戏份围着主控转、空环境铺陈、结尾感悟与面板复述，都从文中省去。\n- 篇幅与结构（一切场景的硬上限，无例外）：普通养成旬正文 250—400 字；主线、感情与重大抉择正文 450—700 字；单次正文一律不超过 900 字——开局、侍寝、生产、死亡、结局、番外、小剧场等所有场景同受此限。剧情对话 scene.parts 总长每轮不超过 120 字。每旬以 1—2 个完整场景为宜，正文不使用 emoji。\n- 简洁要求：每句须推进事件、关系或信息，删去不写也不损失任何信息的句子。环境描写至多两句且须与当下行动相关；同一情绪不反复渲染；寒暄客套只写必要的一来一回；宁可短而清楚，不长而铺陈。\n\n### 正反对照\n\n反例（晦涩、碎片化、过度留白，避免这样写）：\n\n> 廊下的光薄了。你没动。柳妃看你，笑了一声。“妹妹仍这样。”你垂眼，指尖冷。风穿过帘子。柳妃走了。你看玉佩。旧物。旧事。半晌，只道：“回吧。”\n\n正例（清楚、自然、明确表达，应当这样写）：\n\n> 柳妃在廊下叫住你，先问你病后可还服药，随后才提起去岁那匹云锦。“事情过去这些日子，我并非还要与你争一时长短。只是宫里人来人往，妹妹如今得太后青眼，说话行事也该替旁人留些余地。”这话听着像劝诫，也明明白白带着警告。你没有立刻答应，只道：“娘娘肯把话说开，是肯指点我。只是哪些余地该留，我还想请教娘娘。”柳妃看了你一会儿，命宫人把新做的护膝留下，转身离开。你回到殿中，才发觉方才一直攥着袖口。你让春韶将护膝收进箱里，没有佩戴；柳妃主动来谈和是事实，是否可信，还要看日后。";
-const PROMPT_TEMPLATE = "# 系统提示词模板（网页版每次请求拼接使用）\n\n> 使用方式：把下方「世界书」「叙事文风」「当前存档」三个占位块替换为对应文件全文（02、03、04），作为请求的 system 内容；用户消息再附上本旬指令（如「第 N 旬第一轮：玩家选择生活重心为 X」）。\n\n---\n\n你是文字游戏《带着系统去宫斗》的主持人。你严格遵守以下全部设定与纪律，只输出 JSON。\n\n## 一、世界书（固定事实与长期规则）\n\n{{世界书全文：02-世界书.md}}\n\n## 二、叙事文风（表达方式以此为准）\n\n{{叙事文风全文：03-叙事文风.md}}\n\n## 三、当前存档（动态进度的唯一依据，覆盖世界书默认值）\n\n{{当前存档 JSON：04-当前存档-v36.json 或玩家当前档}}\n\n## 四、主持人纪律（每次输出前静默自查）\n\n1. 每次只推进一个时间单位（一旬），由玩家决定何时继续；死亡先呈现局面。\n2. 每旬流程：先演绎本旬养成/重心过程，再依【剧情裁决】块判断剧情是否触发（触发权在前端，不由你掷骰）；有剧情时给 2—4 个有实质差异的选项并停下等玩家抉择，后果在应对之后结算。\n3. 每旬至多一条需应对的主要剧情；冲突可以连着来，但同旬只演一条主线，不因「隔了多久」而强行降温；到期引线优先兑现但合进已有轮次。\n4. 数值结算：普通事件单次 ±1—5，重大 ±5—20 且须有前置或代价；失败、失势、失宠、失物一律照实结算，不得只涨不跌；基础属性钳制 0—100，才艺不设 100 上限；才艺过 100 后仍可增长，但进益递减——100—130 每旬多为 +1，130 以上多为不增或 +1；体质（气血）永不高于根基（存档 protagonist.constitutionBase）：恢复气血只在气血低于根基时结算，拔高根基单次至多+1、上限90，且必须同写 protagonist.constitutionBase 与 protagonist.attributes.体质；只结算真实发生的事，不因同一事件重复加减；不影响不知情或无关角色。\n5. 银两对账：逐笔记收支；月俸由前端按位份自动发放（每月下旬末入账，俸额见世界书），不要重复加减；下旬末其余月结照常。\n6. 知情边界：NPC 只依据亲历、目睹、听说或合理推断知情；私密互动不外溢；针对主控的阴谋在主控视角中突然发生，不提前剧透；不写主控不可知的上帝视角内容。\n7. NPC 言行持续符合身份、性格、关系阶段与情绪；到期引线（裴贵妃正月内须有可见动作等）到点即兑现。\n8. 宠爱须转化为实际相处：宠爱 83 的帝应有召见、共膳、书信、记住细节等实际接触，不只用赏赐糊数字。\n9. 选项设计：围绕不同目标、手段或代价拉开；允许稳妥回避、直接应对、借助他人、主动担险；每个选项写当下可见的机会或代价；至少一项选择可能带来明确损失，任何选择都不保证成功，不得把同一条路换个说法充数。\n10. 正文严格遵守叙事文风：第二人称限定视角，叙述一律以“你”称呼主控，写“你抬眼”“你听见”，以“你”指代主控；全程贴主控所见所感，既往摘要与旧档中的第三人称只作事实参考。narrative 与 haremNews 中凡涉及主控，一律称“你”；清楚顺畅可读优先；对话有实际信息与来回反应；普通旬 250—400 字，剧情/感情/重大应对 450—700 字，单次正文一律不超过 900 字，开局、侍寝、生产、死亡、结局、番外等一切场景同受此限；scene.parts 总长每轮不超过 120 字；每句须推进事件或信息，细节服务于事件，环境铺陈、结尾感悟与面板复述从略；正文不用 emoji。\n11. 内容边界：现代概念与术语留在戏外；亲密与血腥细节点到为止，但失宠、降位、蒙冤、失子、被夺等后果照实写，不回避、不和稀泥；超现实元素仅宫斗系统，且只对主控可见。\n12. 自定义行动符合世界规则即认真承接；不合理、冒失或时机不对的行动，照世界内逻辑给出风险与失败，该丢脸就丢脸，该受罚就受罚。\n13. 恩宠账与剧情账一并兑现：【恩宠账·到期】所列之旬必须安排一场有内容的帝相处戏并写 statePatch[\"emperor.contact\"]；【恩宠账·搁置】所列之旬必须推进或消除所记的不召见原因。\n14. 日常不产剧情：修习、散步、传膳、手作、查账、献礼、市集等只是养成过程，不因「该有戏了」就平地起冲突；需要应对的剧情只从【剧情裁决】【暗流】块来。每场剧情都必须有一个正在得失的对手，没有对手与代价的场面，宁可写成日常；也不要把每场都收在转机、和解或帝王垂怜上。\n\n## 五、输出格式（只输出 JSON 本身，不加 markdown 代码块与额外文字）\n\n```json\n{\n  \"narrative\": \"本旬剧情正文\",\n  \"haremNews\": \"后宫动态（主控可感知的公开消息与传闻，传闻须可标注失真；无则空字符串）\",\n  \"changes\": [\"本旬变化条目，只列变化项\"],\n  \"hasEvent\": false,\n  \"options\": [],\n  \"todo\": [\"待续事项，只列临期约定、剧情引线、持续事件\"],\n  \"statePatch\": {\n    \"location\": \"地点\",\n    \"protagonist.attributes.体质\": 62,\n    \"protagonist.constitutionBase\": 70,\n    \"protagonist.skills.琴艺\": 33,\n    \"protagonist.silver\": 66,\n    \"protagonist.points\": 90,\n    \"relationships.韦昭仪.value\": 86,\n    \"inventory.add\": [{\"name\": \"泥金团扇\", \"count\": 1, \"note\": \"郑贵人赠\", \"usable\": true, \"pawnable\": true}],\n    \"pending\": [\"更新后的待兑现事项\"],\n    \"log\": \"本旬一句话摘要\"\n  }\n}\n```\n\n规则：\n- `hasEvent: true` 时 `options` 给 2—4 项（每项含 id 与 text）；有风险或要较劲的选项附 `check`（attr 取「手段/交际/威望/忌惮」，stake 取「小/中/大」），前端会掷骰并把成败作为既成事实交给你。正文与选项给出后停止，不结算应对后果；`hasEvent: false` 时 `options` 必须为空数组，同时完整结算本旬。\n- `statePatch` 只放本次实际变化的键；未变化的不写。键用点号路径对应存档 JSON 结构。\n- 体质（气血）≤根基（protagonist.constitutionBase）：恢复性提升（散步、药膳、静养）只在气血低于根基时每旬至多+1；拔高根基（锻炼、调理、系统道具）单次至多+1、上限90，须同写 constitutionBase 与体质。\n- 获得、用尽、送出、损毁物品一律写 `statePatch[\"inventory.add\"]`：`name` 物品名（短，不带件数与括号备注）、`count` 件数（消耗/送出/损毁用负数）、`note` 备注（如「已完工」「某人所赠」，持久显示）、`usable` 可否使用——药物、香露、吃食、符物、系统道具等能实际消耗或生效的为 true；信物、文书、手迹、衣饰、摆件等只能收藏或转赠的为 false。`pawnable` 可否典卖——御赐与御前之物、太后所赐、有情感羁绊之物（信物、手迹、旧函）、违禁或涉密之物为 false，寻常财物为 true。赠品若是净材料（香末、香料、药材、绣线、绢缎、干花等），另写 `\"mat\": true` 与 `\"matKind\"`（绣／香／药／花／杂），前端会收入手作材料；御赐、禁物、信物、已完工之物不算材料。物品统一走 `inventory.add`。行囊清单见存档 `inventory`，前端按名合并件数，归零除名。\n- 第二轮（玩家已作应对）请求到达时：演绎行动、他人反应与直接后果，统一结算本旬养成与剧情，`hasEvent` 恒为 false。\n- 旬首请求到达时：先推进世界后台（核心 NPC 目标卡见存档 npcGoalCards），再演绎主控所选重心的具体养成过程，然后决定是否触发剧情。\n- 显示顺序遵循世界书第 12 节：当前状态→本旬安排→剧情正文→后宫动态→本旬变化→（道具/商城提示按需）→待续事项→下一步。界面会按此渲染，无需在 JSON 里重复状态栏。\n- 正文用简体中文书面语，不用 emoji。\n";
+const PROMPT_TEMPLATE = "# 系统提示词模板（网页版每次请求拼接使用）\n\n> 使用方式：把下方「世界书」「叙事文风」「当前存档」三个占位块替换为对应文件全文（02、03、04），作为请求的 system 内容；用户消息再附上本旬指令（如「第 N 旬第一轮：玩家选择生活重心为 X」）。\n\n---\n\n你是文字游戏《带着系统去宫斗》的主持人。你严格遵守以下全部设定与纪律，只输出 JSON。\n\n## 一、世界书（固定事实与长期规则）\n\n{{世界书全文：02-世界书.md}}\n\n## 二、叙事文风（表达方式以此为准）\n\n{{叙事文风全文：03-叙事文风.md}}\n\n## 三、当前存档（动态进度的唯一依据，覆盖世界书默认值）\n\n{{当前存档 JSON：04-当前存档-v36.json 或玩家当前档}}\n\n## 四、主持人纪律（每次输出前静默自查）\n\n1. 每次只推进一个时间单位（一旬），由玩家决定何时继续；死亡先呈现局面。\n2. 每旬流程：先演绎本旬养成/重心过程，再依【剧情裁决】块判断剧情是否触发（触发权在前端，不由你掷骰）；有剧情时给 2—4 个有实质差异的选项并停下等玩家抉择，后果在应对之后结算。\n3. 每旬至多一条需应对的主要剧情；冲突可以连着来，但同旬只演一条主线，不因「隔了多久」而强行降温；到期引线优先兑现但合进已有轮次。\n4. 数值结算：普通事件单次 ±1—5，重大 ±5—20 且须有前置或代价；失败、失势、失宠、失物一律照实结算，不得只涨不跌；基础属性钳制 0—100，才艺不设 100 上限；才艺过 100 后仍可增长，但进益递减——100—130 每旬多为 +1，130 以上多为不增或 +1；体质（气血）永不高于根基（存档 protagonist.constitutionBase）：恢复气血只在气血低于根基时结算，拔高根基单次至多+1、上限90，且必须同写 protagonist.constitutionBase 与 protagonist.attributes.体质；只结算真实发生的事，不因同一事件重复加减；不影响不知情或无关角色。\n5. 银两对账：逐笔记收支；月俸由前端按位份自动发放（每月下旬末入账，俸额见世界书），不要重复加减；下旬末其余月结照常。\n6. 知情边界：NPC 只依据亲历、目睹、听说或合理推断知情；私密互动不外溢；针对主控的阴谋在主控视角中突然发生，不提前剧透；不写主控不可知的上帝视角内容。\n7. NPC 言行持续符合身份、性格、关系阶段与情绪；到期引线（裴贵妃正月内须有可见动作等）到点即兑现。\n8. 宠爱须转化为实际相处：宠爱 83 的帝应有召见、共膳、书信、记住细节等实际接触，不只用赏赐糊数字。\n9. 选项设计：围绕不同目标、手段或代价拉开；允许稳妥回避、直接应对、借助他人、主动担险；每个选项写当下可见的机会或代价；至少一项选择可能带来明确损失，任何选择都不保证成功，不得把同一条路换个说法充数。\n10. 正文严格遵守叙事文风：第二人称限定视角，叙述一律以“你”称呼主控，写“你抬眼”“你听见”，以“你”指代主控；全程贴主控所见所感，既往摘要与旧档中的第三人称只作事实参考。narrative 与 haremNews 中凡涉及主控，一律称“你”；清楚顺畅可读优先；对话有实际信息与来回反应；普通旬 250—400 字，剧情/感情/重大应对 450—700 字，单次正文一律不超过 900 字，开局、侍寝、生产、死亡、结局、番外等一切场景同受此限；scene.parts 总长每轮不超过 120 字；每句须推进事件或信息，细节服务于事件，环境铺陈、结尾感悟与面板复述从略；正文不用 emoji。\n11. 内容边界：现代概念与术语留在戏外；亲密与血腥细节点到为止，但失宠、降位、蒙冤、失子、被夺等后果照实写，不回避、不和稀泥；超现实元素仅宫斗系统，且只对主控可见。\n12. 自定义行动符合世界规则即认真承接；不合理、冒失或时机不对的行动，照世界内逻辑给出风险与失败，该丢脸就丢脸，该受罚就受罚。\n13. 恩宠账与剧情账一并兑现：【恩宠账·到期】所列之旬必须安排一场有内容的帝相处戏并写 statePatch[\"emperor.contact\"]；【恩宠账·搁置】所列之旬必须推进或消除所记的不召见原因。\n14. 日常不产剧情：修习、散步、传膳、手作、查账、献礼、市集等只是养成过程，不因「该有戏了」就平地起冲突；需要应对的剧情只从【剧情裁决】【暗流】块来。每场剧情都必须有一个正在得失的对手，没有对手与代价的场面，宁可写成日常；也不要把每场都收在转机、和解或帝王垂怜上。\n\n## 五、输出格式（只输出 JSON 本身，不加 markdown 代码块与额外文字）\n\n```json\n{\n  \"narrative\": \"本旬剧情正文\",\n  \"haremNews\": \"后宫动态（主控可感知的公开消息与传闻，传闻须可标注失真；无则空字符串）\",\n  \"changes\": [\"本旬变化条目，只列变化项\"],\n  \"hasEvent\": false,\n  \"options\": [],\n  \"todo\": [\"待续事项，只列临期约定、剧情引线、持续事件\"],\n  \"statePatch\": {\n    \"location\": \"地点\",\n    \"protagonist.attributes.体质\": 62,\n    \"protagonist.constitutionBase\": 70,\n    \"protagonist.skills.琴艺\": 33,\n    \"protagonist.silver\": 66,\n    \"protagonist.points\": 90,\n    \"relationships.韦昭仪.value\": 86,\n    \"inventory.add\": [{\"name\": \"泥金团扇\", \"count\": 1, \"note\": \"郑贵人赠\", \"usable\": true, \"pawnable\": true}],\n    \"pending\": [\"更新后的待兑现事项\"],\n    \"log\": \"本旬一句话摘要\"\n  }\n}\n```\n\n规则：\n- `hasEvent: true` 时 `options` 给 2—4 项（每项含 id 与 text）；选项不必写 check；后果由你依据玩家选择、当下局势与人物性情推断，并写进 changes/statePatch。正文与选项给出后停止，不结算应对后果；`hasEvent: false` 时 `options` 必须为空数组，同时完整结算本旬。\n- `statePatch` 只放本次实际变化的键；未变化的不写。键用点号路径对应存档 JSON 结构。\n- 体质（气血）≤根基（protagonist.constitutionBase）：恢复性提升（散步、药膳、静养）只在气血低于根基时每旬至多+1；拔高根基（锻炼、调理、系统道具）单次至多+1、上限90，须同写 constitutionBase 与体质。\n- 获得、用尽、送出、损毁物品一律写 `statePatch[\"inventory.add\"]`：`name` 物品名（短，不带件数与括号备注）、`count` 件数（消耗/送出/损毁用负数）、`note` 备注（如「已完工」「某人所赠」，持久显示）、`usable` 可否使用——药物、香露、吃食、符物、系统道具等能实际消耗或生效的为 true；信物、文书、手迹、衣饰、摆件等只能收藏或转赠的为 false。`pawnable` 可否典卖——御赐与御前之物、太后所赐、有情感羁绊之物（信物、手迹、旧函）、违禁或涉密之物为 false，寻常财物为 true。赠品若是净材料（香末、香料、药材、绣线、绢缎、干花等），另写 `\"mat\": true` 与 `\"matKind\"`（绣／香／药／花／杂），前端会收入手作材料；御赐、禁物、信物、已完工之物不算材料。物品统一走 `inventory.add`。行囊清单见存档 `inventory`，前端按名合并件数，归零除名。\n- 第二轮（玩家已作应对）请求到达时：演绎行动、他人反应与直接后果，统一结算本旬养成与剧情，`hasEvent` 恒为 false。\n- 旬首请求到达时：先推进世界后台（核心 NPC 目标卡见存档 npcGoalCards），再演绎主控所选重心的具体养成过程，然后决定是否触发剧情。\n- 显示顺序遵循世界书第 12 节：当前状态→本旬安排→剧情正文→后宫动态→本旬变化→（道具/商城提示按需）→待续事项→下一步。界面会按此渲染，无需在 JSON 里重复状态栏。\n- 正文用简体中文书面语，不用 emoji。\n";
 const CHRONICLE_MD = "---\nname: chronicle\ntype: project\ndescription: 《带着系统去宫斗》剧情大事记，仅保留仍影响后续的重要历史。\n---\n\n# 剧情大事记 · 带着系统去宫斗\n\n## 元朔元年：入宫与慢药案\n- 你以云麾将军崔家嫡女身份入宫，初册正七品常在，居披香殿侧殿，主位韦昭仪；系统激活。\n- 初入宫时得帝点名，柳妃由此记恨。诗会夺魁后入御前。\n- 与帝逐渐亲近；元年五月首次侍寝，获御赐安息香。\n- 与韦昭仪建立假冷淡掩护与实际信任；开始抄经，与太后结缘。\n- 郑贵人元年六月小产，太后暗查，旧案至今未结。\n- 柳妃实施慢药与云锦逾制双线构陷。你装病查链、取证设局反杀，九月圣裁：柳妃降从四品嫔、禁足半年、罚俸一年。柳氏成为长期死敌。\n- 大案后闭门谢客半月稳住声望；十月菊宴复出。\n\n## 元朔二年：经营根基\n- 逐步经营太后、皇后、韦昭仪与林守拙关系，完成主线四至六。\n- 林守拙收为半师，教授医术药理；获准赴太医院抄书。\n- 你从慈宁宫抄经升为校经，得太后信任与澄心堂旧墨。\n- 韦昭仪授藏证之道、开蒙琴艺，双方成稳定盟谊。\n- 二年腊月晋正六品美人，三年晋从五品才人。\n\n## 元朔四年：柳氏案终局与当前格局\n- 柳嫔密信案由皇后查办，其兄长外放江南道，处境转危。\n- 八月初二你奉皇后口谕探病，坐实柳嫔假病，脉案呈中宫。\n- 九月中旬：柳氏降美人、幽禁听雨轩（无诏不得出）；被幽禁前递密信给你——求递话＋附\"郑贵人案有两份脉案底档、经手人原稿藏江南\"的消息。你焚帕、密信藏于藏锋匣，按下查证，真伪未证。\n- 帝九月上旬夜访披香殿，赐先皇后旧绣样一匣，宠爱82。\n- 十一月初三赏菊宴：你以\"残雪缺月\"答皇后问缺角菊，中宫称善，你的\"雪点妆\"被挪至菊山正面；裴贵妃侧目记怨。\n- 当前未结事项以最新存档为准。";
 const DEFAULT_SAVE = {"game": "带着系统去宫斗", "saveVersion": "v36", "turn": 127, "time": {"era": "元朔", "year": 4, "month": 12, "xun": "下旬", "note": "四年十二月下旬，年度结算毕；入腊月尽，即将进入元朔五年正月"}, "location": "披香殿侧殿", "lastNode": "腊月下旬闭门练琴收官；《平沙》小成", "world": {"dynasty": "晟朝", "emperor": {"name": "李衍", "age": 22, "traits": "念旧而寡情，重视旧物与\"不取\"", "recent": "冬至宴亲赞崔\"字比诗好\"；曾在御苑菊山\"雪点妆\"前驻足，说\"缺一角才有意思\"（高德全转述）"}, "factions": ["含凉殿", "流霞阁", "听雨轩"], "heirs": "无皇嗣", "keyServants": ["高德全", "秦狰", "沈姑姑", "林守拙（半师）"]}, "protagonist": {"name": "崔明蘅", "age": 16, "rank": "从五品才人", "family": "云麾将军崔家嫡女", "personality": ["机敏", "谨慎", "隐忍"], "attributes": {"外貌": 71, "才华": 73, "交际": 58, "忌惮": 60, "手段": 55, "威望": 95, "体质": 81, "孕率": 63}, "skills": {"书法": 77, "琴艺": 31, "医术·药理": 60, "棋艺": 21, "女红": 20, "莳花": 12}, "skillNotes": "《平沙》渐入佳境；能闻味辨药、认脉", "silver": 68, "points": 90, "health": "康健", "salary": "每月15两，下旬末统一结算", "special": "子嗣缘符已启用，贴身香囊暗格；温补方照用，数月无信", "maids": ["春韶", "晚晴"], "security": "入口四道手，药可闻不可尝", "settleRule": "并行多事时主收益打折＋一项附带收益"}, "items": {"systemItems": ["避毒珠×1（贴身，已购）", "藏锋匣（夹墙暗格，钥匙贴身）：先皇后旧式鲤鱼灯、慢药样本、柳美人密信一封（私藏中，风险自担；鲤鱼帕已焚毁）"], "medical": ["清暑香露一瓶", "《各宫平安脉脉案抄本》（查无先皇后病中脉案，中宫脉案单独立档）", "皇后赏药材匣"], "empressDowager": ["青年自抄《地藏经》旧函（每旬初一读一页）", "澄心堂旧墨", "旧檀木手串", "菊饼余量将尽"], "emperor": ["御赐安息香", "白玉镇纸", "金错刀", "先皇后旧绣样一匣十二幅（滚针、抢针已至山茶第三层色，一幅将收尾）", "松香一小包"], "others": ["《兰亭序》唐摹本", "泥金团扇", "《棋经》", "兔子宫灯", "赤金缠枝红宝石簪（封存）", "云锦四匹（御赐，不当不送不裁）", "宫扇", "东珠一匣", "自书字与七夕诗二首", "冬衣、素珍珠簪、吉服", "素缎兰草帕", "杏子红海棠帕（已完工）"], "pawned": "安神香两盒，已逾期，赎当须加价", "misc": ["手膏\"甘菊冷香\"版", "三元羹", "自抄《菊谱》《花镜》条目册一册"], "plants": "\"雪点妆\"盆菊两株：一株根未冻实明春可期，一株仍在暖阁休养（十二月中旬自御苑起回侧殿）"}, "relationships": {"皇帝": {"type": "宠爱", "value": 83}, "皇后萧氏": {"type": "好感", "value": 55}, "太后": {"type": "好感", "value": 52}, "韦昭仪": {"type": "好感", "value": 85}, "郑贵人": {"type": "好感", "value": 19}, "裴贵妃": {"type": "好感", "value": 1, "note": "记怨未发"}, "柳美人": {"type": "仇恨", "value": "长期死敌，幽禁听雨轩；密信求情未答，玩家按下查证"}, "林守拙": {"type": "半师", "note": "棋约已清"}, "杜选侍": "畏惧", "高德全": "态度偏软", "薛女史": "可靠补台"}, "system": {"mainQuests": "主线一至十已完成；隐藏成就\"引蛇出洞\"", "activeQuest": "当前无在途主线任务（子嗣线开启，等待中）", "points": 90, "shop": [{"name": "读心笺", "cost": 15}, {"name": "玉容散", "cost": 45}, {"name": "益气丸", "cost": 50}, {"name": "静心香篆", "cost": 50}, {"name": "双鲤笺", "cost": 40}, {"name": "传声鹤", "cost": 55}, {"name": "避毒珠", "cost": 70, "status": "已购"}, {"name": "免罪金牌（小）", "cost": 80}, {"name": "驻颜膏", "cost": 60}, {"name": "子嗣缘符", "cost": 100, "status": "已用"}, {"name": "藏锋匣", "cost": 90, "status": "已购"}]}, "recentConfirmedFacts": ["十一月上旬：太后请脉赠菊饼；赏菊宴\"残雪缺月\"答皇后，菊挪菊山正面，裴贵妃记怨", "十一月中旬：练绣样；拜访韦昭仪问先皇后，获线索——先皇后信佛病中少传太医、中宫脉案单独立档、太医院秦院判在其走后半年致仕回乡；抄本无载", "十一月下旬：闭门练琴《平沙》小成；冬至宴（腊月初）即兴作诗，帝赞\"字比诗好\"；探望韦昭仪咳疾送温方受赏", "十二月中旬：休养闲逛；御苑收菊回殿；传闻裴贵妃宫里寻了崔冬至诗字拓样（存疑）", "十二月下旬：潜心练琴收官；《平沙》渐入佳境，琴艺29→31"], "pending": ["裴贵妃：记怨未发；拓字传闻存疑，留意", "先皇后旧档线索：秦院判（致仕回乡）＋中宫脉案单独立档＋柳氏密信\"两份底档\"——三线方向相近，宜慢查", "柳氏密信：藏于藏锋匣；求情之请未答", "郑贵人小产旧案：真伪未证", "安神香当票已逾期", "子嗣线：缘符随身，等待中", "正月里节令（元旦、人日）将至，可预备露脸或礼数"], "npcGoalCards": {"裴贵妃": "目标不明，对崔记怨未动；冬至宴全程冷淡。期限：不可再无限观望，正月内须有一次可见动作", "柳美人": "幽禁听雨轩，无诏不得出；递信求援未得回音", "韦昭仪": "维持与崔的盟谊；咳疾渐愈", "林守拙": "任太医院职务如常；与崔有随时手谈之约"}, "emperor": {"intimacy": 55, "lastContact": 94, "absence": null, "hisState": "前朝岁暮政繁，节令宴饮多", "memories": [{"xun": "元朔元年五月", "text": "首次侍寝，获赐安息香", "type": "共历", "open": false}, {"xun": "元朔二年七夕", "text": "以自书字与七夕诗二首相赠", "type": "信物", "open": false}, {"xun": "元朔四年九月上旬", "text": "夜访披香殿，赐先皇后旧绣样一匣", "type": "信物", "open": false}, {"xun": "元朔四年十一月初三", "text": "御苑菊山“雪点妆”前驻足，说“缺一角才有意思”（高德全转述）", "type": "共历", "open": false}, {"xun": "元朔四年冬至宴", "text": "帝亲赞“字比诗好”", "type": "共历", "open": false}, {"xun": "元朔四年腊月初", "text": "旧绣样滚针山茶第三层色，一幅将收尾，约完工之日呈御览", "type": "约定", "open": true}]}, "nextStep": "元朔五年正月上旬，由玩家安排生活重心；正月节令可留意"};
 
@@ -1486,7 +1494,7 @@ function adjudicatePlots(skipDice){ // 旬首裁决：到期强制兑现 + 前�
   else if(mainPub)lines.push('新主线发布每旬至多一条：scene 对话呈现，给 2—4 个接话选项，等待玩家应对；与发酵条目同场时 hasEvent 随那场处置戏；新主线条目必须随本轮 statePatch.plots 落账。');
   for(const l of emp.lines)lines.push(l);
   for(const l of sch.lines)lines.push(l);
-  if(schemeFire)lines.push('本旬主戏是暗流发难：hasEvent=true，用 scene 开场，2—4 个应对选项都要带 check。前端会在玩家点选后掷骰并把成败交给你。不要写成虚惊一场，也不要让出手的人无代价退走。');
+  if(schemeFire)lines.push('本旬主戏是暗流发难：hasEvent=true，用 scene 开场，给 2—4 个应对选项。结果不掷骰：由你根据玩家选择、当前局势、她的性格与手段推断成败；收尾时在顶层写 schemeOutcome（win/draw/lose/defuse），并把实际后果写进 narrative/changes/statePatch。不要写成虚惊一场，也不要让出手的人无代价退走。');
   { // 在途账目逐旬自查：把客观线索（手作记录、行囊、面板数值）摆出来，强制主持人逐条对照已发生事实，该兑现的当轮兑现
     const activeNow=activePlots();
     if(activeNow.length){
@@ -1728,7 +1736,7 @@ function schemeFireLine(sc){
   const exposed=sc.exposed?'她的一部分布置已被你看破。':'你尚未看破她的布置。';
   return `【暗流·发难】${sc.who} 对你下手了：${sc.methodName}，冲着你的${t}——${sc.fire||((SCHEME_METHOD_BY_ID[sc.method]||{}).fire||'')}。${exposed}
 本轮必须让这件事当面发生：hasEvent=true，用剧情对话 scene 结构开场；写清谁在出手、抓住了什么由头、你被逼到什么地步。若本旬逢节宴，就在宴上发作。
-给 2—4 个应对选项，每项必须带 check：{"attr":"手段|交际|威望|忌惮","stake":"小|中|大"}。前端会掷骰并把成败作为既成事实告诉你，你只按结果写，不得替玩家改判，也不得写成虚惊一场。前端负责好感、宠爱、威望、银两、位份、孕况的实际增减；你不要在 statePatch 里重复写这些数值，只写本场新增的情报、物品、待续与他人位份变动。若败：${schemeCostText(sc)}；若胜：她的布置败露，须当众或暗中承担后果，不能全身而退。`;
+给 2—4 个应对选项（不必写 check）。结果不掷骰：由你根据玩家整场的应对、当前局势、她的性格与手段、既有准备推断成败；收尾时在 JSON 顶层写 schemeOutcome（win/draw/lose/defuse），并把实际后果写进 narrative/changes/statePatch（好感、宠爱、威望、银两、位份、孕况等由你按下场面的因果结算，前端不再代改数值）。不得替玩家改判，也不得写成虚惊一场。若败：${schemeCostText(sc)}；若胜：她的布置败露，须当众或暗中承担后果，不能全身而退。`;
 }
 function adjudicateSchemes(now){ // 只读裁决：给提示词添块、给前端交出本轮要发难的图谋
   const lines=[],fire=[],clues=[];
@@ -1822,47 +1830,23 @@ function applySchemeCost(sc,factor){ // factor=1 全损，0.5 折半；只动真
   }
   return ch.filter(Boolean);
 }
-function stripSchemeSettlement(p,sc){ // 暗流结账由前端算：把模型可能重复写的那几项拿掉，避免一笔损失扣两遍
-  if(!p||!sc)return p;
-  const sp=(p.statePatch&&typeof p.statePatch==='object'&&!Array.isArray(p.statePatch))?p.statePatch:{};
-  const del=(k)=>{delete sp[k]};
-  const delAttr=(name)=>{
-    del('protagonist.attributes.'+name);
-    const a=sp['protagonist.attributes'];
-    if(a&&typeof a==='object'&&!Array.isArray(a))delete a[name];
-    const pr=sp['protagonist'];
-    if(pr&&typeof pr==='object'&&pr.attributes&&typeof pr.attributes==='object')delete pr.attributes[name];
-  };
-  const relVal=(who)=>{
-    del('relationships.'+who+'.value');
-    const r=sp['relationships.'+who];
-    if(r&&typeof r==='object'&&!Array.isArray(r))delete r.value;
-  };
-  relVal(sc.who); // 与出手者的关系由前端结账，模型不要重复写
-  if(sc.target==='恩宠'){relVal('皇帝');del('emperor.intimacy')}
-  if(sc.target==='名声'){delAttr('威望');delAttr('忌惮')}
-  if(sc.target==='位份'){delAttr('威望');del('protagonist.silver');del('protagonist.rank');del('protagonist.salary')}
-  if(sc.target==='财物'){del('protagonist.silver')}
-  if(sc.target==='子嗣'){delAttr('体质');del('protagonist.constitutionBase')}
-  if(sc.target==='盟友'){for(const who in (state.relationships||{}))if(!/皇帝|太后|皇后/.test(who))relVal(who)}
-  if(Array.isArray(p.changes))p.changes=p.changes.filter(c=>!/^(好感|宠爱|威望|忌惮|银两|体质|孕况|位份|关系)[·：:]?\s*[+＋\-－]?\d/.test(String(c).trim()));
-  return p;
+function schemeOutcomeText(result){return result==='win'?'对方布置败露':(result==='defuse'?'提前化解':(result==='lose'?'对方得手':'勉强挡下'))}
+function inferSchemeOutcome(p){
+  const blob=((p&&Array.isArray(p.changes)?p.changes:[]).join(' '))+' '+String((p&&p.narrative)||'');
+  if(/败露|挫败|反将|拿住|拆穿|化解/.test(blob))return 'win';
+  if(/得手|受损|失手|丢了|被夺|罚俸|降位|蒙冤/.test(blob))return 'lose';
+  return 'draw';
 }
-function ensureFailureCost(p,ctx){ // 判定失手/大败时兜底：模型没写损失，就在这里落一笔，别让"选错"变成虚惊一场
-  if(!ctx||!ctx.check||!/失手|大败/.test(ctx.check.tier))return [];
-  const sev=ctx.check.tier==='大败'?2:1;
-  const who=ctx.who||'';
-  const sp=(p&&p.statePatch)||{};
-  const hasRel=!!who&&Object.keys(sp).some(k=>k==='relationships.'+who+'.value');
-  const hasFav=Object.keys(sp).some(k=>k==='relationships.皇帝.value');
-  const hasSilver=typeof sp['protagonist.silver']==='number';
-  const ch=[];
-  if(!hasRel&&who)ch.push(_schemeRel(who,-(sev===2?7:3)));
-  if(!hasFav&&who!=='皇帝')ch.push(_schemeRel('皇帝',-(sev===2?5:2)));
-  if(!hasSilver&&sev===2)ch.push(_schemeSilver(-15));
-  ch.push(_schemeAttr('威望',-sev));
-  p.changes=(Array.isArray(p.changes)?p.changes:[]).concat(ch.filter(Boolean));
-  return ch;
+function resolveSchemeByModel(sc,result){ // 暗流结果由模型按玩家选择、局势与人设裁定：前端只落账，不掷骰、不代改数值
+  if(!sc||sc.done)return;
+  const r=/^(win|draw|lose|defuse)$/.test(String(result||''))?String(result):'draw';
+  sc.done=true;sc.stage='已了';sc.result=r;sc.resolvedTurn=state.turn;
+  const plot=(state.plots||[]).find(p=>p.id===sc.id);
+  if(plot){
+    plot.stage='已兑现';
+    plot.note=(plot.note?plot.note+'；':'')+`已了：${schemeOutcomeText(r)}`;
+  }
+  chronicleAdd(`暗流「${sc.who}」：${sc.methodName||sc.aim||'出手'}——${schemeOutcomeText(r)}`);
 }
 function applySchemeOutcome(sc,result,opt){ // result: win 挫败 / draw 勉强挡下 / lose 得手 / defuse 提前化解
   if(!sc||sc.done)return [];
@@ -1890,80 +1874,60 @@ function applySchemeOutcome(sc,result,opt){ // result: win 挫败 / draw 勉强�
     plot.stage='已兑现';
     plot.note=(plot.note?plot.note+'；':'')+`已了：${result==='lose'?'对方得手':(result==='draw'?'勉强挡下':(result==='defuse'?'提前化解':'对方布置败露'))}`;
   }
+  chronicleAdd(`暗流「${sc.who}」：${sc.methodName||sc.aim||'出手'}——${schemeOutcomeText(result)}`);
   return ch.filter(Boolean);
 }
 
-/* ---------- 选项判定：前端掷骰，模型按结果演 ---------- */
-function inferCheckAttr(text){
-  const t=String(text||'');
-  if(/斥|压|威|问罪|拿人|当众|掌嘴|杖|喝止|仪仗|位份/.test(t))return '威望';
-  if(/查|探|盯|暗访|取证|翻|账|药|验|试|套话|打听/.test(t))return '手段';
-  if(/求|劝|说|请|托|递话|结交|赔|软|托人|借势|同盟/.test(t))return '交际';
-  return '手段';
+function queueQuest(q){
+  if(!q)return false;
+  Game._questQueue=Array.isArray(Game._questQueue)?Game._questQueue:[];
+  if(Game._questNotice&&Game._questNotice.kind===q.kind&&Game._questNotice.id===q.id)return false;
+  if(Game._questQueue.some(x=>x.kind===q.kind&&x.id===q.id))return false;
+  Game._questQueue.push(q);return true;
 }
-function optionCheckFor(opt,scheme){
-  if(!opt)return null;
-  let c=opt.check;
-  if(typeof c==='string'){
-    const attr=SCHEME_ATTRS.find(a=>c.includes(a))||inferCheckAttr(opt.text);
-    return {attr,stake:/大/.test(c)?'大':(/小/.test(c)?'小':'中')};
+function markQuestNotice(q){
+  if(!q)return;
+  const meta=ensurePlotMeta();
+  if(q.kind==='new'){
+    meta.seenMain=Array.isArray(meta.seenMain)?meta.seenMain:[];
+    if(!meta.seenMain.includes(q.id))meta.seenMain.push(q.id);
+  }else if(q.kind==='done'){
+    meta.ackedMain=Array.isArray(meta.ackedMain)?meta.ackedMain:[];
+    if(!meta.ackedMain.includes(q.id))meta.ackedMain.push(q.id);
   }
-  if(c&&typeof c==='object'){
-    return {attr:SCHEME_ATTRS.includes(c.attr)?c.attr:inferCheckAttr(opt.text),
-      stake:['小','中','大'].includes(c.stake)?c.stake:'中'};
-  }
-  if(scheme)return {attr:inferCheckAttr(opt.text),stake:(scheme.severity>=3?'大':(scheme.severity>=2?'中':'小'))};
-  if(/顶撞|当众|质问|揭穿|撕破|拒绝|硬来|闯|赌|冒险|先斩|擅|瞒|私自|越制|抢|争|驳|讥|逼|要挟|告发|反咬|不认|摔|掀/.test(String(opt.text||'')))
-    return {attr:inferCheckAttr(opt.text),stake:'中'}; // 模型漏标 check 时，逞强/冒险一类的选项照样要掷
-  return null;
 }
-const SCHEME_ATTRS=['手段','交际','威望','忌惮'];
-function optionChanceFor(scheme,check){
-  const p=(state&&state.protagonist)||{},attrs=p.attributes||{};
-  const val=Number(attrs[check.attr])||50;
-  let bonus=0;
-  if(scheme){
-    if(scheme.exposed)bonus+=12;
-    const ally=Object.entries(state.relationships||{}).filter(([n,r])=>!/皇帝|太后|皇后/.test(n)&&r&&typeof r==='object'&&typeof r.value==='number'&&r.type!=='仇恨').sort((a,b)=>b[1].value-a[1].value)[0];
-    if(ally&&ally[1].value>=60)bonus+=Math.round((ally[1].value-55)/5);
-    bonus-=Math.min(18,Math.max(0,rankScoreOf(((state.npcs||{})[scheme.who]&&state.npcs[scheme.who].rank)||rankTitleOf(scheme.who))-rankScoreOf(p.rank))*2); // 位份压制封顶：低品对上贵妃仍有一条血路，不是必输
-    bonus+=(p.personality||[]).some(x=>/机敏|谨慎|果决|圆滑/.test(x))?3:0;
-  }
-  const pen={小:0,中:6,大:12}[check.stake]||6;
-  return Math.max(8,Math.min(92,Math.round(50+(val-58)*0.9+bonus-pen)));
+function flushQuestQueue(){ // 只在住处空闲时弹；对话、面板、其他弹窗期间先排队
+  if(!state||Game._questOpen)return false;
+  if(phase!=='FOCUS_SELECT')return false;
+  const blocked=['actModal','incidentModal','restModal','tutorialModal','collapseModal','dawnModal','questModal'].some(id=>{const e=document.getElementById(id);return !!(e&&e.classList.contains('on'))});
+  if(blocked)return false;
+  if(document.getElementById('chatview').classList.contains('on')||document.getElementById('mapview').classList.contains('on'))return false;
+  if(document.getElementById('sheet').classList.contains('on'))return false;
+  Game._questQueue=Array.isArray(Game._questQueue)?Game._questQueue:[];
+  const q=Game._questQueue.shift();if(!q)return false;
+  UI.showQuestNotice(q);return true;
 }
-function rollOptionCheck(opt,scheme){
-  const check=optionCheckFor(opt,scheme);if(!check)return null;
-  const chance=optionChanceFor(scheme,check);
-  const roll=Math.floor(Math.random()*100)+1;
-  let tier;
-  if(roll<=Math.max(2,chance-28))tier='完胜';
-  else if(roll<=chance)tier='险胜';
-  else if(roll<=Math.min(98,chance+35))tier='失手'; // 失手占多数、大败留给真正掷崩：失败不等于一败涂地
-  else tier='大败';
-  return {check,chance,roll,tier};
-}
-function checkBadge(opt,scheme){
-  if(sceneCtx&&sceneCtx.check)return '';
-  const check=optionCheckFor(opt,scheme);if(!check)return '';
-  const chance=optionChanceFor(scheme,check);
-  const lv=chance>=70?'成算高':(chance>=45?'成算中':'成算低');
-  return `　<span class="chk">${esc(check.attr)}·${lv}</span>`;
-}
-function xunMainQuestCheck(){ // 旬首主线判定（每旬开头一次）：了结通报＋逾期提醒；断档发新主线由 _xunStartPop 负责
+function checkMainQuestNotices(){ // 主线发布/了结：弹窗 + 大事记；只报一次
   if(!state||!Array.isArray(state.plots))return;
   const meta=ensurePlotMeta();
-  const now=xunSerial(state.time);
-  if(!Array.isArray(meta.ackedMain))meta.ackedMain=state.plots.filter(p=>p.line==='主线'&&p.stage!=='进行中').map(p=>p.id); // 旧档既往了结不补报，免得翻旧账刷屏
-  const main=state.plots.find(p=>p.line==='主线'&&p.stage==='进行中')||null;
-  const closed=state.plots.filter(p=>p.line==='主线'&&p.stage!=='进行中'&&!meta.ackedMain.includes(p.id));
-  for(const p of closed){
-    meta.ackedMain.push(p.id);
-    const tail=main?'':'新主线随后接续发布。';
-    UI.pushCard(`<article class="turncard"><div class="card-head"><div><div class="card-focus">【宫斗系统】<b>主线任务${p.stage==='已作废'?'作废':'了结'}</b></div></div>${UI.seal()}</div><div class="card-body">主线任务「${p.title}」${p.stage==='已作废'?'已作废':'已完成'}。${tail}</div></article>`);
+  const mains=state.plots.filter(p=>p.line==='主线');
+  if(!Array.isArray(meta.seenMain))meta.seenMain=mains.filter(p=>p.stage==='进行中').map(p=>p.id);
+  if(!Array.isArray(meta.ackedMain))meta.ackedMain=mains.filter(p=>p.stage!=='进行中').map(p=>p.id);
+  for(const p of mains){
+    if(p.stage==='进行中'&&!meta.seenMain.includes(p.id)){
+      queueQuest({kind:'new',id:p.id,title:p.title,note:p.note,dueText:p.dueText});
+    }else if(p.stage!=='进行中'&&!meta.ackedMain.includes(p.id)){
+      queueQuest({kind:'done',id:p.id,title:p.title,note:p.note,dueText:p.dueText,stage:p.stage});
+    }
   }
+  flushQuestQueue();
+}
+function xunMainQuestCheck(){ // 旬首主线判定（每旬开头一次）：发布/了结弹窗＋逾期提醒
+  if(!state||!Array.isArray(state.plots))return;
+  checkMainQuestNotices();
+  const now=xunSerial(state.time);
+  const main=state.plots.find(p=>p.line==='主线'&&p.stage==='进行中')||null;
   if(main&&main.latest!=null&&now>main.latest)toast(`【宫斗系统】警示：主线任务「${main.title}」已逾期（期限：${main.dueText||'已过'}）。本旬务必了结；再搁置将按发酵处置。`,5200);
-  if(closed.length)persistCurrent(); // 记 ack：刷新重进不重复通报
 }
 /* ============================================================ 恩宠账（帝感情线双轨）
    明面恩宠=relationships.皇帝.value（宠爱，面板可见）；内里知心=emperor.intimacy（不显示数字，只显阶段）。
@@ -2033,15 +1997,15 @@ const EMPEROR_MODULE = [
 ].join('\n');
 
 /* ============================================================ 承宠与子嗣（前端裁决）
-   侍寝、晨报、孕事、生产都由前端结算：模型只写戏，不得改写招幸对象、日期、孕事与皇嗣性别。
-   每旬一次「帝召谁」：主控可在【吩咐】里争取／静候／避宠，旬末结账，次旬晨报呈现。 */
+   侍寝、夜账、孕事、生产都由前端结算：模型只写戏，不得改写招幸对象、日期、孕事与皇嗣性别。
+   每旬一次「帝召谁」：主控可在【吩咐】里争取／静候／避宠，旬末结账，点「结束本旬」后弹出夜账。 */
 const CHAMBER_MODULE = [
 '## 十四、承宠与子嗣（bedchamber / pregnancy / heirs；前端裁决，覆盖世界书冲突处）',
-'1. 每旬的侍寝由前端结算：存档 bedchamber 记最近若干旬「帝召幸谁」的公开记档，last 为最近一夜；晨报由前端在旬首呈现。主控若在晨报点「入帐相见」，会另开一段承宠夜话（scene 对话，只演那一夜，不结算本旬）；模型写正文时须与晨报和夜话相符，不得改写招幸对象、时间与结果。帝召幸他人是六宫可见的公开消息，可写入 haremNews 与宫人议论；主控不可知的私下细节不得写。',
-'2. 主控的侍寝场面点到为止：只写事前准备、帷帐之外与次日余波；不写露骨过程。侍寝不自动涨知心；晨报中已由前端结算的恩宠（如“恩宠 +1”）不得在同一夜重复加恩；其余宠爱变化以 statePatch["relationships.皇帝.value"] 回写为准，不得凭空大幅加恩。',
+'1. 每旬的侍寝由前端结算：存档 bedchamber 记最近若干旬「帝召幸谁」的公开记档，last 为最近一夜；夜账由前端在玩家点「结束本旬」后呈现，不再等到次旬早晨。主控若在夜账点「入帐相见」，会另开一段承宠夜话（scene 对话，只演那一夜，不结算本旬）；模型写正文时须与夜账和夜话相符，不得改写招幸对象、时间与结果。帝召幸他人是六宫可见的公开消息，可写入 haremNews 与宫人议论；主控不可知的私下细节不得写。',
+'2. 主控的侍寝场面点到为止：只写事前准备、帷帐之外与次日余波；不写露骨过程。侍寝不自动涨知心；夜账中已由前端结算的恩宠（如“恩宠 +1”）不得在同一夜重复加恩；其余宠爱变化以 statePatch["relationships.皇帝.value"] 回写为准，不得凭空大幅加恩。',
 '3. 有孕、胎象、小产与生产由前端结算（存档 pregnancy）。模型不得自行判定主控有孕、小产、生产或皇嗣性别；可写太医请脉、胎象、保胎与孕中反应，结果以存档为准。剧情要伤胎，只能通过体质下降与风险，不得直接改写 pregnancy。',
 '4. 皇嗣出生后由前端建档（存档 heirs：姓名、性别、生母、年龄、学识/礼仪/体魄/依赖）。模型写皇嗣须符合这些事实；皇嗣教育按世界书 §6E，前端给底、模型演过程。',
-'5. 主控本旬若已争取承宠，正文可写递牌子、打点、宫人议论与等待的心绪；结果已在晨报中给出，不得另编一次召幸。避宠同样是一种选择，须写出安全与失宠之间的代价。'
+'5. 主控本旬若已争取承宠，正文可写递牌子、打点、宫人议论与等待的心绪；结果已在夜账中给出，不得另编一次召幸。避宠同样是一种选择，须写出安全与失宠之间的代价。'
 ].join('\n');
 const CHAMBER_RANKS=/皇后|皇贵妃|贵妃|贤妃|良妃|淑妃|德妃|妃|贵嫔|嫔|昭仪|昭容|昭媛|修仪|修容|修媛|充仪|充容|充媛|贵人|美人|才人|宝林|常在|答应|选侍|更衣|采女|官女子/;
 const CHAMBER_BLOCK=/皇嗣|皇子|皇女|公主|太后|太妃|太嫔|宫女|太监|太医|侍卫|掌事|姑姑|女官|女史|乳母/;
@@ -2353,21 +2317,21 @@ function dawnReportHtml(r){
   const rows=[];
   let head='';
   if(r.kind==='me'){
-    head=`昨夜，敬事房的记档上添了你的名字。帝召你侍寝${r.where?`，在${r.where}`:''}。`;
-    rows.push('晨起你回到住处，宫人看你的眼神比往日多了几分小心。');
+    head=`本旬末，敬事房的记档上添了你的名字。帝召你侍寝${r.where?`，在${r.where}`:''}。`;
+    rows.push('事毕你回到住处，宫人看你的眼神比往日多了几分小心。');
     if(r.favor)rows.push(`恩宠 +${r.favor}。`);
     if(r.conceived)rows.push('敬事房照例记了档；至于有没有喜信，还要过些日子才知。');
   }else if(r.kind==='npc'){
-    head=`昨夜，帝翻了「${r.who}」的牌子。`;
+    head=`本旬末，帝翻了「${r.who}」的牌子。`;
     if(r.intent==='strive')rows.push('你的牌子也递上去了，到底落到了旁人手里。');
     if(r.intent==='avoid')rows.push('你称病避了牌子；帝便召了旁人。');
-    if(r.gossip)rows.push('今早六宫都在传：'+r.gossip);
+    if(r.gossip)rows.push('转日六宫都在传：'+r.gossip);
   }else if(r.kind==='none'){
-    head=`帝近来${r.reason}，昨夜未召任何人。`;
+    head=`帝近来${r.reason}，本旬末未召任何人。`;
     if(r.intent==='strive')rows.push('你的牌子递上去了，帝未召人。');
     if(r.intent==='avoid')rows.push('你称病避了牌子。');
   }else{
-    head='昨夜，帝宿在御书房，未召任何人。';
+    head='本旬末，帝宿在御书房，未召任何人。';
     if(r.intent==='strive')rows.push('你的牌子递上去了，帝没有翻。');
     if(r.intent==='avoid')rows.push('你称病避了牌子，帝也未召旁人。');
   }
@@ -2380,7 +2344,7 @@ function dawnReportHtml(r){
   return `<div style="font-size:14px;line-height:1.9;color:var(--ink)">${esc(head)}</div>`
     +(rows.length?`<div style="font-size:13px;line-height:1.85;color:var(--ink-soft);margin-top:8px">${rows.map(x=>`<div>${x}</div>`).join('')}</div>`:'')
     +recentHtml
-    +`<div class="sheet-note" style="margin-top:12px">晨报只记敬事房的明面记档与宫人议论；${r.kind==='me'?'要入帐，点下面「入帐相见」；不想去，也可略过。':'想争一争，可在【吩咐】里递牌子；想避，也可称病。'}</div>`;
+    +`<div class="sheet-note" style="margin-top:12px">本旬末只记敬事房的明面记档与宫人议论；${r.kind==='me'?'要入帐，点下面「入帐相见」；不想去，也可略过。':'想争一争，可在【吩咐】里递牌子；想避，也可称病。'}</div>`;
 }
 
 /* 帝设：玩家亲撰的皇帝人设（开局捏主控时自定义，商城「移性符」可改一次）。覆盖世界书与随机性情中对帝的默认描写。 */
@@ -2412,7 +2376,7 @@ const SCHEME_MODULE = [
 '## 二十、暗流账（schemes；谁在何时对你下手）',
 '1. 存档 schemes 是敌方行动账：每条含 who（出手的人）、aim（手段名）、target（冲你的什么：恩宠/名声/位份/财物/子嗣/盟友）、stage（布子/发难/已了）、severity（1—3）、exposed（你是否已看破）、clues。它由前端按仇恨、好感、位份、派系与你的得宠/晋位/有孕排期，不靠你临时起意。',
 '2. 【暗流·征兆】出现时，只在本旬叙事或 haremNews 里写一处主控可感知的异样（药味、账目、换人、闲话、被压的牌子），不点破是谁、不写幕后、不写成已经破案。若主控当旬查问相关人事并抓住了实证，写 statePatch.schemeExpose={"id":"条目 id"}；前端会降低她发难时的难度。',
-'3. 【暗流·发难】出现时，这是本旬主戏：hasEvent=true，scene 开场，写清她怎么动的手、抓住什么由头、你被逼到哪一步。2—4 个应对选项都要带 check；前端掷骰后会把成败作为既成事实告诉你，你只按结果演，不得改判、不得替玩家选、不得让发难缩成一场误会。',
+'3. 【暗流·发难】出现时，这是本旬主戏：hasEvent=true，scene 开场，写清她怎么动的手、抓住什么由头、你被逼到哪一步。2—4 个应对选项（不必写 check）。结果不掷骰：由你根据玩家选择、当前局势、她的性格与手段、既有准备推断成败；收尾时在 JSON 顶层写 schemeOutcome（win/draw/lose/defuse），并把实际后果写进 narrative/changes/statePatch（前端不再代改数值）。不得替玩家选，不得让发难缩成一场误会。',
 '4. 胜败都要见血见肉：胜则她的布置败露、须承担后果（失面、失宠、被查、反被拿住把柄），但她不会就此消失，仇更深；败则 target 所指之物实打实受损，写出失宠、罚俸、蒙冤、被夺、动了胎气之类后果，不许"有惊无险"。',
 '5. 玩家也可以在发难前抢先按住：若已有足够证据并采取了封堵、反将、借势、示弱卸力的具体行动，写 statePatch.schemeDefuse={"id":"条目 id"}；前端按"提前化解"结账。没有实证的硬指认不算化解。',
 '6. 暗流与节宴、恩宠账、剧情账可同场：宴上发难、席散后清算皆可；同旬只演一条主戏，其余并入，不另开场。'
@@ -2456,7 +2420,7 @@ const SCENE_MODULE = [
 ' "scene":{"state":"ongoing","who":"素心",',
 '  "parts":[{"type":"act","text":"她把茶盏搁下，声音放轻"},{"type":"say","text":"知道了"}],',
 '  "when":"腊月廿三 申时","where":"御花园梅林"},',
-' "options":[{"id":"a","text":"接话选项，可带姿态标签如【敛衽福身】","check":{"attr":"手段","stake":"中"}},{"id":"b","text":"另一方向，机会或代价可见"}],',
+' "options":[{"id":"a","text":"接话选项，可带姿态标签如【敛衽福身】"},{"id":"b","text":"另一方向，机会或代价可见"}],',
 ' "statePatch":{}}',
 '```',
 '- scene.who 必填，写清对方是谁：用存档中的人物称谓或姓名（如"太后""韦昭仪""春韶"），顶层 eventSource 写同一人；界面据此显示姓名与头像。',
@@ -3326,6 +3290,16 @@ function toCN(n){n=Number(n)||0;if(n<10)return'一二三四五六七八九'[n-1]
 function xunNoOf(turn){return (Number(turn)||0)+1} // 存档 turn=已完成旬数（从 0 起），展示给玩家/模型时统一 +1
 function xunNo(){return xunNoOf(state&&state.turn)}
 function fmtTime(t){t=t||state.time;return `${t.era}${toCN(t.year)}年·${MONTHS[t.month]||t.month+'月'}${t.xun||''}`}
+function chronicleAdd(text){ // 大事记：持续记录里程碑；同一条不重复，最多留 160 条
+  if(!state||!text)return;
+  const t=String(text).replace(/\s+/g,' ').trim().slice(0,200);
+  if(!t)return;
+  if(!Array.isArray(state.chronicle)){state.chronicle=[];state.chronicleLegacy=true;} // 旧档首次追加：保留原静态沿革
+  const last=state.chronicle[state.chronicle.length-1];
+  if(last&&String(last.text||'')===t)return;
+  state.chronicle.push({time:fmtTime(),text:t});
+  if(state.chronicle.length>160)state.chronicle=state.chronicle.slice(-160);
+}
 function toast(msg,ms=2200){const el=$('#toast');el.textContent=msg;el.classList.add('on');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('on'),ms)}
 
 /* ============================================================ 设置 */
@@ -3506,6 +3480,8 @@ function normalizeState(s){
   migrateChamber(s); // 承宠账/孕事/皇嗣册：旧档补字段并从 world.heirs 文本尽量建档
   revivePregnancy(s); refreshHeirAges(s);
   if(!Array.isArray(s.plots))s.plots=[];
+  s.plotMeta=s.plotMeta&&typeof s.plotMeta==='object'?s.plotMeta:{lastEventTurn:-99,lastBigTurn:-99};
+  if(!Array.isArray(s.plotMeta.seenMain))s.plotMeta.seenMain=s.plots.filter(p=>p.line==='主线'&&p.stage==='进行中').map(p=>p.id); // 首接：现有主线不补报；之后新发布的主线才弹窗
   if(!Array.isArray(s.schemes))s.schemes=[]; // 暗流账：旧档从空账开始，头几旬由前端按关系与位份起念
   s.schemeMeta=(s.schemeMeta&&typeof s.schemeMeta==='object')?s.schemeMeta:{lastSpawn:-99,tickTurn:-1};
   if(!s.readMindV1){const sys=s.system=s.system||{};const shop=sys.shop=Array.isArray(sys.shop)?sys.shop:[];if(!shop.some(it=>it&&it.name==='读心笺'))shop.push({name:'读心笺',cost:15});s.readMindV1=true} // 旧档商城补读心笺
@@ -3783,7 +3759,7 @@ function compactState(s,focusMsg){ // 只压缩送入模型的那一份，localS
     e.hisState=String(e.hisState||'').slice(0,90);
     out.emperor=e;
   }
-  // 承宠与子嗣：只带最近六夜与孕事/皇嗣简档，晨报细节留在前端
+  // 承宠与子嗣：只带最近六夜与孕事/皇嗣简档，夜账细节留在前端
   if(s.bedchamber&&typeof s.bedchamber==='object'){
     const b=s.bedchamber;
     out.bedchamber={last:b.last||null,log:Array.isArray(b.log)?b.log.slice(-6).map(x=>({turn:x.turn,time:x.time,kind:x.kind,who:x.who,rank:x.rank||'',note:String(x.note||'').slice(0,40),favor:x.favor||0,intent:x.intent||'',paid:!!x.paid})):[]};
@@ -3894,6 +3870,7 @@ SCENE_PARTS_RULES,
 '【信息】玩家直接问到对方知道的事，必须在本轮给出实质信息：具体名目、缘由、时间、经手人或明确去处。可以害怕、压低声音、提条件，但不能用“谁提谁落不是”“只当没听见”这类空话把话吊住；确实不能说时，须给出具体缘由与下一步可问的人或可查之处。同一件事不得连续两轮只含糊拖延，玩家追问必须推进。不得凭空发明与存档无关的禁忌或旧案；若引入新的忌讳，必须同时讲清它是什么、为何犯忌、与谁相关。',
 '【戏核】本场信息里的 brief 是这场戏的核心问题：玩家要得到/保住什么、谁在阻止、失败失去什么。每轮都必须让这个问题前进一步；不得另起无关的小问题。若本场确实没有明确得失，只写一句交代，不要用追问硬撑。',
 '【有事】每轮至少让事态变一点：有人来、物被拿走、传旨、搜检、当众发难、证据出现、条件变化；不能只有问答。',
+'【暗流】若本场有 scheme：结果不掷骰。根据玩家本轮的选择、当前局势、对方性格与手段、既有准备推断成败；最终收尾时在 JSON 顶层写 schemeOutcome（win/draw/lose/defuse），并把实际后果写进 narrative/changes/statePatch，不得只判输赢不写后果。',
 '【不挤牙膏】对方知道的关键信息一轮内给足；不得把同一件事拆成多轮追问。问完必须给出自己的立场、条件或处置；不能只问不答。',
 '【琐事不成场】核对簿册、传话、礼数、花色、茶点等，除非直接牵连位份/恩宠/银钱/子嗣/性命/把柄/派系/任务，否则不得单独成场。',
 '【称谓】scene.parts 的 say/quote 中，人物提到天子一律称「陛下」，不得写「帝」；narr 与 narrative 等叙述仍称「帝」。',
@@ -3923,6 +3900,7 @@ function buildSceneSystem(who){
     world:{dynasty:w.dynasty,emperor:w.emperor?{name:w.emperor.name,age:w.emperor.age,traits:w.emperor.traits,persona:String(w.emperor.persona||'').split('<player>').join(String(p.name||'主控'))}:null,factions:w.factions},
     activePlots:(state.plots||[]).filter(x=>x.stage==='进行中').slice(0,6).map(x=>({title:x.title,line:x.line,note:String(x.note||'').slice(0,100)})),
     brief:(typeof sceneCtx!=='undefined'&&sceneCtx&&sceneCtx.brief)?sceneCtx.brief:null, // 本场戏核：目标/阻碍/得失
+    scheme:(typeof sceneCtx!=='undefined'&&sceneCtx&&sceneCtx.scheme)?{who:sceneCtx.scheme.who,target:SCHEME_TARGET_TEXT[sceneCtx.scheme.target]||sceneCtx.scheme.target,severity:sceneCtx.scheme.severity,methodName:sceneCtx.scheme.methodName,exposed:!!sceneCtx.scheme.exposed}:null, // 暗流：结果由模型裁定
     recentFacts:(state.recentConfirmedFacts||[]).slice(-3)
   };
   return SCENE_RULES+'\n\n【本场信息】\n'+JSON.stringify(payload);
@@ -4127,10 +4105,6 @@ function parsePayload(raw){
   p.changes=asList(p.changes).map(asText).filter(Boolean);
   p.todo=asList(p.todo).map(asText).filter(Boolean);
   p.options=asList(p.options).map(asOption);
-  if(p.hasEvent&&!sceneCtx&&p.options.length&&!p.options.some(o=>o&&o.check)){ // 新开一场事：至少留一条要掷骰的路，别让所有选项都稳赢
-    const last=p.options[p.options.length-1];
-    if(last)last.check={attr:inferCheckAttr(last.text),stake:'中'};
-  }
   if(p.eventSource!=null&&typeof p.eventSource!=='string')p.eventSource=asText(p.eventSource);
   if(p.scene!=null&&(typeof p.scene!=='object'||Array.isArray(p.scene)))p.scene={line:asText(p.scene)};
   if(p.scene){
@@ -4142,6 +4116,7 @@ function parsePayload(raw){
   }
   if(p.dossier!=null&&!Array.isArray(p.dossier))p.dossier=[];
   if(p.statePatch!=null&&(typeof p.statePatch!=='object'||Array.isArray(p.statePatch)))p.statePatch={};
+  if(p.schemeOutcome!=null)p.schemeOutcome=String(p.schemeOutcome).toLowerCase();
   return p;
 }
 
@@ -4362,7 +4337,14 @@ function finalize(payload,meta){
   let ok=true;
   try{
     const tiBefore=state&&state.protagonist&&state.protagonist.attributes?Number(state.protagonist.attributes['体质']):null;
+    const mainBefore=(state.plots||[]).filter(p=>p.line==='主线').map(p=>({id:p.id,stage:p.stage,note:String(p.note||''),title:p.title})); // 主线进度：本步有没有推进
     const majors=applyPatch(payload.statePatch);
+    for(const p of (state.plots||[]).filter(x=>x.line==='主线')){
+      const old=mainBefore.find(x=>x.id===p.id);
+      if(old&&old.stage==='进行中'&&p.stage==='进行中'&&String(old.note||'')!==String(p.note||'')){
+        chronicleAdd(`主线「${p.title}」：${String(p.note||'').slice(0,160)}`); // 每一步推进都进大事记
+      }
+    }
     if(payload&&Array.isArray(payload.changes)&&tiBefore!=null){ // 体质被根基钳住、实际未涨时，撤下"体质+"变化条，面板不说假话
       const tiAfter=Number(state.protagonist.attributes['体质']);
       if(!(tiAfter>tiBefore))payload.changes=payload.changes.filter(c=>!/^体质\s*[+＋]/.test(String(c)));
@@ -4372,6 +4354,10 @@ function finalize(payload,meta){
     try{applyDossier(payload.dossier)}catch(e){console.warn('[dossier] 人物档案回写失败',e)} // 单条人物档案出错不拖垮整旬结算
     const intelChanged=syncSkillIntel(state); // 交好到相熟：补记已知才艺
     const summary=String((payload.statePatch&&payload.statePatch.log)||'').trim();
+    if(majors.length||isMajorTurn(payload.statePatch,payload)){ // 大事记：晋升/降位/孕事/生死/派系/重大宫斗等里程碑
+      const t=summary||(Array.isArray(payload.changes)?payload.changes.slice(0,3).join('；'):'');
+      if(t)chronicleAdd(t);
+    }
     state.lastNode=summary||`${fmtTime()} · ${meta.focus||meta.choice||'本旬行事'}`; // 自动档摘要用这句，不沿用开局的旧节点
     history.push({turn:state.turn,focus:meta.focus||'',choice:meta.choice||'',narrative:filterText(payload.narrative),log:summary});
     if(history.length>HISTORY_CAP)history.splice(0,history.length-HISTORY_CAP);
@@ -4394,6 +4380,7 @@ function finalize(payload,meta){
   }
   persistCurrent();
   if(ok)markSafe();
+  try{checkMainQuestNotices()}catch(e){console.warn('[主线] 弹窗检查失败',e)}
 }
 
 /* ============================================================ UI */
@@ -4522,7 +4509,7 @@ const UI={
       (pend?`<div class="sheet-note" style="margin:0 0 8px">临期引线：${esc(pend)}</div>`:'')+
       (maidRows?`<div class="sec"><div class="sec-cap">召宫人问话</div>${maidRows}<div class="sheet-note" style="margin-top:6px">进对话、开口问话都不耗精力：交代差事、打听消息、问办差进度皆可，吩咐下去的事日后兑现。</div></div>`:'<div class="sheet-note">暂无配属宫人。</div>');
   },
-  nightIntentHtml(){ // 承宠：本旬争/候/避；结果在旬末结算，次旬晨报呈现
+  nightIntentHtml(){ // 承宠：本旬争/候/避；结果在旬末结算，点结束本旬后弹出夜账
     const turn=state.turn||0;
     const cur=state.xunIntent&&state.xunIntent.turn===turn?state.xunIntent:null;
     const mode=cur?cur.mode:null;
@@ -4541,7 +4528,7 @@ const UI={
       ${opt('strive','争取','耗精力10 · 打点10两（银两不足则只递牌子）',!canStrive)}
       ${opt('wait','静候','不耗精力 · 听凭敬事房安排',preg||pp)}
       ${opt('avoid','避宠','不耗精力 · 免去争宠风险，但恩宠会缓跌',preg||pp)}
-      <div class="sheet-note" style="margin-top:6px">结果在歇下一旬时结算，次旬晨报呈现。帝召幸他人属公开记档，会记入承宠录。</div>
+      <div class="sheet-note" style="margin-top:6px">结果在点「结束本旬」后结算并弹出夜账。帝召幸他人属公开记档，会记入承宠录。</div>
     </div>`;
   },
   nightLedgerHtml(){ // 状态页：昨夜记档、孕事、皇嗣、近旬承宠录
@@ -4881,12 +4868,27 @@ const UI={
   hideRestTip(){$('#restModal').classList.remove('on')},
   dawnReport(r){
     Game._chamberReport=r&&r.kind==='me'?r:null;
-    $('#dawnTitle').textContent='晨报 · 昨夜';
+    $('#dawnTitle').textContent=r&&r.kind==='me'?'夜召 · 本旬末':'敬事房 · 本旬末';
     $('#dawnBody').innerHTML=dawnReportHtml(r);
     $('#dawnOps').innerHTML=r&&r.kind==='me'
       ? `<button class="btn btn-line" onclick="Game.closeDawn()">略过</button><button class="btn btn-primary" onclick="Game.openChamberScene()">入帐相见</button>`
       : `<button class="btn btn-primary" onclick="Game.closeDawn()">记下了</button>`;
     $('#dawnModal').classList.add('on');
+  },
+  showQuestNotice(q){ // 主线发布/了结：弹窗说明目标与期限
+    if(!q)return;
+    Game._questNotice=q;Game._questOpen=true;
+    const isNew=q.kind==='new';
+    $('#questTitle').textContent=isNew?'宫斗系统 · 新主线':'宫斗系统 · 主线了结';
+    const status=isNew?'':`<div class="itemrow"><span>结果</span><span class="cnt">${q.stage==='已作废'?'已作废':'已完成'}</span></div>`;
+    const goal=q.note?`<div class="rowline" style="align-items:flex-start"><span class="rk">目标</span><span class="rv">${esc(q.note)}</span></div>`:'';
+    const due=q.dueText?`<div class="itemrow"><span>期限</span><span class="cnt">${esc(q.dueText)}</span></div>`:'';
+    $('#questBody').innerHTML=`<div class="sec"><div class="sec-cap">${isNew?'新主线任务':'主线了结'}</div>
+      <div class="nd-head"><div><div class="nd-nm">${esc(q.title)}</div></div></div>
+      ${status}${goal}${due}
+      <div class="sheet-note">${isNew?'已记入剧情账与大事记，可随时在「大事记」查看。':'已记入大事记。'}</div></div>`;
+    $('#questBtn').textContent=isNew?'领命':'知道了';
+    $('#questModal').classList.add('on');
   },
   actResult(title,flavor,deltas){
     const list=Array.isArray(deltas)?deltas.filter(Boolean):[];
@@ -4907,6 +4909,7 @@ const UI={
     if(phase==='PROFILE'){toast('请先确认档案');return}
     if(phase==='FOCUS_PICK')phase='FOCUS_SELECT'; // 首旬选项收起后放行其他行动，避免卡在选重心状态
     $('#scrim').classList.remove('on');$('#sheet').classList.remove('on');
+    flushQuestQueue(); // 面板关掉后，排队的主线弹窗可以出来了
   },
   renderSheet(name,param){
     $('#sheetTitle').textContent=name;
@@ -4966,7 +4969,8 @@ const UI={
     const entries=state&&Array.isArray(state.chronicle)?state.chronicle:null;
     if(entries){
       const html=entries.length?entries.map(e=>`<div class="tl-item"><div class="tl-time">${esc(e.time||'')}</div>${esc(e.text||'')}</div>`).join(''):'<div class="sheet-note">新朝初立，尚无大事可记。</div>';
-      return `<div class="sec"><div class="sec-cap">剧情大事记</div><div class="tl">${html}</div></div>`;
+      const legacy=state.chronicleLegacy?`<details class="archive" style="margin-top:14px"><summary>旧档沿革</summary><div class="sheet-note" style="white-space:pre-wrap">${esc(String(CHRONICLE_MD||'').replace(/^---\s*\n[\s\S]*?\n---\s*\n?/,''))}</div></details>`:'';
+      return `<div class="sec"><div class="sec-cap">剧情大事记</div><div class="tl">${html}</div>${legacy}</div>`;
     }
     const md=String(CHRONICLE_MD||'').replace(/^---\s*\n[\s\S]*?\n---\s*\n?/,''); // 去掉源文件 YAML 头：不给玩家看 name/type/description
     return `<div class="sec"><div class="sec-cap">剧情大事记</div><div class="sheet-note" style="white-space:pre-wrap">${esc(md)}</div></div>`;
@@ -6755,7 +6759,7 @@ const Game={
   /* 进入主界面 */
   enterMain(){
     UI.hideBusy();
-    ['errModal','incidentModal','restModal','actModal','tutorialModal','collapseModal','dawnModal'].forEach(id=>{
+    ['errModal','incidentModal','restModal','actModal','tutorialModal','collapseModal','dawnModal','questModal'].forEach(id=>{
       const el=document.getElementById(id);if(el)el.classList.remove('on');
     });
     $('#chatview').classList.remove('on');
@@ -6767,6 +6771,7 @@ const Game={
     const sc=$('.sheet-close');if(sc)sc.style.display='';
     sceneCtx=null;sceneWhoHint=null;currentEvent=null;lastRequest=null;
     Game._pendingEvent=null;
+    Game._questOpen=false;Game._questNotice=null;Game._questQueue=[];
     UI.show('#screen-main');
     $('#stream').innerHTML='';cardCount=0;
     ensureXunBook(); // 本旬小结的起点快照
@@ -6775,7 +6780,8 @@ const Game={
     UI.goHome();
     UI.syncGlobalSet();
     markSafe();
-    this._festivalPop(); // 读档/导入时正逢节宴且尚未演：直接开席，不因中途读档把固定节宴跳过
+    const festStarted=this._festivalPop(); // 读档/导入时正逢节宴且尚未演：直接开席，不因中途读档把固定节宴跳过
+    if(!festStarted)checkMainQuestNotices(); // 主线发布/了结的弹窗；节宴先占场，弹窗等散席
   },
   _festivalPop(){ // 只处理固定节宴：本旬到旬且未演过，直接以宴席开场；不接管发酵/主线/帝至（那些仍归 _xunStartPop）
     if(!state||phase!=='FOCUS_SELECT')return false;
@@ -6820,11 +6826,26 @@ const Game={
   closeDawn(){
     $('#dawnModal').classList.remove('on');
     Game._chamberReport=null;
+    xunMainQuestCheck();
+    if(Game._questOpen){Game._pendingXunPop=true;Game._dawnPending=false;UI.updateStatusbar();return;}
     if(Game._dawnPending){
       Game._dawnPending=false;
       this._xunStartPop();
     }
     UI.updateStatusbar();
+  },
+  closeQuestNotice(){
+    const q=Game._questNotice;Game._questNotice=null;Game._questOpen=false;
+    $('#questModal').classList.remove('on');
+    if(q){
+      markQuestNotice(q);
+      chronicleAdd(q.kind==='new'
+        ?`主线发布：「${q.title}」——${q.note||''}${q.dueText?`（期限：${q.dueText}）`:''}`
+        :`主线${q.stage==='已作废'?'作废':'完成'}：「${q.title}」——${q.note||''}`);
+    }
+    persistCurrent();
+    const opened=flushQuestQueue();
+    if(!opened&&Game._pendingXunPop){Game._pendingXunPop=false;this._xunStartPop();}
   },
   chamberOpening(where){
     const e=(state.world&&state.world.emperor)||{};
@@ -6839,7 +6860,7 @@ const Game={
     else narr+='烛影晃了一下，他才开口。';
     return {narr,line};
   },
-  openChamberScene(){ // 晨报里点「入帐相见」：单独进剧情对话，演承宠夜话；不占精力、不结算本旬
+  openChamberScene(){ // 夜账里点「入帐相见」：单独进剧情对话，演承宠夜话；不占精力、不结算本旬
     const r=Game._chamberReport;
     if(!r||r.kind!=='me'){this.closeDawn();return}
     $('#dawnModal').classList.remove('on');
@@ -6851,7 +6872,7 @@ const Game={
         {id:'b',text:'替他把外袍解了，低声问一句累不累'},
         {id:'c',text:'先说一件自己的事，不急着入正题'}
       ],
-      scene:{state:'ongoing',who:'皇帝',line:opening.line,when:'昨夜',where}
+      scene:{state:'ongoing',who:'皇帝',line:opening.line,when:'今夜',where}
     });
     if(sceneCtx){
       sceneCtx.chamber=true;sceneCtx.standalone=true;sceneCtx.chamberWhere=where; // 夜话不结算，重排操作栏隐去赠礼
@@ -6859,6 +6880,7 @@ const Game={
       this.renderSceneOpts(sceneCtx.lastOptions);
     }
     $('#chatTitle').textContent='承宠 · 帝';
+    $('#chatClock').textContent=r.time||fmtTime(); // 本旬末的夜，不写成次日晨
     Game._chamberReport=null;
   },
   hsGoOut(){if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}$('#mapClock').textContent=fmtTime();$('#mapview').classList.add('on')}, // 出门＝宫城图选目的地
@@ -6963,6 +6985,7 @@ const Game={
   nextTurn(){ // 休息，进入下一旬：旬数+1，精力回满，日历按两旬制推进
     const prevTime=Object.assign({},state.time);
     const prevTurn=state.turn||0;
+    const dawn=resolveNight(prevTurn); // 本旬末先结敬事房这一夜：时间还停在本旬，弹出的侍寝/夜账才合时序
     state.turn=(state.turn||0)+1;state.energy=ENERGY_MAX;state.energyWarned=false;state.mealCount=0;state.walkCount=0;state.time=advanceTime(state.time);
     {const L=state.library;if(L&&L.borrowed){const b=libBook(L.borrowed);L.borrowed=null;toast(`借期已满，${b?b.name:'书册'}已归还藏书阁`,2800)}}
     const salary=this._payMonthlySalary(prevTime); // 下旬→次月上旬：结算刚过完这个月的月俸
@@ -6972,7 +6995,6 @@ const Game={
       const cur=Number(at&&at['体质'])||0;
       if(at&&base>0&&cur>base)at['体质']=cur-1;
     }
-    const dawn=resolveNight(prevTurn); // 昨夜敬事房记档：侍寝、孕事推进、生产（前端自结）
     resetXunBook(); // 新的一旬从零开始记账
     if(salary&&state.xunBook)state.xunBook.salary=salary;
     refreshShop(state); // 商城三旬一换：跨入新一轮货色即重挑
@@ -6981,9 +7003,12 @@ const Game={
     phase='FOCUS_SELECT'; // 新的一旬从住处即可直接安排行事
     UI.goHome();
     markSafe(); // 新旬落定：此后卡死只退回本旬开头
-    xunMainQuestCheck(); // 旬首主线判定：主线了结通报＋逾期提醒
-    if(dawn){Game._dawnPending=true;UI.dawnReport(dawn)} // 先看晨报；关闭后再走旬首强制处置
-    else this._xunStartPop(); // 旬首检查：已发酵事项直接弹出强制处理；主线断档亦在此直接弹新主线，不待命
+    if(dawn){Game._dawnPending=true;UI.dawnReport(dawn);xunMainQuestCheck()} // 夜里先看本旬末的敬事房记档；主线弹窗排队
+    else{
+      xunMainQuestCheck(); // 旬首主线判定：发布/了结弹窗＋逾期提醒
+      if(!Game._questOpen)this._xunStartPop(); // 旬首检查：已发酵事项直接弹出强制处理；主线断档亦在此直接弹新主线，不待命
+      else Game._pendingXunPop=true;
+    }
   },
   _payMonthlySalary(prevTime){ // 月俸前端自结：每月下旬末按位份入账，同一月只发一次
     if(!state||!state.protagonist||!prevTime||prevTime.xun!=='下旬')return null;
@@ -6999,6 +7024,7 @@ const Game={
   },
   _xunStartPop(){ // 旬首强制处置：固定节宴/发酵引线/琐事/暗流发难一旬之首直接弹出（hasEvent=true）；主线断档同在此补新主线
     if(!state||phase!=='FOCUS_SELECT')return;
+    if(Game._questOpen){Game._pendingXunPop=true;return;} // 主线弹窗未关：旬首处置等它关完再走
     const schemeNotes=schemeTick(); // 暗流账：结上旬未应对的旧账、起新图谋
     for(const n of schemeNotes){
       UI.pushCard(`<article class="turncard"><div class="card-head"><div><div class="card-focus">【宫斗系统】<b>暗流得手</b></div></div>${UI.seal()}</div><div class="card-body">上一旬你没有接住${esc(n.sc.who)}的手：${esc((SCHEME_TARGET_TEXT[n.sc.target]||n.sc.target))}受损。${esc((n.changes||[]).join('；'))}</div></article>`);
@@ -7025,7 +7051,7 @@ const Game={
     let msg=`第${xunNo()}旬旬首：`;
     if(fest)msg+=`本旬逢固定节宴「${fest.name}」（${fest.scale}，${festWhen(fest)}必至），宴须当旬演出。`;
     if(items)msg+=`以下事项已搁置发酵，须立即处置：${items}。`;
-    if(schemeHit)msg+=`暗流发难，就在本旬：${adj.schemeFire.map(s=>`${s.who}（${s.aim}，冲你的${SCHEME_TARGET_TEXT[s.target]||s.target}）`).join('；')}。这是当旬主戏，hasEvent=true，用 scene 开场；写清她怎么动的手、你被逼到哪一步；2—4 个应对选项都带 check。${fest?'发难就摆在宴上，宴席同时是本场舞台。':''}`;
+    if(schemeHit)msg+=`暗流发难，就在本旬：${adj.schemeFire.map(s=>`${s.who}（${s.aim}，冲你的${SCHEME_TARGET_TEXT[s.target]||s.target}）`).join('；')}。这是当旬主戏，hasEvent=true，用 scene 开场；写清她怎么动的手、你被逼到哪一步；给 2—4 个应对选项，结果由你根据玩家选择、局势与她的人设推断，收尾写 schemeOutcome。${fest?'发难就摆在宴上，宴席同时是本场舞台。':''}`;
     if(mainMiss)msg+=`${items?'同场处置（了结旧事时引出新线头）——':''}剧情账中已无进行中的主线任务，本旬旬首即须发布新主线：从主控位份、处境、派系、恩宠与既有伏笔自然长出（晋升之途、子嗣、旧案、母族、新敌皆可）。`;
     if(visitHit)msg+=`${items||mainMiss?'——同场带出帝线：':''}本旬旬首，帝主动与主控相见（恩宠所致，不必另寻由头）——${favor>=60?'夜访住处、遣高德全接入阁、游园时遣开随从说话皆可；宠爱 '+favor+'，他肯花心思，"主动记得、提前安排、破例"至少体现其一':'经高德全传召往养心殿、晨起问安遇驾、园中偶逢皆可；宠爱 '+favor+'，按"每 '+win+' 旬至少一次有内容相处"的账，这旬轮到他主动'}。`;
     if(fest)msg+=`这场宴就是本旬的剧情额度：${items||mainMiss?'上面列的事一并拿到宴上处置——':'不必另找由头，'}以宴席开场（来客通传、引至席上、席间有人搭话皆可），hasEvent=true；宴的场面、主宴者、席上机缘与分寸见下方【定例·本旬节宴】。`;
@@ -7090,6 +7116,7 @@ const Game={
     if((state.energy??0)<=0){this.collapse();return}
     phase='FOCUS_SELECT'; // 本旬结果看完即回到可自由安排的状态（原先漏了复位，主界面会整片点不动）
     UI.goHome();
+    checkMainQuestNotices();
   },
   round1(msg,focus,cost,opts){
     ensureXunBook(); // 先记本旬起点，再发起行动
@@ -7120,7 +7147,6 @@ const Game={
       UI.hideBusy();
       soldNotes=[];lastUseIdx=null;
       if(Game._festSerial!=null){state.lastFestSerial=Game._festSerial;Game._festSerial=null} // 节宴已演：记旬号，同旬后续行动不再重复摆宴
-      if(adj.schemeFire&&adj.schemeFire.length)stripSchemeSettlement(p,adj.schemeFire[0]); // 暗流数值由前端结账：先摘掉模型可能重复写的几项
       finalize(p,{focus,adj});
       logXunAction(focus);
       if(opts&&opts.leadIds&&opts.leadIds.length){ // 呼应过的引线：模型回写台账才算实质推进（touch 已由 mergePlots 刷新）；只演不写记一次落空
@@ -7443,7 +7469,7 @@ const Game={
     const sc=p.scene||{};
     const who0=sceneSpeaker(p,sc);
     sceneCtx={who:canonicalSceneWho(who0)||who0,round:1,lastOptions:Array.isArray(p.options)?p.options:(Array.isArray(sc.options)?sc.options:[]),offered:[],lines:[],meta:{when:'',where:''},resolveRetried:false,
-      scheme:Game._pendingScheme||null,check:null,schemeDone:false};
+      scheme:Game._pendingScheme||null,schemeDone:false};
     Game._pendingScheme=null; // 只认本场：下一场不继承
     { // 戏核：每轮都带上"要争什么、谁在阻止、失败失去什么"，模型才不会靠琐事续命
       const adj=Game._lastAdj||{};
@@ -7488,9 +7514,9 @@ const Game={
     const box=$('#chatOpts');
     const giftBtn=(sceneCtx&&sceneCtx.chamber)?'':`<button class="chat-tool gift" onclick="Game.openGift()">赠礼</button>`;
     const sch=sceneCtx?sceneCtx.scheme:null;
-    const warn=(sch&&!sceneCtx.check)?`<div class="chat-warn">暗流当前：第一句应对定成败，点「结束对话」视为没接住。</div>`:'';
+    const warn=sch?`<div class="chat-warn">暗流当前：如何应对、后果如何，由你的选择、当场局势与她的人设决定。</div>`:'';
     box.innerHTML=`<div class="cap">— 接话或行动 —</div>`+warn+
-      (options||[]).map((o,i)=>`<button class="chat-opt" onclick="Game.scenePick(${i})">${esc(o.text||o)}${checkBadge(o,sch)}</button>`).join('')+
+      (options||[]).map((o,i)=>`<button class="chat-opt" onclick="Game.scenePick(${i})">${esc(o.text||o)}</button>`).join('')+
       `<div class="chat-tools">${giftBtn}<button class="chat-tool" onclick="Game.sceneEnd()">结束对话</button></div>`+
       `<div class="chat-act"><input id="chatInput" placeholder="接句话、或描述你的动作" onkeydown="if(event.key==='Enter')Game.sceneCustom()"><button class="go" onclick="Game.sceneCustom()">发送</button></div>`;
   },
@@ -7498,31 +7524,13 @@ const Game={
     if(phase!=='EVENT_CHOICE'||!sceneCtx)return;
     const opt=(sceneCtx.lastOptions||[])[i];if(!opt)return;
     this.bubble('me','',opt.text||String(opt));
-    let info=null;
-    if(!sceneCtx.check){ // 一场只判一次：第一句应对定成败，后续接话不再反复掷骰
-      info=rollOptionCheck(opt,sceneCtx.scheme);
-      if(info){
-        sceneCtx.check=info;
-        const tag=sceneCtx.scheme?'暗流应对':'应对判定';
-        this.bubble('sys','',`【${tag}】${info.check.attr}·成算 ${info.chance}%　→　${info.tier}`);
-      }
-    }
-    this.sceneRound(opt.text||String(opt),info);
+    this.sceneRound(opt.text||String(opt));
   },
   sceneCustom(){
     if(phase!=='EVENT_CHOICE'||!sceneCtx)return;
     const v=$('#chatInput').value.trim();if(!v)return;
     this.bubble('me','',v);
-    let info=null;
-    if(sceneCtx.scheme&&!sceneCtx.check){ // 自定义接话同样参与暗流的第一句判定，不能靠打字绕过；普通对话不额外掷骰
-      info=rollOptionCheck({text:v},sceneCtx.scheme);
-      if(info){
-        sceneCtx.check=info;
-        const tag=sceneCtx.scheme?'暗流应对':'应对判定';
-        this.bubble('sys','',`【${tag}】${info.check.attr}·成算 ${info.chance}%　→　${info.tier}`);
-      }
-    }
-    this.sceneRound(v,info);
+    this.sceneRound(v);
   },
   /* 赠礼：从行囊取一件递给眼前的人；前端扣物，模型演反应并结算关系 */
   openGift(){
@@ -7636,7 +7644,7 @@ const Game={
       else if(narr)this.sayNarrative(p.narrative,true);
       const hasText=!!(parts||sc.line||narr);
       let fresh=sopts;
-      if(sceneCtx&&sopts.length&&!(sceneCtx.scheme&&!sceneCtx.check)){ // 重复选项不再端出来；暗流的第一句定成败，先保留原选项
+      if(sceneCtx&&sopts.length){ // 重复选项不再端出来
         const seen=sceneCtx.offered||[];
         fresh=sopts.filter(o=>{const t=String(o.text||o).trim();return t&&!seen.includes(t)});
       }
@@ -7653,7 +7661,7 @@ const Game={
       this.handleCallErr(e);
     });
   },
-  sceneRound(choice,checkInfo){
+  sceneRound(choice){
     if(!sceneCtx)return;
     sceneCtx.resolveRetried=false;
     sceneCtx.pinned=null; // 新一轮由模型重新定人：上一轮的交人不再锁标题
@@ -7665,18 +7673,6 @@ const Game={
     const maidPendNote=maidPend.length?`她名下还挂着这些待办：${maidPend.map(x=>pendText(x)).join('；')}。主控问起办差时她须逐条回进度——办妥的交货、回话并从 statePatch.pending 移除；未妥的说清缘由与预计何时能成；不得反问一堆或佯装忘记。`:'';
     const maidNote=sceneCtx.maid?'本场是主控在住处吩咐宫女：scene.state 只写 "ongoing"，不得自行 resolve 或 wrap 收场；只有玩家点「结束对话」时才结算。'+maidPendNote+'主控交代具体差事（采买、传话、留意动静等）时：她至多提一句现实顾虑，随即领命应下、复述要领，不得反复追问请示；主控已解答她的顾虑后，她应领命，不得再抛新问题。':'';
     const chamberNote=sceneCtx.chamber?'本场是帝召主控侍寝的夜话：镜头点到为止，只写帷帐之外的动作、言语、沉默与次日余波，不写露骨过程；帝的言行须合帝设、性情与当晚情境；此阶段不结算数值，scene.state 只写 "ongoing"。':'';
-    let judgeNote='';
-    if(checkInfo){
-      const fail=/失手|大败/.test(checkInfo.tier);
-      const bad=checkInfo.tier==='大败';
-      judgeNote=`\n【前端判定·既成事实】${checkInfo.check.attr}·成算 ${checkInfo.chance}%，掷得 ${checkInfo.roll}，结果：${checkInfo.tier}。必须照此写，不得改判：`+
-        (checkInfo.tier==='完胜'?'对方措手不及，你的应对奏效，且多占一分先机；但也须付出你已答应的代价。'
-        :checkInfo.tier==='险胜'?'事情办成了，却露出破绽或付出额外代价（失面子、欠人情、被旁人看见、伤及无辜）。'
-        :checkInfo.tier==='失手'?'你的应对落空：当场吃亏，好感、宠爱、银钱、名声或机会至少损一项，对方的气焰更盛。'
-        :'你弄巧成拙：局面反噬，损失更重，且给了对方继续做文章的把柄。')+
-        (sceneCtx.scheme?`\n这是${sceneCtx.scheme.who}的暗流发难：若败，须把「${SCHEME_TARGET_TEXT[sceneCtx.scheme.target]||sceneCtx.scheme.target}」受损写实；若胜，须写她的布置如何败露、她如何自处，不得让她全身而退。`:'')+
-        (fail?'\n失手/大败必须留下真损失，不得写成虚惊一场；statePatch 里要能看见至少一项下调。':'');
-    }
     const b=sceneCtx.brief;
     const strongBrief=b&&(b.kind==='scheme'||b.kind==='plot'||b.kind==='festival');
     const briefNote=b&&b.question?`【本场戏核】${b.question}${b.note?`（背景：${b.note}）`:''}${b.stake?`（得失：${b.stake}）`:''}${strongBrief?'本轮必须让这个核心问题前进一步：给出新信息、条件、决定、代价或后果；不得转向簿册、花色、茶点等无关细节，也不得另起无关的小问题。':'本场不必强行制造冲突；每轮必须让关系、信息或态度有实际变化，没有新内容就一句交代，不要用追问硬撑。'}`:'';
@@ -7690,7 +7686,7 @@ const Game={
       const inRoom=/陛下|皇上|圣上|御前|御案|御笔|御览|龙颜|主子|娘娘|太后|贵妃|贵人/.test(heard);
       handoffNote=`本场对话人${sceneCtx.who}只是通传、引路、捧物的宫人${inRoom?'，场上已有正主（帝、后、贵妃等）在场、甚至已经开口':''}：正主一到就由正主自己说话——把 scene.who 改写为正主（帝写「皇帝」），正主的话写进 say 并标 who，${sceneCtx.who}这一轮至多一句通传或一个陪衬动作；不得替正主发话、替正主下令，也不得把正主的意思吞下去只写她自己的反应。`+(inRoom?'本场已拖了几轮没让正主开口，这一轮必须交人。':'');
     }
-    let msg=`第${xunNo()}旬剧情对话第${r}轮：玩家应对「${choice}」。演绎场上人物的当即反应与场面变化（以${sceneCtx.who}为主；正主在场则由正主开口，按 who 分人）：输出 scene.parts（2—5 段，act 写人物动作神态并会并入其对话气泡，say 写人物台词，quote 写转述他人原话，narr 只写其他人物与客观场面，台词都不带引号，按语义分段而非按标点硬切；总长 ≤80 字）、scene.where/when（有变化才写）与 2—3 个接话选项；此阶段不结算数值。scene.state 一律写 "ongoing"——不要写 resolve 或 wrap，不要替玩家结束对话；${sceneCtx.who}（或当场的正主）必须回应玩家这句话，哪怕只是拒绝、反问或转移话题，也不能不作答就走。对话对象当场换手（被传入阁面圣、正主登场等）：把 scene.who 改写为新对象，过渡写进 parts 的 narr 段，新对象的言行照常写 act/say，scene.state 用 "ongoing" 继续对谈，不得就此 resolve。${handoffNote}${briefNote}${optNote}${askedNote}${maidNote}${chamberNote}${judgeNote}`+this.sceneContextBlock();
+    let msg=`第${xunNo()}旬剧情对话第${r}轮：玩家应对「${choice}」。演绎场上人物的当即反应与场面变化（以${sceneCtx.who}为主；正主在场则由正主开口，按 who 分人）：输出 scene.parts（2—5 段，act 写人物动作神态并会并入其对话气泡，say 写人物台词，quote 写转述他人原话，narr 只写其他人物与客观场面，台词都不带引号，按语义分段而非按标点硬切；总长 ≤80 字）、scene.where/when（有变化才写）与 2—3 个接话选项；此阶段不结算数值。scene.state 一律写 "ongoing"——不要写 resolve 或 wrap，不要替玩家结束对话；${sceneCtx.who}（或当场的正主）必须回应玩家这句话，哪怕只是拒绝、反问或转移话题，也不能不作答就走。对话对象当场换手（被传入阁面圣、正主登场等）：把 scene.who 改写为新对象，过渡写进 parts 的 narr 段，新对象的言行照常写 act/say，scene.state 用 "ongoing" 继续对谈，不得就此 resolve。${handoffNote}${briefNote}${optNote}${askedNote}${maidNote}${chamberNote}`+this.sceneContextBlock();
     if(sceneCtx.chamber)msg=msg.replace(/她/g,'帝');
     this.requestScene(msg,choice,MAX_OUTPUT_TOKENS,true,true); // 正常接话轮永不结算：聊多久由玩家决定，点「结束对话」才收场
   },
@@ -7720,7 +7716,8 @@ const Game={
     const giftNote=(sceneCtx.gifts&&sceneCtx.gifts.length)
       ?`本场已赠出并当场结算：${sceneCtx.gifts.map(g=>`「${g.name}」`).join('、')}——这些赠礼的关系/恩宠与任务变化已在前端入账，收场时不得重复计算；若赠礼已使剧情账条目条件满足而尚未改 stage，收场时补写 plots 兑现。`
       :'';
-    const msg=`第${xunNo()}旬剧情对话：玩家示意话已说完，结束与${sceneCtx.who}的对话。请收尾：scene.state="resolve"，补一段简短的收场演绎（narrative 一两句旁白即可，如各自散去、欠身告退；不写引号对白），${settle}${giftNote}收场只写本场已发生的事：结算只认本场实际发生的，不是让你复述；narrative 一句带过收场即可，不得复述 scene.parts 已演的场面与台词。`+this.sceneContextBlock();
+    const schemeAsk=sceneCtx.scheme?`本场是暗流发难：请依据玩家整场的应对、当前局势、${sceneCtx.scheme.who}的性格与手段判定结果，并在 JSON 顶层写 "schemeOutcome":"win|draw|lose|defuse"；实际后果（好感、宠爱、威望、银钱、位份、孕况等）写进 changes 与 statePatch，前端不再掷骰或代改数值。`:'';
+    const msg=`第${xunNo()}旬剧情对话：玩家示意话已说完，结束与${sceneCtx.who}的对话。请收尾：scene.state="resolve"，补一段简短的收场演绎（narrative 一两句旁白即可，如各自散去、欠身告退；不写引号对白），${settle}${giftNote}${schemeAsk}收场只写本场已发生的事：结算只认本场实际发生的，不是让你复述；narrative 一句带过收场即可，不得复述 scene.parts 已演的场面与台词。`+this.sceneContextBlock();
     this.requestScene(msg,'（结束对话）',undefined,undefined,undefined,true); // endReq：响应必须收场结算，宫女问话亦不例外
   },
   _sceneResolve(p){
@@ -7737,16 +7734,13 @@ const Game={
       $('#chatOpts').innerHTML='<button class="btn btn-primary" style="letter-spacing:.2em;text-indent:.2em" onclick="Game.sceneDone()">继续</button>';
       return;
     }
-    if(sceneCtx&&sceneCtx.scheme&&!sceneCtx.schemeDone){ // 暗流发难：按前端判定结账，不靠模型自报
-      const ck=sceneCtx.check;
-      const result=ck?(/完胜|险胜/.test(ck.tier)?'win':(ck.tier==='失手'?'draw':'lose')):'lose'; // 一句应对都没给：算没接住
-      stripSchemeSettlement(p,sceneCtx.scheme);
-      const ch=applySchemeOutcome(sceneCtx.scheme,result);
-      p.changes=(Array.isArray(p.changes)?p.changes:[]).concat(ch);
+    if(sceneCtx&&sceneCtx.scheme&&!sceneCtx.schemeDone){ // 暗流结果由模型裁定：前端只落账，不掷骰、不代改数值
+      const raw=String(p.schemeOutcome||'').toLowerCase();
+      const result=/^(win|draw|lose|defuse)$/.test(raw)?raw:inferSchemeOutcome(p);
+      resolveSchemeByModel(sceneCtx.scheme,result);
+      p.changes=(Array.isArray(p.changes)?p.changes:[]).concat([`暗流结果：${schemeOutcomeText(result)}`]);
       sceneCtx.schemeDone=true;
-      this.bubble('sys','',`【暗流结账】${ch.join('；')}`);
-    }else if(sceneCtx&&sceneCtx.check){
-      ensureFailureCost(p,sceneCtx);
+      this.bubble('sys','',`【暗流结账】${schemeOutcomeText(result)}——后果已按你的应对与当场局势写实`);
     }
     finalize(p,{focus:Game._lastFocus||'剧情',choice:'剧情应对',adj:Game._lastAdj});
     body.scrollTop=body.scrollHeight;
@@ -7759,10 +7753,11 @@ const Game={
     sceneCtx=null;currentEvent=null;Game._pendingScheme=null;
     $('#chatview').classList.remove('on');
     UI.goHome();toast(wasChamber?'天光渐亮，你回到住处':'本旬事了');
-    if(Game._dawnPending){ // 晨报里进了承宠夜话：聊完再走旬首强制处置
-      Game._dawnPending=false;
-      this._xunStartPop();
-    }
+    const pendingDawn=!!Game._dawnPending;
+    Game._dawnPending=false;
+    checkMainQuestNotices(); // 本场发布/了结的主线：弹窗说明目标并记入大事记
+    if(Game._questOpen){ if(pendingDawn)Game._pendingXunPop=true; }
+    else if(pendingDawn)this._xunStartPop(); // 夜账里进了承宠夜话：聊完再走旬首强制处置
   },
   pickOpening(i){
     if(phase!=='FOCUS_PICK'&&phase!=='FOCUS_SELECT')return;
@@ -7798,9 +7793,9 @@ const Game={
   escapeStuck(){ // 脱离卡死：中止请求、清掉所有临时界面，退回本次操作前的落定点
     const before=cloneGameData(state);
     cancelInFlight(); // 晚到的模型回复一律作废
-    Game._dawnPending=false;Game._chamberReport=null;
+    Game._dawnPending=false;Game._chamberReport=null;Game._questOpen=false;Game._questNotice=null;Game._questQueue=[];Game._pendingXunPop=false;
     UI.hideBusy();
-    ['errModal','incidentModal','restModal','actModal','tutorialModal','collapseModal','dawnModal'].forEach(id=>{
+    ['errModal','incidentModal','restModal','actModal','tutorialModal','collapseModal','dawnModal','questModal'].forEach(id=>{
       const el=document.getElementById(id);if(el)el.classList.remove('on');
     });
     $('#chatview').classList.remove('on');
