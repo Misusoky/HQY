@@ -13,6 +13,8 @@
 - 主线写死为「三途·命途」（`MAIN_LINES` / `state.mainLine`）：开局入梦五问定线（`DREAM_QUESTIONS`），三条路各五阶，门槛与关目由前端判定（`mlStageCheck`、`mainLineAfterSettle`），模型只演并用 `statePatch.mainBeat` 报关目；剧情账 `p-destiny` 条目前端维护，模型回写不认；到期由 `mainLineXunCheck` 造一场「命途考」发难（复用暗流账），胜负经 `mainLineOnScheme` 结账。改道只有一次（`mainLineSwitch`）。
 - 性情要落到言行：`PERSONA_ACT`（20 个词条各写「怎么说话／惯用手段／雷区」）与 `PERSONA_ACT_MODULE`；`buildSceneSystem` 的 `npc.act`、`sceneRound` 的 `npcActCue`、`buildStaticSystem` 里的 `personaActTable()` 三处注入。旧档缺 tags 时 `npcTraitsOf` 从 `hidden.真实性情` 反推。
 - 旁人要主动影响主控：`npcMoveBrief()` 每旬点名 1—2 人，给出其目标与性情化的行动，并要求这一动作落到主控身上、以 `statePatch.plots` 立条（line=支线/敌对，3—6 旬期限），由既有到期/发酵机制催办。
+- 亲疏档位：`relTier`（结怨/有隙/初识/相熟/亲厚/知己）由关系值定，`relCue` 写进每轮对话与场景信息；低亲疏不得一见面就托账托银，托事须有上命/利益/把柄/人情作由头。帝用另一套：`empTier`（宠爱＋知心两档，含冷淡档）。
+- 帝与六宫各有一笔账：`npcs.<称谓>.favor`（帝宠）、`emperorStory`（与帝的旧事）、`arc`（她眼下的事）；`emperorAttitudeOf` 由宠爱＋帝的性情＋旧事＋子嗣推出。回写走 `statePatch.emperorFavor` / `emperorStory` / `npcArc`。面板「六宫·帝前」与人物详情「帝前」可查。
 - 主线不是配额：进行中的主线清零后可以一直空着，裁决块只以【发布·新主线（可选）】提示，没有自然线头就不发；标题必须与 `goal` 说同一件事，`dueText` 没有真实期限就不写。别把这条改回「必须开立新主线」，那会逼模型硬编名字与期限。
 - 剧情对话的说话人由前端兜底（`isServantWho`、`sceneHandoffTarget`、`applySceneHandoff`）：引见/通传的太监、宫女占着 `scene.who` 时，一旦正主已到场（御案、御笔、御前等实景词，或当面称「陛下，」）或台词里出现「朕/寡人」，前端当场把对话人交回正主，未标 who 的台词归正主、其余动作仍归原说话人，并锁住标题不被旁人收尾动作抢回去。提示词里也得同步要求「宫人不得代主人发话」，两处缺一不可；但提示词里那条「交人」指令只在出现御前实景或「陛下／朕／皇上」时才写——宫女、女官口中的「主子／娘娘」是在称呼主控，不算正主到场，否则问话场会被误判成引见场，逼着宫女草草交人。
 - 剧情对话的内容节奏由前端「本场账」兜住：模型每轮输出 `scene.ledger`（本场已确认、已有结论的事），`Game.mergeLedger` 去重累积、`Game.sceneContextBlock` 下一轮回灌，`sceneRound` 再按 `sceneCtx.round` 注入【节奏】段（第三轮落定、第五轮后不再另起问句），压住同一件事反复盘问。改对话提示词时这几段要一起保留；一场对话只在一日一处发生，不跨日。
