@@ -4764,8 +4764,30 @@ async function callModel(userMsg,opts){
     }
   }
 }
-function repairJsonText(t){ // 模型常见的两种小毛病：字符串里有裸换行、对象末尾多逗号。就地修好，省一次整轮重发
-  let s=String(t||''),out='',inStr=false,esc=false;
+function unquoteEmbeddedJson(s){ // 模型把对象/数组当字符串塞进值里："scene":"{…}" → "scene":{…}
+  const re=/("(?:scene|statePatch|plots|options|dossier|emperor|protagonist|world|pregnancy|bedchamber|chars|npcs)"\s*:\s*)"(\{|\[)/g;
+  let out=String(s||''),m,guard=0;
+  while((m=re.exec(out))!==null&&guard++<8){
+    const quoteIdx=m.index+m[1].length; // 值前那个引号的位置
+    const openIdx=quoteIdx+1;           // 紧随其后的 { 或 [
+    const open=out[openIdx],close=open==='{'?'}':']';
+    let depth=0,end=-1;
+    for(let i=openIdx;i<out.length;i++){
+      const c=out[i];
+      if(c===open)depth++;
+      else if(c===close){depth--;if(depth===0){end=i;break}}
+    }
+    if(end<0)break; // 没闭合：多半是截断，别硬修
+    let tail=end+1;
+    if(out[tail]==='"')tail++; // 去掉多余的那个收尾引号
+    const inner=out.slice(openIdx,end+1);
+    out=out.slice(0,quoteIdx)+inner+out.slice(tail);
+    re.lastIndex=quoteIdx+inner.length;
+  }
+  return out;
+}
+function repairJsonText(t){ // 模型常见的三种小毛病：对象被写成字符串、字符串里有裸换行、对象末尾多逗号。就地修好，省一次整轮重发
+  let s=unquoteEmbeddedJson(String(t||'')),out='',inStr=false,esc=false;
   for(const ch of s){
     if(inStr){
       if(esc){out+=ch;esc=false;continue}
@@ -4807,6 +4829,9 @@ function parsePayload(raw){
   p.todo=asList(p.todo).map(asText).filter(Boolean);
   p.options=asList(p.options).map(asOption);
   if(p.eventSource!=null&&typeof p.eventSource!=='string')p.eventSource=asText(p.eventSource);
+  if(typeof p.scene==='string'&&/^\s*\{/.test(p.scene)){ // scene 被整个塞成 JSON 字符串：解开再用，别把原文当台词显示
+    try{p.scene=JSON.parse(p.scene)}catch(e){try{p.scene=JSON.parse(repairJsonText(p.scene))}catch(e2){}}
+  }
   if(p.scene!=null&&(typeof p.scene!=='object'||Array.isArray(p.scene)))p.scene={line:asText(p.scene)};
   if(p.scene){
     if(p.scene.line!=null&&typeof p.scene.line!=='string')p.scene.line=asText(p.scene.line);
