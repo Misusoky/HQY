@@ -2517,6 +2517,7 @@ SCENE_PARTS_RULES,
 '- 本场戏核：一场戏只回答一个核心问题——玩家要得到/保住什么，谁在阻止，失败会失去什么。开场前先自问这三件事；答不上来就不要开 scene，写成日常旁白或直接结算。每轮只能推进这个核心问题，不得另起无关的小问题。核对簿册、传话、礼数、花色、茶点等琐事，除非直接牵连位份/恩宠/银钱/子嗣/性命/把柄/派系/任务，否则不得单独成场。',
 '- 一场戏至少发生一件可叙述的“事”：有人来、传旨、搜检、夺物、当众发难、宴上出事、证据出现、条件变化等。不能只有来回问答；对话必须改变事态（谁得了什么、谁失了面子、谁被迫表态），否则拆成一句日常旁白。',
 '- 不挤牙膏：对方知道的关键信息，一轮内给足；不得把同一件事拆成多轮追问。问完必须给出自己的立场、条件或处置；不能只问不答。',
+'- 每轮 scene.parts 至少一段 say：对方的原话必须写在 say 的 text 里（act 只写动作神态，narr 只写场面），不得只写 act 而把台词吞掉，也不得把台词挪去 scene.line——界面会按段渲染，缺了 say 就只剩一个动作气泡。若对方确实一言不发，须在 act/narr 写明缘由并照常给接话选项。',
 '- 新冲突必须落地：谁受益、谁受损、代价是什么、为什么是现在；答不上来就不要写。',
 '- 接话选项每轮必须换新：不得重复上一轮的原句或同义改写，玩家已经选过、答过的方向不再作为选项；每个选项须是不同的决定或策略（答应、拒绝、拖延、反将、求助、交换条件等），不是同一问题的不同问法，并至少写出一项当下可见的机会或代价；当前话题问尽时，转向处置、条件、人情或下一步行动，不得靠重复提问拖长对话。选项不得全是「答：……」式的表态，从第二轮起至少一个选项是把事推进一步的动作（递出去、去见某人、当场办、暂且搁下、起身告退）。',
 '- 对方自己拿主意：除开场第一次请示外，不得用「你打算怎么办」「你说呢」「你怎么答」「要不要」这类话把决定推回玩家；能问的只有足以改变结果的具体事实（谁、何时、何地、何物、经手人），一轮至多一个问句，问的同时须给出自己的判断、条件或处置。禁止预演还没发生的事：旁人提醒谁要来问什么、该怎么说，只写一句提醒并给行动选项（提或不提、去或不去、见或不见），不得围着一句还没说出口的话再演一轮。',
@@ -3955,6 +3956,7 @@ SCENE_PARTS_RULES,
 '【有事】每轮至少让事态变一点：有人来、物被拿走、传旨、搜检、当众发难、证据出现、条件变化；不能只有问答。',
 '【暗流】若本场有 scheme：结果不掷骰。根据玩家本轮的选择、当前局势、对方性格与手段、既有准备推断成败；最终收尾时在 JSON 顶层写 schemeOutcome（win/draw/lose/defuse），并把实际后果写进 narrative/changes/statePatch，不得只判输赢不写后果。',
 '【不挤牙膏】对方知道的关键信息一轮内给足；不得把同一件事拆成多轮追问。问完必须给出自己的立场、条件或处置；不能只问不答。',
+'【台词】每轮 scene.parts 至少一段 say：对方的原话必须落在 say 的 text 里（动作神态放 act，场面旁白放 narr），不得只写 act 就把台词吞掉，也不得把台词挪去 scene.line。若对方确实一言不发，须在 act 或 narr 里写明缘由（只摇了摇头、转身走了、把帘子放下），并照常给接话选项——不能让玩家面对一个"张了口却没有话"的空回合。',
 '【琐事不成场】核对簿册、传话、礼数、花色、茶点等，除非直接牵连位份/恩宠/银钱/子嗣/性命/把柄/派系/任务，否则不得单独成场。',
 '【称谓】scene.parts 的 say/quote 中，人物提到天子一律称「陛下」，不得写「帝」；narr 与 narrative 等叙述仍称「帝」。',
 '【推进】不得原地盘问：对方问过并得到回答的事，不得再问或换个说法重问；玩家答过即视为已交代，只能追问影响得失的关键点，或直接给出处置。每轮至少推进一项：新信息、决定、态度/关系变化、后果或新的具体行动。不要为凑对话制造无意义的盘问、试探或临时加码的审查。',
@@ -7473,10 +7475,17 @@ const Game={
     let arr=sc&&sc.parts;
     if(typeof arr==='string'){try{arr=JSON.parse(arr)}catch(e){arr=null}}
     if(!Array.isArray(arr))return null;
+    const pick=p=>{ // 台词字段各家写法不一：text/content/line/dialogue…都认，别因为换了键名就把整句话吞掉
+      if(typeof p==='string')return p;
+      for(const k of ['text','content','line','dialogue','dialog','speech','words','utterance']){
+        const v=p[k];if(typeof v==='string'&&v.trim())return v;
+      }
+      return '';
+    };
     const out=[];
     for(const p of arr){
       if(p==null)continue;
-      let text=filterText(typeof p==='string'?p:(p.text??p.content??'')).trim();
+      let text=filterText(pick(p)).trim();
       if(!text||/^[\s。，、；：！？…—·'"“”‘’「」『』()（）]+$/.test(text))continue;
       const raw=String(p.type||p.t||p.role||'').trim().toLowerCase();
       const isQuote=['quote','quoted','cite','citation','refer','references','引用','转述','引述'].includes(raw);
@@ -7485,7 +7494,15 @@ const Game={
       if(isSay||isQuote)text=fixEmperorMention(text); // 台词里提天子称“陛下”，不写“帝”
       out.push({type:isQuote?'quote':isAct?'act':isSay?'say':'narr',text,who:p.who?String(p.who).trim():''});
     }
-    return out.length?out:null;
+    if(!out.length)return null;
+    if(!out.some(x=>x.type==='say'||x.type==='quote')){ // parts 只给了动作/旁白、台词却落在 scene.line 上：补一句，别让这轮只剩个动作
+      const line=filterText(String((sc&&(sc.line||sc.text||sc.dialogue))||'')).trim().replace(/^[「『“"]\s*|\s*[」』”"]$/g,'');
+      if(line){
+        const i=out.findIndex(x=>x.type==='narr'); // 台词该在旁白之前，接在动作后面
+        out.splice(i<0?out.length:i,0,{type:'say',text:fixEmperorMention(line),who:''});
+      }
+    }
+    return out;
   },
   quoteBubble(who,text){ // 转述他人原话：不挂当前说话人头像，单独成一只引文气泡
     const body=$('#chatBody');
@@ -7727,7 +7744,10 @@ const Game={
     }catch(e){console.warn('[赠礼] 结算失败',e)}
     sceneCtx.giftBusy=false;
     this.sceneMeta(sc);
-    if(parts)this.sayParts(parts);
+    if(parts){
+      this.sayParts(parts);
+      if(narr&&!parts.some(x=>x.type==='say'||x.type==='quote'))this.sayNarrative(narr,false);
+    }
     else if(sc.line)this.sayLine(sc.line);
     else if(narr)this.sayNarrative(narr,true);
     const ch=(Array.isArray(p.changes)?p.changes:[]).filter(Boolean).map(String);
@@ -7782,6 +7802,13 @@ const Game={
         this.requestScene(fix,choice,maxTokens,noHistory,compact,endReq);
         return;
       }
+      if(sceneCtx&&!sceneCtx.noSayRetried&&parts&&!narr&&!String(sc.line||'').trim()&&!parts.some(x=>x.type==='say'||x.type==='quote')){
+        // 这一轮只有动作、一句台词都没有：多半是模型漏了 say 段，补问一次再渲染
+        sceneCtx.noSayRetried=true;
+        const fix=msg+'\n【纠正】上一轮你只写了动作/神态，没有给出对方的台词（scene.parts 里缺 say 段）。请重新输出本轮：scene.parts 至少一段 say 写对方原话（动作放 act，场面放 narr）；若对方确实一言不发，就在 narr 里写明缘由并照常给接话选项。';
+        this.requestScene(fix,choice,maxTokens,noHistory,compact,endReq);
+        return;
+      }
       phase='EVENT_CHOICE';
       this.mergeLedger(sc); // 本场已确认事项入账：下一轮连同对话记录一并回灌
       let nw=canonicalSceneWho(sc.who); // 对话对象当场换手（被传入阁面圣、正主登场）：认下新说话人，改标题与头像
@@ -7795,7 +7822,11 @@ const Game={
       }
       if(nw&&sceneCtx&&nw!==sceneCtx.who){sceneCtx.who=nw;$('#chatTitle').textContent='剧情对话 · '+dispName(nw);$('#chatAva').innerHTML=avatarHtml(nw)}
       this.sceneMeta(sc);
-      if(parts)this.sayParts(parts);
+      if(parts){
+        this.sayParts(parts);
+        // parts 里一句话都没有、台词落到了 narrative：别把这段吞掉，带引号的仍按台词渲染
+        if(narr&&!parts.some(x=>x.type==='say'||x.type==='quote'))this.sayNarrative(p.narrative,false);
+      }
       else if(sc.line)this.sayLine(sc.line);
       else if(narr)this.sayNarrative(p.narrative,true);
       const hasText=!!(parts||sc.line||narr);
@@ -7820,6 +7851,7 @@ const Game={
   sceneRound(choice){
     if(!sceneCtx)return;
     sceneCtx.resolveRetried=false;
+    sceneCtx.noSayRetried=false;
     sceneCtx.pinned=null; // 新一轮由模型重新定人：上一轮的交人不再锁标题
     if(sceneCtx.standalone&&!sceneCtx.logged){logXunAction(sceneCtx.chamber?'承宠·夜话':'问话·'+sceneCtx.who);sceneCtx.logged=true}
     this.recordLine('me',choice);
