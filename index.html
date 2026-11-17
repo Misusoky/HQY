@@ -3081,6 +3081,21 @@ const PRESENCE_MODULE = [
 '11. 正文与选项只写言行细节，不报数值、档位名或本模块；同一旬不重复写同一反应。'
 ].join('\n');
 
+/* 玩家界面盘点：正文只能把主控往真实存在的入口上引，杜绝"去账房"这类点不到的地方 */
+const PLAY_UI_MODULE = [
+'## 二十二、玩家界面（正文只能指这里有的东西）',
+'玩家点得到的入口只有这些，别的一律不存在：',
+'- 住处：吩咐（既可召宫人问话、交代差事、打听消息，也可自己写一句要做的事：查账、领料、写家书、抄经、打点宫人，都从这里办）、手作、才艺修习、传膳、出门。',
+'- 宫城图（点「出门」后）：养心殿（求见帝）、六宫（拜访后妃、太后、皇后）、藏书阁（寻书、借阅、研读）、墨妙斋（写字作画）、太医院（问医、抄书）、御花园（散步、偶遇）。',
+'- 顶栏：状态（局面、剧情账、命途）、行囊（使用／典卖／赠礼）、人物、时间、银两（遣人出宫采买）、积分（商城换道具）。',
+'规则：',
+'1. 正文要主控做的事，必须落在上面某一项上，并写清去哪里、点哪一项，例如「去太医院请脉」「吩咐宫人查一查份例的账」「往藏书阁寻一册」。',
+'2. 没有「账房」「内务府值房」「尚服局值房」这类可点的地点：查账、领料、传旨、问话一律写成差人去办、宫人来回话（吩咐），或并进六宫／养心殿／太医院等既有去处。不要让玩家去找界面上不存在的地方，也不要让她「直接去内务府」。',
+'3. 主控做不了的事（亲身赴前朝、出宫远行、私会外男等），写成托人办、办不成，或另寻门路，不要当成可执行指示留在正文与待续事项里。',
+'4. 待续事项（pending）与「下一步」建议同样遵此：只写玩家下一旬真能安排的行动。',
+'5. 玩家若自行要做界面上没有的事，按世界内方式承接（差遣、托人、等待），不要凭空多出一个可点的场景。'
+].join('\n');
+
 /* 外貌/忌惮分档：提示词、剧情对话与面板共用，数值以存档为准 */
 function presenceLook(v){
   v=Number(v);
@@ -4182,7 +4197,15 @@ function itemFlags(it){ // 补齐物品词条：可使用 / 可典当；认出�
   if(typeof it.pawnable!=='boolean')it.pawnable=guessPawnable(it.name,it.note);
   return applyShopCatalog(it);
 }
-let acquiredThisTurn=[]; // 本旬新得之物：结算时提示"可使用/可典当"
+let acquiredThisTurn=[]; // 新得之物：入库即提示"可使用/可典当"，不攒到下一旬
+let _acqTimer=null;
+function flushAcquired(){ // 本地得到的画、手作、买的东西当场报，别等下一次模型结算才冒出来
+  if(_acqTimer){clearTimeout(_acqTimer);_acqTimer=null}
+  if(!Array.isArray(acquiredThisTurn)||!acquiredThisTurn.length)return;
+  const list=acquiredThisTurn.slice(0,3).map(x=>`「${x.name}」${x.usable?'可使用':'不可使用'}·${x.pawnable?'可典当':'不可典当'}`).join('、');
+  toast('获得 '+list+(acquiredThisTurn.length>3?' 等':''),4200);
+  acquiredThisTurn=[];
+}
 function addToInventory(list){ // 入库：按 名+备注 合并件数，件数归零即除名
   if(!Array.isArray(list)||!state||!Array.isArray(state.inventory))return;
   for(const raw0 of list){
@@ -4203,6 +4226,10 @@ function addToInventory(list){ // 入库：按 名+备注 合并件数，件数�
       state.inventory.push(it);
     }
     if(it.count>0)acquiredThisTurn.push({name:it.name,usable:it.usable,pawnable:it.pawnable});
+  }
+  if(acquiredThisTurn.length){ // 同一批入库合并成一条提示（模型一次给几件时不刷屏）
+    if(_acqTimer)clearTimeout(_acqTimer);
+    _acqTimer=setTimeout(flushAcquired,350);
   }
 }
 function giftAllowed(it){ // 可赠与：囊中尚存、非御赐/禁物/信物/毒物，当票不算
@@ -4271,6 +4298,7 @@ const JSON_RETRY_PARSE=1;       // 返回了文本却解析不出 JSON：追加�
 const REQUEST_TIMEOUT=120000;   // 单次请求超时（毫秒），超时立即报错而不是一直转圈
 const HISTORY_FULL_TURNS=3;     // 送入上下文的完整近旬数，更早的只送一句摘要
 const HISTORY_CAP=80;           // 本地最多保留的旬数
+let lastApiStat=null;           // 上次请求的耗时与 token 用量：设置页可见，便于判断慢在输入还是输出
 
 /* 脱困：每次操作落定后留一份完整回退点；卡死时退回到本次操作之前。
    runEpoch 用于作废脱困后仍晚到的模型回复，避免回退后又被写回。 */
@@ -4471,7 +4499,7 @@ function buildStaticSystem(){
       .replace('{{世界书全文：02-世界书.md}}',WORLD_BOOK_RUNTIME)
       .replace('{{叙事文风全文：03-叙事文风.md}}',STYLE_GUIDE)
       .replace('{{当前存档 JSON：04-当前存档-v36.json 或玩家当前档}}','（见本提示词末尾「当前存档」段，动态存档在最后）')
-      +'\n\n'+NPC_MODULE+'\n\n'+ENERGY_MODULE+'\n\n'+PLOTS_MODULE+'\n\n'+MAIN_LINE_MODULE+'\n\n'+SCHEME_MODULE+'\n\n'+FESTIVAL_MODULE+'\n\n'+EMPEROR_MODULE+'\n\n'+EMPEROR_PERSONA_MODULE+'\n\n'+CHAMBER_MODULE+'\n\n'+SCENE_MODULE+'\n\n'+SKILL_MODULE+'\n\n'+CRAFT_MODULE+'\n\n'+STUDIO_MODULE+'\n\n'+GIFT_MODULE+'\n\n'+PERSONA_MODULE+'\n\n'+PERSONA_ACT_MODULE+'\n\n'+LENGTH_MODULE+'\n\n'+PRESENCE_MODULE; // 只放与存档无关的常量：本档人物性情表是动态的，见 buildSystem
+      +'\n\n'+NPC_MODULE+'\n\n'+ENERGY_MODULE+'\n\n'+PLOTS_MODULE+'\n\n'+MAIN_LINE_MODULE+'\n\n'+SCHEME_MODULE+'\n\n'+FESTIVAL_MODULE+'\n\n'+EMPEROR_MODULE+'\n\n'+EMPEROR_PERSONA_MODULE+'\n\n'+CHAMBER_MODULE+'\n\n'+SCENE_MODULE+'\n\n'+SKILL_MODULE+'\n\n'+CRAFT_MODULE+'\n\n'+STUDIO_MODULE+'\n\n'+GIFT_MODULE+'\n\n'+PERSONA_MODULE+'\n\n'+PERSONA_ACT_MODULE+'\n\n'+LENGTH_MODULE+'\n\n'+PRESENCE_MODULE+'\n\n'+PLAY_UI_MODULE; // 只放与存档无关的常量：本档人物性情表是动态的，见 buildSystem
   }
   return _staticSystem;
 }
@@ -4678,7 +4706,9 @@ async function callModel(userMsg,opts){
       }
       if(usage){ // 耗时与 token 用量：用于判断慢在输入还是输出
         const u=usage;
-        console.info(`[API] ${((Date.now()-started)/1000).toFixed(1)}s  prompt ${u.prompt_tokens??'?'} / completion ${u.completion_tokens??'?'} tokens`
+        const sec=(Date.now()-started)/1000;
+        lastApiStat={sec,in:u.prompt_tokens??null,out:u.completion_tokens??null,cache:u.prompt_cache_hit_tokens??null,model:respModel||s.model||'',at:Date.now()};
+        console.info(`[API] ${sec.toFixed(1)}s  prompt ${u.prompt_tokens??'?'} / completion ${u.completion_tokens??'?'} tokens`
           +(u.prompt_cache_hit_tokens!=null?` / cache hit ${u.prompt_cache_hit_tokens}`:''));
       }
       if(finish==='length'||finish==='max_tokens'){ // 截断的 JSON 必然解析失败，标记后由外层精简重试
@@ -4734,6 +4764,25 @@ async function callModel(userMsg,opts){
     }
   }
 }
+function repairJsonText(t){ // 模型常见的两种小毛病：字符串里有裸换行、对象末尾多逗号。就地修好，省一次整轮重发
+  let s=String(t||''),out='',inStr=false,esc=false;
+  for(const ch of s){
+    if(inStr){
+      if(esc){out+=ch;esc=false;continue}
+      if(ch==='\\'){out+=ch;esc=true;continue}
+      if(ch==='"'){out+=ch;inStr=false;continue}
+      if(ch==='\n'){out+='\\n';continue}
+      if(ch==='\r')continue;
+      if(ch==='\t'){out+='\\t';continue}
+      out+=ch;continue;
+    }
+    if(ch==='"'){inStr=true;out+=ch;continue}
+    out+=ch;
+  }
+  if(inStr)return ''; // 字符串都没闭合：多半是截断，交给重试，别把半截数据当结果
+  out=out.replace(/,\s*([}\]])/g,'$1');
+  return out;
+}
 function parsePayload(raw){
   const src=raw==null?'':String(raw);
   let t=src.trim().replace(/^```(?:json)?\s*/i,'').replace(/```\s*$/,'').trim();
@@ -4742,8 +4791,11 @@ function parsePayload(raw){
   const a=t.indexOf('{'),b=t.lastIndexOf('}');
   if(a<0)fail('返回不是 JSON');
   if(b<=a)fail('输出在 JSON 闭合前被截断（可重试）');
-  let p;try{p=JSON.parse(t.slice(a,b+1))}catch(e){
-    fail(/end of (JSON )?input|unterminated|unexpected end/i.test(e.message)?'输出在 JSON 闭合前被截断（可重试）':'JSON 解析失败：'+e.message);
+  const body=t.slice(a,b+1);
+  let p;try{p=JSON.parse(body)}catch(e){
+    const fixed=repairJsonText(body);
+    if(fixed&&fixed!==body){try{p=JSON.parse(fixed)}catch(e2){}}
+    if(!p)fail(/end of (JSON )?input|unterminated|unexpected end/i.test(e.message)?'输出在 JSON 闭合前被截断（可重试）':'JSON 解析失败：'+e.message);
   }
   if(typeof p.narrative!=='string')fail('JSON 缺 narrative 字段');
   if(p.narrative.length>900)console.info(`[文风] 正文 ${p.narrative.length} 字，超出 900 字上限`);
@@ -5022,11 +5074,7 @@ function finalize(payload,meta){
     const saved=saveToSlot(0,true); // 每旬结算都更新自动档：不再只在大事件与逢五旬时存
     if(!saved)toast('自动存档失败：本机存储空间不足，请删除旧档或先导出备份',5200);
     else if(major)toast('已自动存档（'+fmtTime()+'）');
-    if(acquiredThisTurn.length){ // 新得之物：顺手标出能否使用、能否典当
-      const list=acquiredThisTurn.slice(0,3).map(x=>`「${x.name}」${x.usable?'可使用':'不可使用'}·${x.pawnable?'可典当':'不可典当'}`).join('、');
-      toast('获得 '+list+(acquiredThisTurn.length>3?' 等':''),4200);
-      acquiredThisTurn=[];
-    }
+    flushAcquired(); // 模型这一轮给的东西：与本地入库同一套提示
   }catch(e){
     ok=false;
     console.error('[结算] 失败',e);
@@ -5161,6 +5209,11 @@ const UI={
     const festNote=fest?`<div class="sheet-note" style="margin:0 0 8px">本旬节宴：<b>${esc(fest.name)}</b>（${esc(fest.scale)}）——座次、仪注与席上机缘见「局面」。</div>`:'';
     return `<div class="focus-cap">— 吩咐 · 精力 ${state.energy}／${ENERGY_MAX} —</div>`+festNote+this.nightIntentHtml()+
       (pend?`<div class="sheet-note" style="margin:0 0 8px">临期引线：${esc(pend)}</div>`:'')+
+      `<div class="sec"><div class="sec-cap">自己吩咐一件</div>
+        <textarea class="craftinsp" id="focusText" maxlength="80" placeholder="查一查份例的账 / 写封家书 / 差人去内务府领料 / 往慈宁宫抄经…"></textarea>
+        <div class="setbtns"><button class="btn btn-primary" onclick="Game.customFocus()">吩咐下去</button></div>
+        <div class="sheet-note">界面上没有专门入口的事——查账、领料、传话、家书、抄经、打点、安抚宫人——都在这里吩咐；这一旬办得成办不成、耗多少精力，由演绎结算。</div>
+      </div>`+
       (maidRows?`<div class="sec"><div class="sec-cap">召宫人问话</div>${maidRows}<div class="sheet-note" style="margin-top:6px">进对话、开口问话都不耗精力：交代差事、打听消息、问办差进度皆可，吩咐下去的事日后兑现。</div></div>`:'<div class="sheet-note">暂无配属宫人。</div>');
   },
   nightIntentHtml(){ // 承宠：本旬争/候/避；结果在旬末结算，点结束本旬后弹出夜账
@@ -6123,6 +6176,7 @@ const UI={
       <div class="setrow"><span class="sk">外观</span><select id="setTheme"><option value="auto" ${s.theme==='auto'?'selected':''}>跟随系统</option><option value="light" ${s.theme==='light'?'selected':''}>宣纸（浅色）</option><option value="dark" ${s.theme==='dark'?'selected':''}>墨底（深色）</option></select></div>
       <div class="setrow"><span class="sk">背景音乐</span><select onchange="Game.toggleBgm(this.value!=='0')"><option value="1" ${s.bgm!==false?'selected':''}>开启（古琴氛围）</option><option value="0" ${s.bgm===false?'selected':''}>关闭</option></select></div>
       <div class="setrow"><span class="sk">BGM 速率</span><input type="range" id="setBgmRate" min="0.5" max="1.5" step="0.05" value="${s.bgmRate||1}" oninput="Game.setBgmRate(parseFloat(this.value))"><span class="sk num" id="bgmRateVal">${Math.round((s.bgmRate||1)*100)}%</span></div>
+      <div class="sheet-note" style="margin-top:6px">${lastApiStat?`上次请求：${lastApiStat.sec.toFixed(1)} 秒 · 输入 ${lastApiStat.in??'?'}${lastApiStat.cache!=null?`（缓存命中 ${lastApiStat.cache}）`:''} / 输出 ${lastApiStat.out??'?'} tokens`:'尚无请求记录'}<br>输入大、缓存命中为 0 → 提示词过长或前缀失效；输出大而耗时长 → 是生成慢，可换更快的模型。</div>
       <div class="setbtns"><button class="btn btn-primary" onclick="Game.saveSettingsFromUI()">保存设置</button><button class="btn btn-line" id="btnTestApi" onclick="Game.testApi()">测试连通</button></div>
       <div id="apiTestRes" style="display:none;margin-top:10px;font-size:13px;line-height:1.7;border-radius:8px;padding:8px 10px"></div></div>
       <div class="sec"><div class="sec-cap">数据</div>
@@ -6691,7 +6745,10 @@ function craftCommit(data,parsed,s){ // 校验通过且 API 返回成功后，�
     craftValue:craftValueFor(parsed,data)
   };
   craftPushItemTo(s,item); // 用捕获的存档入库：避免请求期间切换存档后写错档
-  if(typeof acquiredThisTurn!=='undefined'&&Array.isArray(acquiredThisTurn))acquiredThisTurn.push({name:item.name,usable:item.usable,pawnable:item.pawnable});
+  if(typeof acquiredThisTurn!=='undefined'&&Array.isArray(acquiredThisTurn)){
+    acquiredThisTurn.push({name:item.name,usable:item.usable,pawnable:item.pawnable});
+    if(typeof flushAcquired==='function')flushAcquired(); // 手作成品当场提示，不等下次结算
+  }
   const c=s.craft=s.craft&&typeof s.craft==='object'?s.craft:{v:1,history:[]};
   if(!Array.isArray(c.history))c.history=[];
   c.history.push({turn:s.turn,time:fmtTime(),name:item.name,quality:item.quality,traits:item.traits,materials:item.materials,energy:item.energy,inspiration:item.inspiration});
@@ -7760,7 +7817,8 @@ const Game={
       for(let i=0;i<w;i++)deck.push(id)}
     return deck[Math.floor(Math.random()*deck.length)];
   },
-  mapGo(place){ // 宫城图目的地：养心殿见驾、六宫访妃嫔、太医院问医、藏书阁寻书、墨妙斋写字作画、御花园散步闲逛；出宫暂留空
+  mapGo(place){ // 宫城图目的地：养心殿见驾、六宫访妃嫔、太医院问医、藏书阁寻书、墨妙斋写字作画、御花园散步闲逛；出宫目前没有行程
+    if(place==='出宫'){toast('宫门未开：本作暂不设出宫行程；要采买可点顶栏「银两」遣人去办',3200);return}
     if(place==='养心殿'){this.visitNpc('皇帝');return}
     if(place==='六宫'){UI.openSheet('六宫');return}       // 不关宫城图：面板浮在图上，拜访落定由 settle 收图
     if(place==='太医院'){UI.openSheet('太医院');return}
@@ -8676,6 +8734,16 @@ const Game={
     Game._openingOptions=null; // 首旬四选一只出现一次，之后"吩咐"回到自拟面板
     UI.closeSheet();
     this.round1(`第${xunNo()}旬第一轮：玩家消耗精力 ${focusEnergyCost(t)} 选定上旬生活重心「${t}」。按第一轮流程演绎本旬。`,t,focusEnergyCost(t));
+  },
+  customFocus(){ // 吩咐表里自拟的一件事：查账、领料、家书、抄经等没有专门入口的都能在这里办
+    if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
+    const el=document.getElementById('focusText');
+    const t=el?String(el.value||'').trim():'';
+    if(!t){toast('先写一句要吩咐的事');return}
+    if((state.energy??0)<=0){this.collapse();return}
+    const cost=focusEnergyCost(t);
+    UI.closeSheet();
+    this.round1(`第${xunNo()}旬第一轮：玩家吩咐「${t}」（耗精力 ${cost}）。这是本旬的一件实际安排：按世界规则演绎由谁去办、怎么办、办到什么程度，办不成也照实写、并给出卡在哪一步；若牵出剧情，按第一轮规则给 2—4 个选项并停下，不结算应对后果。`,`吩咐·${t.length>12?t.slice(0,12)+'…':t}`,cost);
   },
   handleCallErr(e){
     if(e.name==='AbortError')return;
