@@ -1752,7 +1752,8 @@ function schemeHosts(s){ // 有动机、有身份、能被演出来的人：仇�
     if(/皇帝|太后|皇后/.test(who))continue; // 帝后太后另有线，不入暗流
     const v=Number(r.value);
     const hate=r.type==='仇恨';
-    if(!hate&&!(Number.isFinite(v)&&v<=12))continue;
+    const depth=String(((npcs[who]||{}).profile||{}).depth||'初识');
+    if(!hate&&!(Number.isFinite(v)&&v<=12&&(v<0||depth!=='初识')))continue; // 0 与初识都是中性：没有嫌隙就不下手
     const n=npcs[who]||Object.values(npcs).find(x=>x&&x.name===who)||null;
     const rank=(n&&n.rank)||rankTitleOf(who); // 旧档 npcs 可能为空：关系里带着位份称谓也能起念
     if(!n&&!rank&&!cards[who])continue;
@@ -3457,10 +3458,10 @@ function npcActCue(who){ // 本场对方的性情→言行提示：让模型照�
 }
 /* 亲疏档位：好感/仇恨决定她肯跟你说到什么份上。低亲疏只会试探与客套，不会一见面就托账托银。 */
 const REL_TIERS=[
-  {key:'feud',label:'结怨',min:-9999,max:-1,allow:'话里带刺，能推就推，当众不留情；不接你的好意，也不受你的礼',deny:'托付、共谋、借银、作保'},
-  {key:'cold',label:'有隙',min:0,max:9,allow:'客气但疏远，场面话为主，私下多半推托',deny:'交底、重托'},
-  {key:'new',label:'初识',min:10,max:29,allow:'按位份称呼，只谈场面话与天气宫务；会试探你的底细，也防着你',deny:'核账、代笔、跑腿、借银、作保、共谋'},
-  {key:'familiar',label:'相熟',min:30,max:49,allow:'可闲话、可递话、可帮小忙，仍不交底',deny:'重托、共谋、性命相托'},
+  {key:'feud',label:'结怨',min:-9999,max:-20,allow:'话里带刺，能推就推，当众不留情；不接你的好意，也不受你的礼',deny:'托付、共谋、借银、作保'},
+  {key:'cold',label:'有隙',min:-19,max:-1,allow:'客气但疏远，场面话为主，私下多半推托',deny:'交底、重托'},
+  {key:'new',label:'初识',min:0,max:19,allow:'按位份称呼，只谈场面话与天气宫务；会试探你的底细，也防着你',deny:'核账、代笔、跑腿、借银、作保、共谋'},
+  {key:'familiar',label:'相熟',min:20,max:49,allow:'可闲话、可递话、可帮小忙，仍不交底',deny:'重托、共谋、性命相托'},
   {key:'close',label:'亲厚',min:50,max:69,allow:'可托事、可诉苦，会替你遮掩，也会开口求你',deny:''},
   {key:'ally',label:'知己',min:70,max:9999,allow:'可交底、可共谋、肯替你担风险',deny:''}
 ];
@@ -3473,8 +3474,8 @@ function relValueOf(who){
 function relTier(who){
   const r=((state&&state.relationships)||{})[who]||null;
   const raw=relValueOf(who);
-  const v=raw==null?10:raw;
-  if(r&&typeof r==='object'&&r.type==='仇恨'){
+  const v=raw==null?0:raw; // 没有账＝尚无往来，按初识算；0 也是初识，不是有隙
+  if((r&&typeof r==='object'&&r.type==='仇恨')||v<=-20){
     return {key:'feud',label:'结怨',value:raw,allow:REL_TIERS[0].allow,deny:REL_TIERS[0].deny};
   }
   const t=REL_TIERS.find(x=>v>=x.min&&v<=x.max)||REL_TIERS[2];
@@ -3486,7 +3487,8 @@ function empTier(){ // 帝的两档：明面宠爱、内里知心
     :favor>=55?'偏宠：召见与赏赐不断，遇事愿意听一句'
     :favor>=35?'有来有往：照例召见，赏赐不薄不厚'
     :favor>=15?'客套：逢节有赏，平日想不起来'
-    :'冷淡：牌子常被压着，年节也未必见一面';
+    :favor>0?'冷淡：牌子常被压着，年节也未必见一面'
+    :'未入眼：他此刻还不知道宫里有你这么个人';
   const talk=inti>=70?'肯说私心与旧事，也听得进逆耳的话'
     :inti>=50?'能谈旧事与心事，遇分歧会争两句'
     :inti>=30?'可谈些旧事，仍不许你过问朝政与私心'
@@ -3500,7 +3502,8 @@ function emperorAttitudeOf(n){ // 帝待某位妃嫔：宠爱＋帝的性情＋�
     :f>=55?'偏宠：召见与赏赐不断'
     :f>=35?'照例：有召见，赏赐不薄不厚'
     :f>=15?'客套：逢节有赏，平日想不起'
-    :'冷淡：牌子常被压着';
+    :f>0?'冷淡：牌子常被压着'
+    :'尚未留意：他甚至想不起她';
   const et=String((((state||{}).world||{}).emperor||{}).traits||'');
   if(f>=55&&/多疑/.test(et))a+='；他会留意她与旁人来往';
   if(f>=55&&/念旧/.test(et))a+='；旧日情分记得比别人清楚';
