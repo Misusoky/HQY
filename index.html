@@ -2980,6 +2980,7 @@ SCENE_PARTS_RULES,
 '- 每轮 scene.parts 至少一段 say：对方的原话必须写在 say 的 text 里（act 只写动作神态，narr 只写场面），不得只写 act 而把台词吞掉，也不得把台词挪去 scene.line——界面会按段渲染，缺了 say 就只剩一个动作气泡。若对方确实一言不发，须在 act/narr 写明缘由并照常给接话选项。',
 '- 新冲突必须落地：谁受益、谁受损、代价是什么、为什么是现在；答不上来就不要写。',
 '- 接话选项每轮必须换新：不得重复上一轮的原句或同义改写，玩家已经选过、答过的方向不再作为选项；每个选项须是不同的决定或策略（答应、拒绝、拖延、反将、求助、交换条件等），不是同一问题的不同问法，并至少写出一项当下可见的机会或代价；当前话题问尽时，转向处置、条件、人情或下一步行动，不得靠重复提问拖长对话。选项不得全是「答：……」式的表态，从第二轮起至少一个选项是把事推进一步的动作（递出去、去见某人、当场办、暂且搁下、起身告退）。',
+'- 选项写法（重要）：选项是主控在这一刻的现场言行——括号里是她此刻的动作、神情与环境（「（福身告退）」「（把册子推回去）」），括号外是她当场说出口的原话，不带引号。不要用转述口吻（「应下即告退」「福德告退，回殿理清」），也不要写「回殿后连夜理清」「次日晨送来」这类之后才发生的事：那是后话，不是这一轮说给对方听的内容；要立约就写成她此刻说出口的承诺。整轮只做动作、不开口时，整个选项都放括号里。NPC 只回应主控实际说了、做了的，不得把她没开口的打算当成台词来应答。',
 '- 对方自己拿主意：除开场第一次请示外，不得用「你打算怎么办」「你说呢」「你怎么答」「要不要」这类话把决定推回玩家；能问的只有足以改变结果的具体事实（谁、何时、何地、何物、经手人），一轮至多一个问句，问的同时须给出自己的判断、条件或处置。禁止预演还没发生的事：旁人提醒谁要来问什么、该怎么说，只写一句提醒并给行动选项（提或不提、去或不去、见或不见），不得围着一句还没说出口的话再演一轮。',
 '- 每轮输出 scene.ledger：本场已交代清楚、已有结论的事，逐条累积（每条≤20字），前端会把它回灌给你；ledger 里的事后续不得再问，也不得换说法重提。节奏：本场第三轮起，核心问题必须落定——给结论、条件、处置或明确拒绝；第五轮后不再另起问句，只演对玩家这句话的回应与随之而来的动作、后果。',
 '- 一场对话只在同一日、同一处发生：scene.when 只写当日时辰的推移，不得跳到次日、翌日、明日。上一轮已经定下的事（说或不说、去或不去、提或不提）本轮直接推进出结果，不得换个日子、换个地方再把准备演一遍；要隔日再谈，由玩家结束这场、另开下一场。',
@@ -4429,6 +4430,8 @@ SCENE_PARTS_RULES,
 '【称谓】scene.parts 的 say/quote 中，人物提到天子一律称「陛下」，不得写「帝」；narr 与 narrative 等叙述仍称「帝」。',
 '【推进】不得原地盘问：对方问过并得到回答的事，不得再问或换个说法重问；玩家答过即视为已交代，只能追问影响得失的关键点，或直接给出处置。每轮至少推进一项：新信息、决定、态度/关系变化、后果或新的具体行动。不要为凑对话制造无意义的盘问、试探或临时加码的审查。',
 '【选项】本轮 options 必须与上一轮不同，不得原句或同义改写；玩家已选过、答过的方向不再作为选项。每个选项必须是不同的决定或策略（答应、拒绝、拖延、反将、求助、交换条件等），不是同一问题的不同问法；每个选项至少写出一项当下可见的机会或代价。当前话题问尽时，转向处置、条件、人情或下一步行动，不得靠重复提问拖长对话。选项不得全是「答：……」式的表态，从第二轮起至少一个选项是把事推进一步的动作（递出去、去见某人、当场办、暂且搁下、起身告退）。',
+'【选项写法】选项一律写成主控在这一刻的现场言行：括号里是她此刻的动作、神情与环境（如「（福身告退）」「（把册子推回去）」），括号外是她当场说出口的原话，不带引号。不得用转述口吻（「应下即告退」「福德告退，回殿理清」），也不得把「回殿后连夜理清」「次日晨送来」这类之后才做的事写进选项——那是后话，不是这一句对话里的内容；要承诺就写成她此刻说出口的话。整轮只想做动作、不开口时，整个选项都放在括号里。',
+'【玩家】用户消息里「玩家应对」引号内的文字是主控这一轮的言行：括号内是动作/神情，括号外是当场说出口的话。NPC 只回应她实际做了与说了的，不得把她没开口的打算、离开之后的安排当成她当众说出的台词来复述或应答。',
 '【不抛回】对方自己拿主意：除开场第一次请示外，不得用「你打算怎么办」「你说呢」「你怎么答」「要不要」「怎么回」这类话把决定推回玩家。能问的只有足以改变结果的具体事实——谁、何时、何地、何物、经手人；一轮至多一个问句，且问的同时须给出自己的判断、条件或处置。',
 '【预警不成场】旁人提醒一件还没发生的事（谁要问你什么、该怎么答、要不要提），只写一句提醒，随即给行动选项（提或不提、去或不去、见或不见、改走哪条路）；不得围着「打算怎么答」再演一轮。',
 '【已确认】scene.ledger 逐轮累积本场已经交代清楚、已有结论的事（每条一句话，≤20 字，含人物给过的答复与已定的处置）。写进 ledger 的事，后续轮次不得再问、不得换个说法重提；玩家不必重复表态。',
@@ -7630,9 +7633,9 @@ const Game={
     this.openScene({
       eventSource:'皇帝',narrative:opening.narr,
       options:[
-        {id:'a',text:'垂首谢恩，按着礼数来'},
-        {id:'b',text:'替他把外袍解了，低声问一句累不累'},
-        {id:'c',text:'先说一件自己的事，不急着入正题'}
+        {id:'a',text:'（垂首谢恩，按着礼数来）臣妾遵旨'},
+        {id:'b',text:'（替他把外袍解了，低声）陛下今日累不累'},
+        {id:'c',text:'（不急着入正题）臣妾今日有件小事，想同陛下说'}
       ],
       scene:{state:'ongoing',who:'皇帝',line:opening.line,when:'今夜',where}
     });
@@ -7734,10 +7737,10 @@ const Game={
     const home=this.homeLocation()||'本宫住处'; // 旧档实在认不出住处时，宁可写得笼统，也不沿用园中地点
     if(state.location!==home){state.location=home;persistCurrent()} // 在住处吩咐宫人：先把上一场外出留下的地点归位
     this.openScene({eventSource:name,narrative:'',options:[
-      {id:'a',text:'交代差事：传话、采买、留意某处动静'},
-      {id:'b',text:'打听消息：宫里近日有什么风声'},
-      {id:'c',text:'问话：之前交代的事办得如何'},
-      {id:'d',text:'闲聊几句，看看她的心思'}
+      {id:'a',text:'（招手让她近前）有件差事要你去办'},
+      {id:'b',text:'（放下手里的东西）近几日宫里有什么风声'},
+      {id:'c',text:'（看她一眼）上回交代的事，办得如何了'},
+      {id:'d',text:'（让她坐下说话）闲话几句，看看她的心思'}
     ],scene:{state:'ongoing',line:greet,when:fmtTime(),where:home}});
     if(sceneCtx){
       sceneCtx.local=true;sceneCtx.standalone=true;sceneCtx.maid=true; // 本地开场：一言未发即结束不结算；问话想聊多久聊多久，只有玩家点「结束对话」才收场
@@ -8297,16 +8300,32 @@ const Game={
       `<div class="chat-tools">${giftBtn}<button class="chat-tool" onclick="Game.sceneEnd()">结束对话</button></div>`+
       `<div class="chat-act"><input id="chatInput" placeholder="接句话、或描述你的动作" onkeydown="if(event.key==='Enter')Game.sceneCustom()"><button class="go" onclick="Game.sceneCustom()">发送</button></div>`;
   },
+  playerSegs(text){ // 玩家气泡按现场对话渲染：括号/【】内是动作，括号外是当场说出口的话
+    const s=String(text||'').trim();
+    if(!s)return null;
+    const out=[];const re=/（([^）]*)）|\(([^)]*)\)|【([^】]*)】/g;let last=0,m;
+    while((m=re.exec(s))!==null){
+      const pre=s.slice(last,m.index).trim();
+      if(pre)out.push({text:pre});
+      const act=String(m[1]??m[2]??m[3]??'').trim();
+      if(act)out.push({act});
+      last=re.lastIndex;
+    }
+    const tail=s.slice(last).trim();
+    if(tail)out.push({text:tail});
+    return out.length?out:null;
+  },
   scenePick(i){
     if(phase!=='EVENT_CHOICE'||!sceneCtx)return;
     const opt=(sceneCtx.lastOptions||[])[i];if(!opt)return;
-    this.bubble('me','',opt.text||String(opt));
-    this.sceneRound(opt.text||String(opt));
+    const t=opt.text||String(opt);
+    this.bubble('me','',t,this.playerSegs(t));
+    this.sceneRound(t);
   },
   sceneCustom(){
     if(phase!=='EVENT_CHOICE'||!sceneCtx)return;
     const v=$('#chatInput').value.trim();if(!v)return;
-    this.bubble('me','',v);
+    this.bubble('me','',v,this.playerSegs(v));
     this.sceneRound(v);
   },
   /* 赠礼：从行囊取一件递给眼前的人；前端扣物，模型演反应并结算关系 */
@@ -8497,7 +8516,9 @@ const Game={
       const inRoom=/御前|御案|御笔|御览|御座|御书|御膳|龙颜|龙袍|陛下|皇上|圣上|天子/.test(heard); // 宫女口中的「主子/娘娘」是称呼主控，不算正主到场
       if(inRoom)handoffNote=`本场对话人${sceneCtx.who}只是通传、引路、捧物的宫人，场上已有正主（帝、后、贵妃等）在场、甚至已经开口：正主一到就由正主自己说话——把 scene.who 改写为正主（帝写「皇帝」），正主的话写进 say 并标 who，${sceneCtx.who}这一轮至多一句通传或一个陪衬动作；不得替正主发话、替正主下令，也不得把正主的意思吞下去只写她自己的反应。本场已拖了几轮没让正主开口，这一轮必须交人。`;
     }
-    let msg=`第${xunNo()}旬剧情对话第${r}轮：玩家应对「${choice}」。演绎场上人物的当即反应与场面变化（以${sceneCtx.who}为主；正主在场则由正主开口，按 who 分人）：输出 scene.parts（2—5 段，act 写人物动作神态并会并入其对话气泡，say 写人物台词，quote 写转述他人原话，narr 只写其他人物与客观场面，台词都不带引号，按语义分段而非按标点硬切；总长 ≤${r>=3?110:80} 字）、scene.ledger（本场已确认、已有结论的事，逐条累积，每条≤20字）、scene.where/when（有变化才写）与 2—3 个接话选项；此阶段不结算数值。scene.state 一律写 "ongoing"——不要写 resolve 或 wrap，不要替玩家结束对话；${sceneCtx.who}（或当场的正主）必须回应玩家这句话，哪怕只是拒绝、反问或转移话题，也不能不作答就走。对话对象当场换手（被传入阁面圣、正主登场等）：把 scene.who 改写为新对象，过渡写进 parts 的 narr 段，新对象的言行照常写 act/say，scene.state 用 "ongoing" 继续对谈，不得就此 resolve。${handoffNote}${briefNote}${optNote}${askedNote}${paceNote}${maidNote}${chamberNote}`+this.sceneContextBlock();
+    const plainChoice=!/[（(【]/.test(String(choice||'')); // 老式选项只有叙述、没标动作与台词：额外交代一句，别把打算当成她说出口的话
+    const parseNote=plainChoice?'这一条没有用括号标出动作、也没标明哪句是说出口的原话：按她此刻的言行演绎，NPC 只回应她实际做了、说了的，不得把她心里的打算当作已说出口的承诺来复述。':'';
+    let msg=`第${xunNo()}旬剧情对话第${r}轮：玩家应对「${choice}」（括号内是主控的动作/神情，括号外是当场说出口的话；未加括号的叙述按她此刻要说/要做的事理解，其中离开之后的安排不是她当众说出的台词）。${parseNote}演绎场上人物的当即反应与场面变化（以${sceneCtx.who}为主；正主在场则由正主开口，按 who 分人）：输出 scene.parts（2—5 段，act 写人物动作神态并会并入其对话气泡，say 写人物台词，quote 写转述他人原话，narr 只写其他人物与客观场面，台词都不带引号，按语义分段而非按标点硬切；总长 ≤${r>=3?110:80} 字）、scene.ledger（本场已确认、已有结论的事，逐条累积，每条≤20字）、scene.where/when（有变化才写）与 2—3 个接话选项（选项按【选项写法】：括号内动作、括号外当下的原话，不写之后才做的事）；此阶段不结算数值。scene.state 一律写 "ongoing"——不要写 resolve 或 wrap，不要替玩家结束对话；${sceneCtx.who}（或当场的正主）必须回应玩家这一轮的言行，哪怕只是拒绝、反问或转移话题，也不能不作答就走。对话对象当场换手（被传入阁面圣、正主登场等）：把 scene.who 改写为新对象，过渡写进 parts 的 narr 段，新对象的言行照常写 act/say，scene.state 用 "ongoing" 继续对谈，不得就此 resolve。${handoffNote}${briefNote}${optNote}${askedNote}${paceNote}${maidNote}${chamberNote}`+this.sceneContextBlock();
     if(sceneCtx.chamber)msg=msg.replace(/她/g,'帝');
     this.requestScene(msg,choice,MAX_OUTPUT_TOKENS,true,true); // 正常接话轮永不结算：聊多久由玩家决定，点「结束对话」才收场
   },
