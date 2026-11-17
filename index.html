@@ -1278,6 +1278,18 @@ const PERSONA_MODULE = [
 '5. 帝头像固定为年轻俊朗者，正文也按年轻俊朗来写；太后、嬷嬷等年长角色才用年长面容。'
 ].join('\n');
 
+/* 性情落地：同一个动作，不同性情的人反应相反；人物要主动改变主控的处境 */
+const PERSONA_ACT_MODULE = [
+'## 十一之一、性情要落到言行与后果（覆盖“有标签就够”的写法）',
+'1. 每句台词、每个动作都要能反推出这个人的性情；读者不看标签，也应猜得出是谁在说话。不许所有配角共用同一种温吞宫斗腔，不许把性情写成“她生性谨慎”式的介绍。',
+'2. 每场戏至少给此人一处只属于她的细节：口癖、忌讳、在意之物、惯用的手段（例如多疑者先问“谁告诉你的”，骄矜者先看座次，温厚者先问对方冷暖）。',
+'3. 同一个举动，对不同性情的人结果可以相反：当众直球示好——多疑者会疑你有所图、温厚者受用、孤傲者嫌你轻浮；当众驳面——骄矜者当场发作、大气者一笑揭过、隐忍者记下、怯懦者回去哭。不得让所有人对同一句话给出同一种反应。',
+'4. 后果也要按性情分叉：同一次施恩、试探、求助、冒犯，落在不同人身上，该涨的涨、该记恨的记恨，数值方向与幅度都不同。写 changes/statePatch 时按此结算，不许一律“好感+2”。',
+'5. 帝的性情参与结算：念旧者记得旧物旧事却不解释；多疑者越主动越要问“你想从朕这里得什么”，旁人递的话他会去对；寡情者热络讨好反使他退半步；重规矩者越制一次，先前的恩全折；心软者眼泪有用一次，第二次他会疑心你拿捏他；风雅者只认接得上话的人。同一句话在不同性情的帝处，结果应当不同。',
+'6. 每个人都要有自己的目标与期限（npcGoalCards 写明“当前目标｜正在做的事｜下一步与期限”），每 2—4 旬至少有一个人的主动动作落到主控身上，改变她一个选项、一笔人情、一处关系或一桩风险；不得整旬只写主控自己的事，旁人只在旁白里点头。',
+'7. 性情不是万能借口：谨慎不等于永远不说话，爽直不等于当众骂人；角色可以在极端处境里做出违背性情的事，但要写出那是被逼出来的。'
+].join('\n');
+
 /* 输出预算：网页版按条计费、逐字生成，篇幅直接决定等待时间。本节放在所有模块之后，覆盖前面的篇幅数字 */
 const LENGTH_MODULE = [
 '## 十四、篇幅与输出预算（硬性覆盖世界书、叙事文风与模板中的篇幅数字）',
@@ -1623,7 +1635,7 @@ function adjudicatePlots(skipDice){ // 旬首裁决：到期强制兑现 + 前�
   }
   lines.push('结算只经 statePatch.plots 回写【发生变化】的台账条目：兑现者 stage 改"已兑现"；改写期限者须在 note 说明理由并给出新 dueText；新埋引线新增条目（id 用 "p-" 加短标题，与现存 id 区分，goal 写一句目标和怎样算成）；作废者 stage 改"已作废"并注明缘由。只回写变化的条目，前端按 id 合并。注意：条件已足的条目必须兑现（stage 改"已兑现"，可附积分与任务进度），只改写 note 不算办结；手作成品相赠、请托办妥皆可兑现任务，规则见系统提示词手作模块与剧情台账条。pending 只留非剧情琐事。');
   const before={};[...overdue,...due].forEach(p=>before[p.id]=p.dueText||'');
-  return {due,overdue,stale,pendStale,target,hit,mainPub:!!mainPub,needMain:!!needMain,fest:festNew?fest:null,festSoft,gardenMeet:'',empDue:emp.due,schemeFire:sch.fire,schemeClue:sch.clues,before,text:'【剧情裁决 · 本旬】（前端判定：固定节宴到旬必演＋到期/超期强制兑现＋搁置发酵强制处理＋主线断档强制发布＋剧情骰被动触发，覆盖"自行决定是否触发剧情"）\n'+lines.map((l,i)=>`${i+1}. ${l}`).join('\n')+(state.mainLine?mainLineBrief():'')};
+  return {due,overdue,stale,pendStale,target,hit,mainPub:!!mainPub,needMain:!!needMain,fest:festNew?fest:null,festSoft,gardenMeet:'',empDue:emp.due,schemeFire:sch.fire,schemeClue:sch.clues,before,text:'【剧情裁决 · 本旬】（前端判定：固定节宴到旬必演＋到期/超期强制兑现＋搁置发酵强制处理＋主线断档强制发布＋剧情骰被动触发，覆盖"自行决定是否触发剧情"）\n'+lines.map((l,i)=>`${i+1}. ${l}`).join('\n')+(state.mainLine?mainLineBrief():'')+npcMoveBrief()};
 }
 function matchLeads(ctxList){ // 与给定语境（人名/地名/事由）相关的在途引线：标题或备注含对方名讳/地名即命中
   const cvs=(ctxList||[]).map(s=>String(s||'').trim()).filter(s=>s.length>=2);
@@ -2371,6 +2383,37 @@ function mainLineBrief(){
   if(ml.beatWait>=4&&c&&c.all&&!c.beatDone)lines.push('门槛早够了，却一直没演关目：本旬务必把「'+st.beat.text+'」演出来。');
   lines.push('命途的剧情账条目（p-destiny）由前端维护：不要改它的 title/goal/note/dueText/stage。关目演完时，在 statePatch 里写 "mainBeat":"'+st.beat.id+'"；没有真演就不要写。');
   return '\n'+lines.join('\n');
+}
+function personaActTable(){ // 本档在场人物的性情→言行对照（只列存档里真实出现的性情词）
+  if(!state)return '';
+  const set=new Set();
+  for(const id in (state.npcs||{})){
+    const n=state.npcs[id];if(!n)continue;
+    for(const t of normalizePersona(((n.profile||{}).traits)||[]))set.add(t);
+  }
+  const me=state.protagonist||{};
+  for(const t of normalizePersona(me.personality||[]))set.add(t);
+  if(!set.size)return '';
+  return [...set].slice(0,10).map(t=>{const a=PERSONA_ACT[t];return a?`${t}：说话${a.voice}；做法${a.act}；雷区${a.trigger}`:''}).filter(Boolean).join('\n');
+}
+function npcMoveBrief(){ // 人物动向：旁人不能只在旁白里点头，每旬至少一人的主动动作落到主控身上
+  if(!state)return '';
+  const cards=state.npcGoalCards||{};
+  const names=Object.keys(cards).filter(n=>n&&n!=='皇帝'&&n!=='命途');
+  if(!names.length)return '';
+  const turn=Number(state.turn)||0;
+  const picks=[];
+  for(let i=0;i<Math.min(2,names.length);i++)picks.push(names[(turn+i)%names.length]);
+  const rows=picks.map(n=>{
+    const tr=npcTraitsOf(n);
+    const act=tr.length?PERSONA_ACT[tr[0]]:null;
+    return `${n}（${tr.join('、')||'档案未载性情，按其出身与位份演'}）：${cards[n]}${act?`；按她的性子，本旬多半会「${act.act}」，话也照「${act.voice}」的调子说`:''}。`;
+  }).join('\n');
+  const em=state.emperor||{};
+  const et=String(((state.world||{}).emperor||{}).traits||'');
+  const empLine=et?`\n帝（${et}）：${em.hisState?em.hisState+'；':''}他若本旬有动作，须由这条性情推出——同一句话换个性情的帝，结果应当不同。`:'';
+  return `\n【人物动向·本旬】\n${rows}${empLine}\n本旬至少让其中一人的主动动作落到主控身上：求她、试她、压她、护她或避她——写成一个具体动作，改变她一个选项、一笔人情、一处关系或一桩风险，并在 changes/statePatch 里落账。不得只在旁白里提一句“某某来过”。
+这件事要以前端能追的方式落账：以 statePatch.plots 立一条条目（line 用“支线”或“敌对”，id 用“p-人物-事由”，goal 写清此人要什么、怎样算成，dueText 给 3—6 旬）；不立条目就当没发生，前端不会替你记住，也不会催办。`;
 }
 function mainLineSwitch(id){
   const ml=state&&state.mainLine;if(!ml||!MAIN_LINES[id]||id===ml.id)return false;
@@ -3348,6 +3391,61 @@ const PERSONA_PAIR=(()=>{const s=new Set();const add=(a,b)=>{s.add(a+'|'+b);s.ad
   for(const g of PERSONA_GROUPS)for(let i=0;i<g.length;i++)for(let j=i+1;j<g.length;j++)add(g[i],g[j]);
   for(const [a,b] of PERSONA_CONFLICT)add(a,b);
   return s})();
+/* 性情落到言行：每一条都写清「怎么说话」「惯用什么手段」「什么会立刻触怒她」。
+   模型据此刻画，读者不看标签也应能反推出性情；同一句话对不同性情的人，结果可以相反。 */
+const PERSONA_ACT={
+  机敏:{voice:'话不说满，先递半句看人反应，爱用反问',act:'借别人的手办事，自己不出面',trigger:'被当众点破心思，会立刻换一副说辞'},
+  谨慎:{voice:'先问清来由再答，“容我想想”常挂嘴边',act:'留退路、留凭据，绝不第一个表态',trigger:'被逼着当场站队，会记恨很久'},
+  隐忍:{voice:'受了气也只答“是”，语气平得听不出情绪',act:'把账记在心里，等一个能一次算清的机会',trigger:'被当成软柿子反复拿捏，会突然翻脸'},
+  爽直:{voice:'开口见底，不绕弯，敬语用得少',act:'当场把话挑明，先动手再想后果',trigger:'被人阴阳怪气地绕话，会直接拍桌'},
+  温厚:{voice:'先问对方冷暖，拒绝也先给台阶',act:'替人补台、私下劝和，不当众驳人',trigger:'被辜负一次，会沉默很久，此后不再多管'},
+  孤傲:{voice:'惜字如金，不接闲话，也不称“姐姐”',act:'独来独往，宁可自损也不求人',trigger:'被当众轻慢，会当场冷脸，此后不见'},
+  执拗:{voice:'别人说三句，她只说一句“不”',act:'认死理，撞了南墙也不改口',trigger:'被强压着改主意，会记一辈子'},
+  柔婉:{voice:'轻声细语，句末常带“罢了”“也罢”',act:'以退为进，用示弱换余地',trigger:'被逼到没有退路，会做出极狠的事'},
+  果决:{voice:'短句，问一句就要一句答复',act:'先定后说，宁可错也不拖',trigger:'被人拖着不办，会直接掀桌'},
+  多疑:{voice:'爱反问“你怎么知道”“谁告诉你的”',act:'听一半信一半，暗中派人去对',trigger:'一句对不上的话，能让她想三天'},
+  淡泊:{voice:'不争不辩，常说“随它去”',act:'避开是非，能不出面就不出面',trigger:'被硬拖进争斗，会记住是谁拖的'},
+  好胜:{voice:'句句带比较，见人先看位份与穿戴',act:'抢在前头，哪怕多花银子',trigger:'被人压一头，会当众找回场子'},
+  细腻:{voice:'记得旁人说过的细节，不动声色地提一句',act:'从小处入手，送东西必合人心意',trigger:'被敷衍，会默默疏远，不再多话'},
+  大气:{voice:'不缠小节，先说大局',act:'肯让利、肯担责，收人心',trigger:'被算计到头上才出手，一出手不留情'},
+  怯懦:{voice:'话尾常带“许是我想多了”，先把自己说小',act:'推给别人拿主意，遇事先躲',trigger:'被逼到墙角，会哭着去告状'},
+  风趣:{voice:'正经话也包在玩笑里',act:'用玩笑试探，用自嘲脱身',trigger:'玩笑被当真、被当众驳面，会收起笑脸'},
+  坚忍:{voice:'不多说苦，只报结果',act:'熬，一件事做十遍也不喊累',trigger:'被说她熬不住，会格外较劲'},
+  清傲:{voice:'用词讲究，不肯附和，也不肯说俗话',act:'宁可不合群，也不改自己的规矩',trigger:'被逼着低头，会当场拂袖'},
+  圆滑:{voice:'两头都留话，句句能进能退',act:'递消息、牵线、做和事佬，从中取利',trigger:'被逼表态，会立刻称病避开'},
+  骄矜:{voice:'爱提家世与位份，语气居高，不给人台阶',act:'以势压人，先声夺人',trigger:'被驳面子，会当场发作'}
+};
+function npcTraitsOf(who){
+  const w=String(who||'').trim();if(!w)return [];
+  const npcs=(state&&state.npcs)||{};
+  let n=npcs[w];
+  if(!n)n=Object.values(npcs).find(x=>x&&(x.name===w||x.realName===w))||null;
+  if(!n&&typeof UI!=='undefined'&&UI.isEmperorId(w)){
+    const em=((state||{}).world||{}).emperor||{};
+    return normalizePersona(String(em.traits||'').split(/[，,、；;]/).filter(Boolean));
+  }
+  let tr=normalizePersona(((n&&n.profile)||{}).traits||[]);
+  if(!tr.length){ // 旧档/新角色缺 tags：从 hidden.真实性情 的措辞反推
+    const hid=String(((n||{}).hidden||{})['真实性情']||'');
+    if(hid)tr=PERSONA_ALL.filter(t=>PERSONA_FLAVOR[t]&&hid.includes(PERSONA_FLAVOR[t]));
+  }
+  return tr;
+}
+function npcActCue(who){ // 本场对方的性情→言行提示：让模型照着写，而不是泛泛“宫斗腔”
+  const w=String(who||'').trim();if(!w)return '';
+  if(typeof UI!=='undefined'&&UI.isEmperorId(w)){
+    const em=((state||{}).world||{}).emperor||{};
+    return em.traits?`此人（帝）的性情：${em.traits}。他的反应须照此推出；同一句话换个性情的帝，结果应当不同。`:'';
+  }
+  const tr=npcTraitsOf(w),act=personaActText(tr);
+  if(!tr.length)return '';
+  return `此人（${w}）的性情：${tr.join('、')}。${act}。本轮的反应必须能从这些性情推出；若不看标签也能猜出是她，才算写对。`;
+}
+function personaActText(traits){
+  const ps=normalizePersona(traits||[]).map(t=>PERSONA_ACT[t]).filter(Boolean);
+  if(!ps.length)return '';
+  return ps.map(x=>`说话：${x.voice}；做法：${x.act}；雷区：${x.trigger}`).join('。');
+}
 const PERSONA_FLAVOR={
   机敏:'心思转得快，最会看人脸色',谨慎:'凡事先留退路，不肯轻易表态',隐忍:'有气也先咽下去，账记在心里',
   爽直:'有话直说，得罪人也不在乎',温厚:'待人和气，肯给人留体面',孤傲:'清高，不肯与人凑趣',
@@ -4383,7 +4481,7 @@ function buildStaticSystem(){
       .replace('{{世界书全文：02-世界书.md}}',WORLD_BOOK_RUNTIME)
       .replace('{{叙事文风全文：03-叙事文风.md}}',STYLE_GUIDE)
       .replace('{{当前存档 JSON：04-当前存档-v36.json 或玩家当前档}}','（见本提示词末尾「当前存档」段，动态存档在最后）')
-      +'\n\n'+NPC_MODULE+'\n\n'+ENERGY_MODULE+'\n\n'+PLOTS_MODULE+'\n\n'+MAIN_LINE_MODULE+'\n\n'+SCHEME_MODULE+'\n\n'+FESTIVAL_MODULE+'\n\n'+EMPEROR_MODULE+'\n\n'+EMPEROR_PERSONA_MODULE+'\n\n'+CHAMBER_MODULE+'\n\n'+SCENE_MODULE+'\n\n'+SKILL_MODULE+'\n\n'+CRAFT_MODULE+'\n\n'+STUDIO_MODULE+'\n\n'+GIFT_MODULE+'\n\n'+PERSONA_MODULE+'\n\n'+LENGTH_MODULE+'\n\n'+PRESENCE_MODULE;
+      +'\n\n'+NPC_MODULE+'\n\n'+ENERGY_MODULE+'\n\n'+PLOTS_MODULE+'\n\n'+MAIN_LINE_MODULE+'\n\n'+SCHEME_MODULE+'\n\n'+FESTIVAL_MODULE+'\n\n'+EMPEROR_MODULE+'\n\n'+EMPEROR_PERSONA_MODULE+'\n\n'+CHAMBER_MODULE+'\n\n'+SCENE_MODULE+'\n\n'+SKILL_MODULE+'\n\n'+CRAFT_MODULE+'\n\n'+STUDIO_MODULE+'\n\n'+GIFT_MODULE+'\n\n'+PERSONA_MODULE+'\n\n'+PERSONA_ACT_MODULE+'\n\n'+personaActTable()+'\n\n'+LENGTH_MODULE+'\n\n'+PRESENCE_MODULE;
   }
   return _staticSystem;
 }
@@ -4415,6 +4513,7 @@ function buildMessages(userMsg,noHistory){
 const SCENE_RULES=[
 '你是文字游戏《带着系统去宫斗》的主持人，现在只推进一段剧情对话里「场上人物这一轮的反应」。时间与数值留到收尾结算。只输出 JSON。',
 '【文风】架空盛唐，人物言语符合身份、性情与当下情绪；用古代语汇；只写场上人物的话与关键动作，谁开口就写谁。',
+'【性情】本场信息里 npc.act 是此人的说话方式、惯用手段与雷区，照它写：台词要能从性情反推，至少一处细节只属于这个人；不要写成通用宫斗腔。同一句话落在不同性情的人身上，反应可以相反。',
 '【输出】{"narrative":"","changes":[],"hasEvent":true,"scene":{"state":"ongoing","who":"对方称谓","parts":[{"type":"act","text":"对方的动作神态"},{"type":"say","text":"对方原话，不带引号"}],"ledger":["本场已确认、已有结论的事"],"where":"有变化才写","when":"有变化才写"},"options":[{"id":"a","text":"≤70字"},{"id":"b","text":"≤70字"}]}　scene.state 只写 "ongoing"（继续对谈），不要写 "wrap" 或 "resolve"。',
 SCENE_PARTS_RULES,
 '【收尾】narrative 只写旁白，不写引号对白。',
@@ -4454,7 +4553,7 @@ function buildSceneSystem(who){
     time:fmtTime(),location:state.location,residence:Game.homeLocation(),
     protagonist:{name:p.name,rank:p.rank,age:p.age,personality:normalizePersona(p.personality),look:p.look,stance:presenceCue(state)},
     npc:{name:who,realName:n.realName,rank:n.rank,age:n.age,faction:n.faction,
-      traits:normalizePersona(prof.traits),hidden,relationship,
+      traits:normalizePersona(prof.traits),act:personaActText(prof.traits),hidden,relationship,
       biography:Array.isArray(prof.biography)?prof.biography.slice(-5).map(b=>String((b&&b.text)||b||'').slice(0,100)):[],
       recent:Array.isArray(prof.recent)?prof.recent.slice(-2):[]},
     world:{dynasty:w.dynasty,emperor:w.emperor?{name:w.emperor.name,age:w.emperor.age,traits:w.emperor.traits,persona:String(w.emperor.persona||'').split('<player>').join(String(p.name||'主控'))}:null,factions:w.factions},
@@ -8518,7 +8617,8 @@ const Game={
     }
     const plainChoice=!/[（(【]/.test(String(choice||'')); // 老式选项只有叙述、没标动作与台词：额外交代一句，别把打算当成她说出口的话
     const parseNote=plainChoice?'这一条没有用括号标出动作、也没标明哪句是说出口的原话：按她此刻的言行演绎，NPC 只回应她实际做了、说了的，不得把她心里的打算当作已说出口的承诺来复述。':'';
-    let msg=`第${xunNo()}旬剧情对话第${r}轮：玩家应对「${choice}」（括号内是主控的动作/神情，括号外是当场说出口的话；未加括号的叙述按她此刻要说/要做的事理解，其中离开之后的安排不是她当众说出的台词）。${parseNote}演绎场上人物的当即反应与场面变化（以${sceneCtx.who}为主；正主在场则由正主开口，按 who 分人）：输出 scene.parts（2—5 段，act 写人物动作神态并会并入其对话气泡，say 写人物台词，quote 写转述他人原话，narr 只写其他人物与客观场面，台词都不带引号，按语义分段而非按标点硬切；总长 ≤${r>=3?110:80} 字）、scene.ledger（本场已确认、已有结论的事，逐条累积，每条≤20字）、scene.where/when（有变化才写）与 2—3 个接话选项（选项按【选项写法】：括号内动作、括号外当下的原话，不写之后才做的事）；此阶段不结算数值。scene.state 一律写 "ongoing"——不要写 resolve 或 wrap，不要替玩家结束对话；${sceneCtx.who}（或当场的正主）必须回应玩家这一轮的言行，哪怕只是拒绝、反问或转移话题，也不能不作答就走。对话对象当场换手（被传入阁面圣、正主登场等）：把 scene.who 改写为新对象，过渡写进 parts 的 narr 段，新对象的言行照常写 act/say，scene.state 用 "ongoing" 继续对谈，不得就此 resolve。${handoffNote}${briefNote}${optNote}${askedNote}${paceNote}${maidNote}${chamberNote}`+this.sceneContextBlock();
+    const personaCue=npcActCue(sceneCtx.who);
+    let msg=`第${xunNo()}旬剧情对话第${r}轮：玩家应对「${choice}」（括号内是主控的动作/神情，括号外是当场说出口的话；未加括号的叙述按她此刻要说/要做的事理解，其中离开之后的安排不是她当众说出的台词）。${parseNote}演绎场上人物的当即反应与场面变化（以${sceneCtx.who}为主；正主在场则由正主开口，按 who 分人）：输出 scene.parts（2—5 段，act 写人物动作神态并会并入其对话气泡，say 写人物台词，quote 写转述他人原话，narr 只写其他人物与客观场面，台词都不带引号，按语义分段而非按标点硬切；总长 ≤${r>=3?110:80} 字）、scene.ledger（本场已确认、已有结论的事，逐条累积，每条≤20字）、scene.where/when（有变化才写）与 2—3 个接话选项（选项按【选项写法】：括号内动作、括号外当下的原话，不写之后才做的事）；此阶段不结算数值。scene.state 一律写 "ongoing"——不要写 resolve 或 wrap，不要替玩家结束对话；${sceneCtx.who}（或当场的正主）必须回应玩家这一轮的言行，哪怕只是拒绝、反问或转移话题，也不能不作答就走。对话对象当场换手（被传入阁面圣、正主登场等）：把 scene.who 改写为新对象，过渡写进 parts 的 narr 段，新对象的言行照常写 act/say，scene.state 用 "ongoing" 继续对谈，不得就此 resolve。${handoffNote}${briefNote}${optNote}${askedNote}${paceNote}${maidNote}${chamberNote}${personaCue?'\n【性情】'+personaCue:''}`+this.sceneContextBlock();
     if(sceneCtx.chamber)msg=msg.replace(/她/g,'帝');
     this.requestScene(msg,choice,MAX_OUTPUT_TOKENS,true,true); // 正常接话轮永不结算：聊多久由玩家决定，点「结束对话」才收场
   },
