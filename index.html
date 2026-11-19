@@ -10364,9 +10364,11 @@ window.addEventListener('resize',()=>UI.layoutHotspots());
 /* PWA 离线缓存：首载后把字体与常驻图存进 Cache Storage，之后每次打开都读本地 */
 if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)){
   window.addEventListener('load',()=>{
+    const warm=()=>{const c=navigator.serviceWorker.controller;if(c)c.postMessage({type:'precache'})}; // 落在当前在岗的 worker 上
+    navigator.serviceWorker.addEventListener('controllerchange',warm); // SW 换代后由新 worker 收，旧账已清
     navigator.serviceWorker.register('sw.js',{updateViaCache:'none'})
       .then(reg=>{ try{reg.update()}catch(e){} return navigator.serviceWorker.ready })
-      .then(reg=>{ if(reg&&reg.active)reg.active.postMessage({type:'precache'}) })
+      .then(warm)
       .catch(()=>{});
   });
 }

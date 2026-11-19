@@ -1,8 +1,7 @@
 /* 红墙引 · 离线缓存：首屏 HTML 走网络优先（保证 push 后能拿到新版），字体与图片走缓存优先。
    改了 assets 里的字体或图片，把 VERSION 加一：旧缓存会在下次激活时清掉，客户端随即换新。 */
-const VERSION = 'hqy-1';
-const SHELL_CACHE = VERSION + '·shell';
-const ASSET_CACHE = VERSION + '·assets';
+const VERSION = 'hqy-2';
+const ASSET_CACHE = VERSION + '·assets'; // 只有一本账：HTML、字体、图片、音频都存这里，VERSION 一加全部换新
 
 /* 页面首次加载完会发 precache：这些是每次启动都要用到的，先存下，之后离线也能开 */
 const ASSETS = [
@@ -49,11 +48,11 @@ self.addEventListener('fetch', e => {
 });
 
 async function navigate(req) {
-  const cache = await caches.open(SHELL_CACHE);
-  const cached = (await cache.match('./index.html')) || (await (await caches.open(ASSET_CACHE)).match('./index.html'));
+  const cache = await caches.open(ASSET_CACHE);
+  const cached = await cache.match('./index.html');
   try {
     const res = await withTimeout(fetch(req), 5000);
-    if (res && res.ok) cache.put('./index.html', res.clone()); // 每次联网成功都刷新离线副本
+    if (res && res.ok) cache.put('./index.html', res.clone()); // 每次联网成功都刷新离线副本（与 precache 同一本账，不会留旧版）
     return res;
   } catch (err) {
     if (cached) return cached;
