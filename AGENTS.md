@@ -22,6 +22,7 @@
 - 对话渲染不能吞台词：`Game.sceneParts` 认 `text/content/line/dialogue…` 多种键名，并在「parts 里没有 say/quote」时用 `scene.line` 补一段 say；`requestScene` / `_giftResolve` 在 parts 无台词时把 `narrative` 按引号拆成台词补渲染。提示词里「每轮至少一段 say」与这两处兜底要一起留着，少一处就会出现「张了口却没话」的空气泡。刻意没有「空回合再补问一次」的重试：那会让一轮对话多发一次请求，得不偿失。
 - 主控写的是现场言行，不是转述：选项一律写成「（动作/神情）当场说出口的原话」，`Game.playerSegs` 把括号与【】渲染成动作段；`sceneRound` 会把「括号=动作、括号外=台词、没标括号的老式叙述不算说出口」交代给模型，并禁止选项写「回殿后连夜…」这类之后才做的事。提示词里【选项写法】【玩家】两条与这段解析说明要一起留着，否则主角的叙述（连同她之后要做的事）会被当成台词说给对方听。
 - 剧情只能指向真实入口：`PLAY_UI_MODULE` 把玩家点得到的界面写成清单（吩咐／手作／才艺修习／传膳／出门·宫城图七处／顶栏），并要求正文与 pending 不得出现「账房」「内务府值房」这类点不到的地方，改写成差人去办或并入既有去处。吩咐面板另有 `#focusText` + `Game.customFocus` 承接查账、领料、家书、抄经这类没有专门入口的事——别把它删了，删了模型给的指示就又落不了地。自拟行动按玩家指令走两种结算：纯办事 / 派人去办走普通结果弹窗（`hasEvent=false`），要当面交涉、问话、请托、赏罚的走 `scene` 对话细演（`hasEvent=true`，收场再结算）；精力由前端照扣，两种都必须落账（`log` + 至少一项实质结果）。指名到的人物与地点用 `customActionWho` / `customActionCtx` 接上引线与待续的呼应。
+- 来客与相邀：`_xunStartPop` 处理旬首来客（帝按 `emperorVisitChance`，恩宠越高越常来；妃嫔走 `pickConsortVisitor`），`Game.maybeIncomingVisit` 在精力降到本旬阈值（`VISIT_MID_THRESHOLDS`，`meta.midVisitThreshold`）时补一场旬中来客；`meta.visitThisTurn` 是旬号，保证一旬至多一回。不熟的人不能凭空登门：`consortVisitReason` 只放行相熟以上，或剧情账／待续里同在一件事（共同 stake）、目标卡里与主控同怨一人（敌人的敌人）的人。相邀在宫务·行事（`UI.inviteHtml` → `Game.inviteNpc`），成算 `inviteChance` 由好感（帝看恩宠）× `INVITE_RATE` 直接算，先掷骰：应了才调模型进 `scene`，不应则用 `inviteRefusalText` 弹写好的回绝；能耗 `INVITE_ENERGY` 成与不成照扣，一旬一帖（`state.inviteTurn`）。中宫与太后不列来访／相邀名单。
 - 新得物品当场提示：`addToInventory` 入账即用 350ms 防抖调 `flushAcquired`，`finalize` 也调一次兜底。不要改回「攒到下一次模型结算时统一弹」——那会让上一旬画的画拖到下一旬某场剧情时才蹦出来。
 
 ## 开局页

@@ -3195,7 +3195,7 @@ const PRESENCE_MODULE = [
 const PLAY_UI_MODULE = [
 '## 二十二、玩家界面（正文只能指这里有的东西）',
 '玩家点得到的入口只有这些，别的一律不存在：',
-'- 住处：宫务（分三栏：行事——自己安排本旬要做的事，查账、领料、写家书、抄经、打点宫人，以及承宠打算；装潢——换住处背景；吩咐——召配属宫人问话、交代差事、打听消息）、手作、才艺修习、传膳、出门。',
+'- 住处：宫务（分三栏：行事——自己安排本旬要做的事，查账、领料、写家书、抄经、打点宫人、递帖相邀，以及承宠打算；装潢——换住处背景；吩咐——召配属宫人问话、交代差事、打听消息）、手作、才艺修习、传膳、出门。',
 '- 宫城图（点「出门」后）：养心殿（求见帝）、六宫（拜访后妃、太后、皇后）、藏书阁（寻书、借阅、研读）、墨妙斋（写字作画）、太医院（问医、抄书）、御花园（散步、偶遇）。',
 '- 顶栏：状态（局面、剧情账、命途）、行囊（使用／典卖／赠礼）、人物、时间、银两（遣人出宫采买）、积分（商城换道具）。',
 '规则：',
@@ -3344,8 +3344,115 @@ const STALE_AUTO_EXPIRE=3;   // 发酵后连续 N 旬被裁决列出仍无回写
 const ECHO_MISS_MAX=2;       // 同一引线连续被散步/拜访呼应 N 次却无台账回写：此后不再借行动硬凑交集，留待旬首发酵处置
 const ECHO_LEAD_TOTAL=3;     // 同一引线被呼应的总次数硬上限（无论有无回写）：到顶不再主动提示——防"每次改个说法"无限续命、散步永远撞同一件事
 const GARDEN_MEET_CHANCE=0.6; // 御花园散步偶遇概率：掷不中（四成）就只演风物见闻，谁都不遇；帝单独按恩宠掷骰，其余熟人在普通池
-const EMPEROR_VISIT_BASE=0.22;    // 旬首帝主动相见基础概率：恩宠≥40、无缺席、上旬未有相处才掷；一旬一骰
+const EMPEROR_VISIT_BASE=0.22;    // 旧档兼容：帝旬首来访的基础概率（现行成算见 emperorVisitChance）
 const EMPEROR_VISIT_OVERDUE=0.65; // 恩宠账逾期（距上次相处超过每N旬上限）：他主动来/召的概率大增——宠爱须兑现成动静，不兑现则无感
+const VISIT_MID_THRESHOLDS=[60,45,30,15]; // 旬中来客的精力阈值：精力降到或低于此值，来客可能登门（每旬至多一回）
+const INVITE_ENERGY=10;                   // 递帖相邀的精力开销：成与不成都要耗
+const INVITE_RATE=0.9;                    // 相邀成算乘区：好感（帝看恩宠）÷100×0.9
+function emperorVisitChance(favor){ // 帝主动相见的成算：恩宠越高越常来
+  return Math.max(0.05,Math.min(0.45,0.06+(Number(favor)||0)*0.0035));
+}
+function isConsortWho(id,n){ // 此人是否妃嫔（太后与宫人除外；中宫另由 consortVisitIds 过滤）
+  const w=String(id||'');const rank=String((n&&n.rank)||'');
+  if(/太后/.test(w+rank))return false;
+  if(/后|妃|嫔|昭仪|昭容|昭媛|修仪|修容|修媛|充仪|充容|充媛|贵人|才人|美人|宝林|常在|答应|选侍|更衣|采女/.test(rank))return true;
+  return /皇后|贵妃|昭仪|昭容|昭媛|修仪|修容|修媛|充仪|充容|充媛|妃|嫔|贵人|才人|美人|宝林|常在|答应|选侍|更衣|采女/.test(w);
+}
+function consortVisitIds(){ // 可主动登门或受邀的妃嫔：已认识、未结怨、未幽禁病重
+  const ids=new Set();const npcs=(state&&state.npcs)||{};
+  for(const id in npcs){const n=npcs[id]||{};if(n.known&&isConsortWho(id,n))ids.add(id)}
+  for(const id in ((state&&state.relationships)||{})){if(isConsortWho(id,npcs[id]||{}))ids.add(id)}
+  return [...ids].filter(id=>{
+    if(/皇后|中宫/.test(id))return false; // 中宫不轻易移驾/赴低位之约，另走请安与传召
+    const n=npcs[id]||{};
+    if(n.alive===false||n.dead)return false;
+    const rel=(state.relationships||{})[id];const note=typeof rel==='object'?String(rel.note||''):'';
+    if(/幽禁|冷宫|禁足|病重|卧床|薨|殁/.test(String(n.status||'')+String(n.rank||'')+String(n.note||'')+note))return false;
+    return relTier(id).key!=='feud';
+  });
+}
+function consortVisitReason(id){ // 来访由头：交情不到相熟的人，必须有一件共同的事、一个共同的敌人，或有求于你
+  const n=(state.npcs||{})[id]||{};
+  const name=String(n.name||id);
+  const tier=relTier(id);
+  if(tier.key==='feud')return null;
+  const goal=String(((state.npcGoalCards||{})[id])||n.arc||'');
+  const enemies=Object.keys((state&&state.relationships)||{}).filter(k=>{
+    if(k===id)return false;
+    const r=state.relationships[k];const v=(r&&typeof r==='object')?Number(r.value):Number(r);
+    return (r&&typeof r==='object'&&r.type==='仇恨')||v<=-20;
+  });
+  const shared=enemies.find(en=>goal&&goal.includes(en));
+  if(shared)return {kind:'enemy',text:`她与${shared}不睦——敌人的敌人，正可彼此借力`,weight:1.25};
+  const leads=matchLeads([id,name]);
+  const pends=matchPending([id,name]);
+  if(leads.length||pends.length)return {kind:'stake',text:`与你同在一件事上：${leads.length?leads[0].title:pendText(pends[0])}`,weight:1.2};
+  if(tier.key==='close'||tier.key==='ally')return {kind:'friend',text:'交情到了，来看看你',weight:1};
+  if(tier.key==='familiar')return {kind:'familiar',text:'相熟了，顺路来坐坐',weight:0.85};
+  if(goal&&state.protagonist&&(String(state.protagonist.name||'')&&goal.includes(state.protagonist.name)))return {kind:'business',text:'她有事要与你商量',weight:0.9};
+  return null;
+}
+function pickConsortVisitor(){ // 在可来的妃嫔里按交情与由头加权择一人
+  const pool=[];
+  for(const id of consortVisitIds()){
+    const r=consortVisitReason(id);if(!r)continue;
+    const bond=Math.max(0,Number(relValueOf(id))||0);
+    pool.push({id,kind:'consort',reason:r.text,w:r.weight*(0.4+bond/140)});
+  }
+  if(!pool.length)return null;
+  const total=pool.reduce((a,b)=>a+b.w,0);let x=Math.random()*total;
+  for(const p of pool){x-=p.w;if(x<=0)return {id:p.id,kind:p.kind,reason:p.reason}}
+  return {id:pool[pool.length-1].id,kind:'consort',reason:pool[pool.length-1].reason};
+}
+function pickIncomingVisitor(stage){ // 旬中来客：帝按恩宠、妃嫔按交情与由头，各掷一回
+  const e=(state&&state.emperor)||{};
+  const favor=mlFavor(state);
+  const now=xunSerial(state.time);
+  const gap=now-(typeof e.lastContact==='number'?e.lastContact:now);
+  const absence=String(e.absence||'').trim();
+  if(favor>=35&&!absence&&gap>=1&&Math.random()<emperorVisitChance(favor)*(stage==='mid'?0.55:1)){
+    return {id:emperorKey(),kind:'emperor',reason:'恩宠所致，他肯亲自走一趟'};
+  }
+  if(Math.random()<(stage==='mid'?0.26:0.18))return pickConsortVisitor();
+  return null;
+}
+function emperorKey(){return Object.keys((state&&state.relationships)||{}).find(k=>UI.isEmperorId(k))||'皇帝'}
+function inviteChance(who){ // 相邀成算：直接由好感（帝看恩宠）乘固定乘区
+  if(UI.isEmperorId(who))return Math.max(0.03,Math.min(0.95,mlFavor(state)/100*INVITE_RATE));
+  if(relTier(who).key==='feud')return 0;
+  return Math.max(0.02,Math.min(0.95,(Number(relValueOf(who))||0)/100*INVITE_RATE));
+}
+function inviteCandidates(){ // 可递帖的人：帝与已认识的妃嫔（结怨者不列）
+  const out=[{id:emperorKey(),kind:'emperor',name:'皇帝'}];
+  for(const id of consortVisitIds())out.push({id,kind:'consort',name:dispName(id)});
+  return out;
+}
+function inviteRefusalText(who){ // 相邀落空：写好的回绝话，按对象与交情分档
+  const pick=arr=>arr[Math.floor(Math.random()*arr.length)];
+  if(UI.isEmperorId(who)){
+    const e=(state&&state.emperor)||{};
+    const absence=String(e.absence||'').trim();
+    return absence
+      ? pick([`高德全捧着帖子出来，压低声：“陛下这阵子${absence}，六宫都少召见，小主的心意奴才先替您收着。”`,
+              `帖子递进去半日，才等来一句回话：“陛下近日不得闲，改日再替小主寻空。”`])
+      : pick([`高德全捧着帖子出来，躬身道：“陛下今夜已经翻了旁人的牌子；小主这份心，奴才替您递进去了。”`,
+              `帖子递进去，回话只有一句：“陛下前朝有事，脱不开身，改日再召。”`,
+              `高德全把帖子原样捧回：“陛下说这几日实在抽不出空，让小主不必再等。”`]);
+  }
+  const t=relTier(who);
+  if(t.key==='feud'||t.key==='cold'){
+    return pick([`${who}打发宫女把帖子送回来：“我们主子说了，受不起。”`,
+                 `回话客气，却把帖子原样退回——那边显然不打算来。`]);
+  }
+  if(t.key==='new'){
+    return pick([`宫女把帖子送回来，说话客客气气：“我们主子说，这几日身上不大好，改日再叙。”`,
+                 `隔了半晌才有人来回：“主子今日不得闲，小主的心意心领了。”`,
+                 `帖子留下了，人没来；回话说宫中事忙，脱不开身。`]);
+  }
+  return pick([`${who}遣人来致意：“今日实在脱不开身，改日亲自来给小主赔罪。”`,
+               `让人捎了话，说这几日宫务缠身，过些时候一定来坐。`,
+               `回帖写了两句客气话，人没到——显然被别的事绊住了。`]);
+}
 function focusEnergyCost(focus){ // 各类行动精力消耗
   const f=String(focus||'');
   if(/使用道具|使用物品/.test(f))return 5; // 用物最轻
@@ -4668,7 +4775,7 @@ function compactState(s,focusMsg){ // 只压缩送入模型的那一份，localS
   const out=Object.assign({},s);
   out.turn=xunNoOf(s.turn); // 对外统一 1 起旬号，与指令里的「第N旬」一致
   // 前端内部标记与展示字段不送模型
-  for(const k of ['avatarMap','plotMeta','schemeMeta','xunBook','saveVersion','plotLedgerV1','pawnFix1','itemFlagV1','readMindV1','energyWarned','mealCount','lastSalaryMonth','lastFestSerial','items','craftV1','chamberV1','xunIntent','postpartumUntil','decor'])delete out[k];
+  for(const k of ['avatarMap','plotMeta','schemeMeta','xunBook','saveVersion','plotLedgerV1','pawnFix1','itemFlagV1','readMindV1','energyWarned','mealCount','lastSalaryMonth','lastFestSerial','items','craftV1','chamberV1','xunIntent','inviteTurn','postpartumUntil','decor'])delete out[k];
   if(out.protagonist&&typeof out.protagonist==='object'){
     out.protagonist=Object.assign({},s.protagonist);
     delete out.protagonist.avatar; // 头像由前端按身份分配
@@ -5542,7 +5649,19 @@ const UI={
         <textarea class="craftinsp" id="focusText" maxlength="120" placeholder="查一查份例的账 / 写封家书 / 差人去内务府领料 / 去给柳妃递句话…"></textarea>
         <div class="setbtns"><button class="btn btn-primary" onclick="Game.customFocus()">安排下去</button></div>
         <div class="sheet-note">界面上没有专门入口的事都在这里安排。要人当面说话的事（请托、对质、问话、赏罚）会进对话窗细演，由你一句句接；派人去办的差事则当场给结果。无论哪一种，都照常扣精力，并留下实打实的后果。</div>
-      </div>`;
+      </div>`+this.inviteHtml();
+  },
+  inviteHtml(){ // 宫务·行事：递帖相邀
+    const used=state.inviteTurn===state.turn;
+    const low=(state.energy??0)<=INVITE_ENERGY;
+    const rows=inviteCandidates().map(c=>{
+      const pct=Math.round(inviteChance(c.id)*100);
+      const off=used||low;
+      return `<button class="npcrow"${off?' disabled style="opacity:.45"':''} onclick="Game.inviteNpc('${esc(c.id)}')"><span class="nr-name">${esc(dispName(c.id))}</span><span class="nr-depth">成算 ${pct}% · 精力 ${INVITE_ENERGY}</span></button>`;
+    }).join('');
+    return `<div class="sec"><div class="sec-cap">递帖相邀</div>
+      <div class="sheet-note" style="margin:0 0 6px">请人来住处一叙：成算只看交情，帝看恩宠；成与不成都耗 ${INVITE_ENERGY} 精力，一旬只递一回。${used?'<br>本旬的帖子已经递过了。':(low?'<br>精力不足，先歇一歇。':'')}</div>
+      ${rows||'<div class="sheet-note">眼下没有可递帖的人。</div>'}</div>`;
   },
   gongMaidHtml(){ // 宫务·吩咐：召配属宫女问话
     const maids=(state.protagonist&&state.protagonist.maids)||[];
@@ -8335,17 +8454,26 @@ const Game={
     // 旬首帝至：恩宠≥40、无缺席、上旬未有相处，且本旬不与发酵处置/节宴抢戏——掷骰决定帝是否主动相见（宠爱兑现成动静）
     const meta=ensurePlotMeta();
     const e=state.emperor;
-    const favor=Number((state.relationships&&state.relationships['皇帝']||{}).value)||0;
+    const favor=mlFavor(state); // 帝的存档键可能是「皇帝」，也可能是本名
     const win=favor>=60?2:4;
     const now=xunSerial(state.time);
     const gap=now-(typeof(e&&e.lastContact)==='number'?e.lastContact:now);
-    const baseOk=(meta.graceTurn||0)<=(state.turn||0)&&favor>=40&&!!e&&!e.absence&&gap>=1;
-    const clearOk=baseOk&&!adj.stale.length&&!adj.pendStale.length&&!fest&&!schemeHit; // 发酵/节宴/暗流在账：帝至让路，但命中不丢——挂起待账清补演
-    if(meta.visitRollTurn!==state.turn){meta.visitRollTurn=state.turn;meta.visitHit=clearOk&&Math.random()<(gap>win?EMPEROR_VISIT_OVERDUE:EMPEROR_VISIT_BASE+(favor>=75?0.08:0))} // 一旬一骰，同旬重复调用不重复掷
+    const graceOk=(meta.graceTurn||0)<=(state.turn||0);
+    const noOther=!adj.stale.length&&!adj.pendStale.length&&!fest&&!schemeHit; // 发酵/节宴/暗流在账：来客让路
+    const baseOk=graceOk&&favor>=40&&!!e&&!e.absence&&gap>=1;
+    const clearOk=baseOk&&noOther;
+    if(meta.visitRollTurn!==state.turn){meta.visitRollTurn=state.turn;meta.visitHit=clearOk&&Math.random()<(gap>win?EMPEROR_VISIT_OVERDUE:emperorVisitChance(favor))} // 一旬一骰，同旬重复调用不重复掷；恩宠越高越常来
     let visitHit=false;
     if(clearOk&&(meta.visitHit||meta.visitPending)){visitHit=true;meta.visitHit=false;meta.visitPending=false}
     else if(!clearOk&&meta.visitHit){meta.visitPending=true;meta.visitHit=false}
-    if(!schemeHit&&!adj.stale.length&&!adj.pendStale.length&&!mainMiss&&!visitHit&&!fest)return;
+    // 妃嫔来访：与帝至共用旬首这一回来客名额；不熟的人须有共同的事或共同的敌人才会登门
+    let npcVisit=null;
+    if(!visitHit&&!mainMiss&&graceOk&&noOther){
+      if(meta.npcVisitRollTurn!==state.turn){meta.npcVisitRollTurn=state.turn;meta.npcVisitHit=Math.random()<0.16?pickConsortVisitor():null} // 一旬一骰；与新主线发布不抢场
+      npcVisit=meta.npcVisitHit||null;
+    }
+    if(visitHit||npcVisit)meta.visitThisTurn=state.turn; // 本旬来访额度用掉，旬中不再来客
+    if(!schemeHit&&!adj.stale.length&&!adj.pendStale.length&&!mainMiss&&!visitHit&&!npcVisit&&!fest)return;
     const items=[...adj.stale.map(p=>`「${p.title}」`),...adj.pendStale.map(x=>pendText(x))].join('；');
     let msg=`第${xunNo()}旬旬首：`;
     if(fest)msg+=`本旬逢固定节宴「${fest.name}」（${fest.scale}，${festWhen(fest)}必至），宴须当旬演出。`;
@@ -8353,13 +8481,15 @@ const Game={
     if(schemeHit)msg+=`暗流发难，就在本旬：${adj.schemeFire.map(s=>`${s.who}（${s.aim}，冲你的${SCHEME_TARGET_TEXT[s.target]||s.target}）`).join('；')}。这是当旬主戏，hasEvent=true，用 scene 开场；写清她怎么动的手、你被逼到哪一步；给 2—4 个应对选项，结果由你根据玩家选择、局势与她的人设推断，收尾写 schemeOutcome。${fest?'发难就摆在宴上，宴席同时是本场舞台。':''}`;
     if(mainMiss)msg+=`${items?'同场处置（了结旧事时引出新线头）——':''}剧情账中已无进行中的主线：这不等于必须发一条。若确有从当前处境与既有伏笔自然长出的线头（位份、子嗣、旧案、母族、新敌），可顺势开立；没有就空着，不要为了补槽位硬编名字与期限。若发布，标题须与 goal 说同一件事，dueText 只写真实期限或不写，earliest/latest 不要写数字。`;
     if(visitHit)msg+=`${items||mainMiss?'——同场带出帝线：':''}本旬旬首，帝主动与主控相见（恩宠所致，不必另寻由头）——${favor>=60?'夜访住处、遣高德全接入阁、游园时遣开随从说话皆可；宠爱 '+favor+'，他肯花心思，"主动记得、提前安排、破例"至少体现其一':'经高德全传召往养心殿、晨起问安遇驾、园中偶逢皆可；宠爱 '+favor+'，按"每 '+win+' 旬至少一次有内容相处"的账，这旬轮到他主动'}。`;
+    if(npcVisit)msg+=`${items||mainMiss||visitHit?'——同场再添一层：':''}本旬旬首，${dispName(npcVisit.id)}主动登门（由头：${npcVisit.reason}）。她是自己来的，不是恰好路过：须写清她为何此刻来、带了什么话或要求什么，一开口就有实际来意，且态度按其性情、位份与交情写，不得有求必应。`;
     if(fest)msg+=`这场宴就是本旬的剧情额度：${items||mainMiss?'上面列的事一并拿到宴上处置——':'不必另找由头，'}以宴席开场（来客通传、引至席上、席间有人搭话皆可），hasEvent=true；宴的场面、主宴者、席上机缘与分寸见下方【定例·本旬节宴】。`;
     msg+='请用剧情对话 scene 结构开场（state="ongoing"，对方的话或动作开场，嵌入主控当前处境自然发生：来人传话、事发、旧事被翻上门等皆可），给 2—4 个接话选项后停止，不结算应对后果；';
     if(visitHit)msg+='帝相处的正戏在这场：给足一来一往的实际内容（谈旧事、记挂着什么、破什么例），并经 statePatch["emperor.contact"] 记一句相处注记；';
     if(mainMiss)msg+=`并务必以 statePatch.plots 落账一条 line="主线" 的新条目（id 用 "p-" 加短标题，note 一句话写清走向，可给 dueText 期限）${meta._mainMissed?'——此前已要求开立新主线仍未落账，本轮务必落账':''}；`;
     else if(items)msg+='玩家点「结束对话」后统一结算并回写台账/待续（兑现者 stage 改"已兑现"；琐事办掉即从 pending 移除）；';
     else msg+='玩家点「结束对话」后统一结算本旬；';
-    this.round1(msg,schemeHit?('旬首·暗流 '+adj.schemeFire[0].who):(fest?('旬首·节宴 '+fest.name):(mainMiss?'旬首·新主线发布':(visitHit?'旬首·帝至':'旬首·发酵处置'))),0,{skipDice:true,_xunPop:true,_mainPubPop:!!mainMiss,_schemePop:schemeHit}); // 强制处置不占精力
+    const focusLabel=schemeHit?('旬首·暗流 '+adj.schemeFire[0].who):(fest?('旬首·节宴 '+fest.name):(mainMiss?'旬首·新主线发布':(visitHit?'旬首·帝至':(npcVisit?'旬首·来访 '+dispName(npcVisit.id):'旬首·发酵处置'))));
+    this.round1(msg,focusLabel,0,{skipDice:true,_xunPop:true,_mainPubPop:!!mainMiss,_schemePop:schemeHit,whoHint:visitHit?'皇帝':(npcVisit?npcVisit.id:undefined)}); // 强制处置与来客不占精力
   },
   collapse(){ // 精力归零：当场昏迷，扣体质，弹窗确认后强制进入下一旬
     $('#mapview').classList.remove('on'); // 从宫城图直接触发时也兜底收起
@@ -8416,6 +8546,7 @@ const Game={
     phase='FOCUS_SELECT'; // 本旬结果看完即回到可自由安排的状态（原先漏了复位，主界面会整片点不动）
     UI.goHome();
     checkMainQuestNotices();
+    this.maybeIncomingVisit(); // 精力落到阈值：可能有人登门
   },
   round1(msg,focus,cost,opts){
     ensureXunBook(); // 先记本旬起点，再发起行动
@@ -9123,6 +9254,7 @@ const Game={
     checkMainQuestNotices(); // 本场发布/了结的主线：弹窗说明目标并记入大事记
     if(Game._questOpen){ if(pendingDawn)Game._pendingXunPop=true; }
     else if(pendingDawn)this._xunStartPop(); // 夜账里进了承宠夜话：聊完再走旬首强制处置
+    else this.maybeIncomingVisit(); // 本场散后若精力已到阈值，来客照常登门
   },
   pickOpening(i){
     if(phase!=='FOCUS_PICK'&&phase!=='FOCUS_SELECT')return;
@@ -9151,6 +9283,54 @@ const Game={
 无论走哪一路，此事都必须真正影响剧情：普通交代在本次结算里、当面详演在收场那一轮里，statePatch 必须写 log 一句话，并至少落下一项实质结果（银两、关系或恩宠、才艺、行囊、待续 pending、剧情账 plots 的推进或新立、状态、情报、机会）。办不成、被推诿、扑空、逾矩受斥同样是结果：写明卡在哪一步，并留下代价或后患（欠人情、走漏风声、失掉时机、被人记恨、下人抱怨等）；不得只写一段没有下文的过程，也不得把没请示过的事写成既成事实。${leadHint}${pendHint}`;
     UI.closeSheet();
     this.round1(msg,`吩咐·${t.length>12?t.slice(0,12)+'…':t}`,cost,{leadIds:hits.map(p=>p.id),pendTexts:phits.map(pendText),whoHint:who||undefined});
+  },
+  inviteNpc(who){ // 宫务·行事：递帖相邀，先按成算掷骰；应了才调模型，不应则出写好的回绝
+    if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
+    if(!state||!state.protagonist)return;
+    if(!inviteCandidates().some(c=>c.id===who)){toast('帖子递不出去：此人不在可邀之列');return}
+    if(state.inviteTurn===state.turn){toast('本旬的帖子已经递过了，待下旬再说');return}
+    if((state.energy??0)<=INVITE_ENERGY){toast(`精力不足：递帖待客要耗 ${INVITE_ENERGY} 精力`);return}
+    ensureXunBook();
+    const isEmp=UI.isEmperorId(who);
+    const name=dispName(who);
+    const chance=inviteChance(who);
+    state.energy=Math.max(0,Math.round((state.energy??0)-INVITE_ENERGY));
+    state.inviteTurn=state.turn;
+    logXunAction(`相邀·${name}`);
+    persistCurrent();markSafe();UI.updateStatusbar();
+    UI.closeSheet();
+    if(Math.random()<chance){
+      const meta=ensurePlotMeta();meta.visitThisTurn=state.turn; // 本旬来客额度已用
+      const where=this.homeLocation()||'本宫住处';
+      const msg=`第${xunNo()}旬：玩家递帖相邀「${name}」，对方应了（成算 ${Math.round(chance*100)}%）。${isEmp?'帝':'她'}依约来到${where}。用剧情对话 scene 结构开场（scene.state="ongoing"，scene.who 填「${isEmp?'皇帝':who}」，scene.where 写「${where}」，narrative 只交代你在何处迎候、此人如何进门，scene.parts 写对方第一句话与动作），给 2—4 个接话选项后停下，不结算应对后果，等玩家点「结束对话」再统一结算。${isEmp?'这是帝应你的帖子而来：须写他为何肯来、记得什么或破什么例，收场经 statePatch["emperor.contact"] 记一句相处注记。':'她既肯应帖，就不是空坐：须带实际来意或情绪，态度按其性情、位份与交情写，不得有求必应。'}精力已由前端扣定，不得重复加减。`;
+      this.round1(msg,`相邀·${name}`,0,{skipDice:true,_xunPop:true,whoHint:isEmp?'皇帝':who});
+    }else{
+      UI.actResult(`相邀 · ${name}`,inviteRefusalText(who),[]); // 写好的回绝，不调模型
+    }
+  },
+  maybeIncomingVisit(){ // 旬中来客：精力降到本旬阈值时，有人登门；每旬至多一回，且须本旬尚无大事
+    if(!state||phase!=='FOCUS_SELECT')return false;
+    if(sceneCtx||currentEvent)return false;
+    if(['busyModal','actModal','incidentModal','questModal','dawnModal','collapseModal','restModal','tutorialModal','errModal'].some(id=>{const el=document.getElementById(id);return el&&el.classList.contains('on')}))return false;
+    const meta=ensurePlotMeta();
+    if(meta.visitThisTurn===state.turn||meta.midVisitDone===state.turn)return false;
+    if(meta.lastEventTurn===state.turn)return false; // 本旬已有一场需应对的戏，不再叠一场
+    if(meta.midVisitTurn!==state.turn){
+      meta.midVisitTurn=state.turn;
+      meta.midVisitThreshold=VISIT_MID_THRESHOLDS[Math.floor(Math.random()*VISIT_MID_THRESHOLDS.length)];
+    }
+    const energy=Math.round(Number(state.energy)||0);
+    if(energy<=0||energy>meta.midVisitThreshold)return false;
+    meta.midVisitDone=state.turn;
+    const v=pickIncomingVisitor('mid');
+    if(!v)return false;
+    meta.visitThisTurn=state.turn;
+    const isEmp=v.kind==='emperor';
+    const who=isEmp?'帝':dispName(v.id);
+    const where=this.homeLocation()||'本宫住处';
+    const msg=`第${xunNo()}旬旬中：主控本旬行事至此，精力剩下 ${energy}，人回到${where}。${who}忽然登门（由头：${v.reason}）。用剧情对话 scene 结构开场（scene.state="ongoing"，scene.who 填「${isEmp?'皇帝':v.id}」，scene.where 写「${where}」，narrative 只交代你在何处、此人如何进来或被引进，scene.parts 写对方第一句话与动作），给 2—4 个接话选项后停下，不结算应对后果，等玩家点「结束对话」再统一结算。${isEmp?'这是帝主动来：须写出他为什么此刻来、记得什么或破什么例，收场经 statePatch["emperor.contact"] 记一句相处注记。':'她是主动登门，须有实际来意（消息、请托、试探、赔礼或结盟），不得写成恰好路过；肯不肯说、说到几分，按交情与性情来。'}来客不占精力，也不要写成主控另行出门。`;
+    this.round1(msg,isEmp?'来访·帝':`来访·${who}`,0,{skipDice:true,_xunPop:true,whoHint:isEmp?'皇帝':v.id});
+    return true;
   },
   handleCallErr(e){
     if(e.name==='AbortError')return;
