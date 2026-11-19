@@ -4133,7 +4133,7 @@ function toast(msg,ms=2200){const el=$('#toast');el.textContent=msg;el.classList
 
 /* ============================================================ 设置 */
 const SET_KEY='sgd_settings';
-const DEFAULT_SETTINGS={apiKey:'',baseUrl:'https://api.deepseek.com/v1',model:'deepseek-chat',theme:'auto',stream:true,bgm:true};
+const DEFAULT_SETTINGS={apiKey:'',baseUrl:'https://api.deepseek.com/v1',model:'deepseek-chat',theme:'auto',stream:true,bgm:true,bgmTrack:1};
 function loadSettings(){
   try{return Object.assign({},DEFAULT_SETTINGS,JSON.parse(localStorage.getItem(SET_KEY)||'{}'))}
   catch(e){return Object.assign({},DEFAULT_SETTINGS)}
@@ -4143,39 +4143,66 @@ function applyTheme(){const t=loadSettings().theme;document.documentElement.data
 applyTheme();
 
 /* ============================================================ BGM
-   音频源：assets/bgm.m4a（《古宫清音》Suno 生成，头尾已做淡入淡出处理便于循环）。
-   默认开启，受浏览器自动播放限制，首次点击页面后启动；设置里可随时开关、变速率。 */
+   曲目按加入顺序命名：一、二、三……；新增曲目只需在 BGM_TRACKS 末尾追加一项。
+   默认开启，受浏览器自动播放限制，首次点击页面后启动；设置里可随时切换曲目、开关与变速率。 */
+const BGM_TRACKS=[
+  {id:1,name:'一',src:'assets/bgm.m4a'},
+  {id:2,name:'二',src:'assets/bgm2.m4a'}
+];
 const BGM=(()=>{
   const FADE_MS=800,VOL=0.6;
-  let audio=null,timer=null,playing=false,rate=1;
-  function ensure(){
-    if(audio)return true;
-    audio=new Audio('assets/bgm.m4a');
+  let audio=null,timer=null,playing=false,rate=1,track=1;
+  function meta(id){return BGM_TRACKS.find(t=>t.id===id)||BGM_TRACKS[0]}
+  function ensure(id){
+    const m=meta(id||track);
+    if(audio&&audio.dataset.track===String(m.id))return true;
+    if(audio){try{audio.pause()}catch(e){}audio=null}
+    audio=new Audio(m.src);
     audio.loop=true;audio.volume=0;audio.playbackRate=rate;
+    audio.dataset.track=String(m.id);
+    track=m.id;
     return true;
   }
   function fadeTo(v){
     clearInterval(timer);
     timer=setInterval(()=>{
+      if(!audio){clearInterval(timer);return}
       const d=1/(FADE_MS/100); // 每 100ms 一步，FADE_MS 内线性淡完
       let nv=audio.volume+(v>audio.volume?d:-d);
       if(Math.abs(nv-v)<=d){nv=v;clearInterval(timer)}
       audio.volume=Math.max(0,Math.min(1,nv));
     },100);
   }
-  function start(){if(playing)return;if(!ensure())return;playing=true;
-    audio.playbackRate=rate;
+  function start(){if(playing)return;ensure(track);playing=true;
+    audio.playbackRate=rate;audio.volume=0;
     audio.play().then(()=>fadeTo(VOL)).catch(()=>{playing=false});}
   function stop(){if(!playing)return;playing=false;
     fadeTo(0);setTimeout(()=>{if(!playing&&audio)audio.pause()},FADE_MS+100);}
+  function setTrack(id,play){ // play=undefined 只换曲；true 立即播放；false 只记曲目不播
+    id=Number(id)||1;
+    if(!BGM_TRACKS.some(t=>t.id===id))id=BGM_TRACKS[0].id;
+    const wasPlaying=playing;
+    clearInterval(timer);
+    if(audio){try{audio.pause()}catch(e){}audio=null}
+    track=id;
+    if(play===false||(!wasPlaying&&play!==true)){playing=false;return}
+    playing=false;
+    start();
+  }
   document.addEventListener('visibilitychange',()=>{ // 切后台暂停，回来自动续
     if(!audio)return;
     if(document.hidden)audio.pause();else if(playing)audio.play().catch(()=>{});});
-  return{start,stop,
+  return{start,stop,setTrack,
     setRate(v){rate=Math.max(0.5,Math.min(1.5,v||1));if(audio)audio.playbackRate=rate;},
-    get playing(){return playing}};
+    get playing(){return playing},
+    get track(){return track},
+    get current(){return meta(track)}};
 })();
-function applyBgm(){if(loadSettings().bgm!==false)BGM.start();else BGM.stop()}
+function applyBgm(){
+  const s=loadSettings();
+  if(s.bgm!==false){BGM.setTrack(s.bgmTrack||1,false);BGM.start()}
+  else BGM.stop();
+}
 document.addEventListener('pointerdown',()=>applyBgm(),{once:true}); // 首次点击后按设置启动（绕开自动播放限制）
 
 /* ============================================================ 存档 */
@@ -6424,7 +6451,7 @@ const UI={
       <div class="setrow"><span class="sk">模型</span><input id="setModel" placeholder="deepseek-chat" value="${esc(s.model)}"></div>
       <div class="setrow"><span class="sk">流式输出</span><select id="setStream"><option value="1" ${s.stream!==false?'selected':''}>开启（边写边看，推荐）</option><option value="0" ${s.stream===false?'selected':''}>关闭（接口不支持流式时）</option></select></div>
       <div class="setrow"><span class="sk">外观</span><select id="setTheme"><option value="auto" ${s.theme==='auto'?'selected':''}>跟随系统</option><option value="light" ${s.theme==='light'?'selected':''}>宣纸（浅色）</option><option value="dark" ${s.theme==='dark'?'selected':''}>墨底（深色）</option></select></div>
-      <div class="setrow"><span class="sk">背景音乐</span><select onchange="Game.toggleBgm(this.value!=='0')"><option value="1" ${s.bgm!==false?'selected':''}>开启（古琴氛围）</option><option value="0" ${s.bgm===false?'selected':''}>关闭</option></select></div>
+      <div class="setrow"><span class="sk">背景音乐</span><select onchange="Game.chooseBgm(this.value)"><option value="0" ${s.bgm===false?'selected':''}>关闭</option>${BGM_TRACKS.map(t=>`<option value="${t.id}" ${s.bgm!==false&&(Number(s.bgmTrack)||1)===t.id?'selected':''}>${t.name}</option>`).join('')}</select></div>
       <div class="setrow"><span class="sk">BGM 速率</span><input type="range" id="setBgmRate" min="0.5" max="1.5" step="0.05" value="${s.bgmRate||1}" oninput="Game.setBgmRate(parseFloat(this.value))"><span class="sk num" id="bgmRateVal">${Math.round((s.bgmRate||1)*100)}%</span></div>
       <div class="sheet-note" style="margin-top:6px">${lastApiStat?`上次请求：${lastApiStat.sec.toFixed(1)} 秒 · 输入 ${lastApiStat.in??'?'}${lastApiStat.cache!=null?`（缓存命中 ${lastApiStat.cache}）`:''} / 输出 ${lastApiStat.out??'?'} tokens`:'尚无请求记录'}<br>输入大、缓存命中为 0 → 提示词过长或前缀失效；输出大而耗时长 → 是生成慢，可换更快的模型。</div>
       <div class="setbtns"><button class="btn btn-primary" onclick="Game.saveSettingsFromUI()">保存设置</button><button class="btn btn-line" id="btnTestApi" onclick="Game.testApi()">测试连通</button></div>
@@ -9677,7 +9704,15 @@ const Game={
   },
   /* 设置 */
   switchSetPane(p){setPane=p;UI.renderSheet('设置')},
-  toggleBgm(on){const s=loadSettings();s.bgm=on;localStorage.setItem(SET_KEY,JSON.stringify(s));applyBgm();toast(on?'背景音乐已开启':'背景音乐已关闭')},
+  chooseBgm(v){ // 0=关闭；其余为曲目 id（一、二……按 BGM_TRACKS 顺序）
+    const id=Number(v)||0,s=loadSettings();
+    if(id<=0){s.bgm=false;localStorage.setItem(SET_KEY,JSON.stringify(s));BGM.stop();toast('背景音乐已关闭');return}
+    const t=BGM_TRACKS.find(x=>x.id===id);
+    if(!t){toast('没有这一首');return}
+    s.bgm=true;s.bgmTrack=id;localStorage.setItem(SET_KEY,JSON.stringify(s));
+    BGM.setTrack(id,true);
+    toast('背景音乐：'+t.name);
+  },
   setBgmRate(v){if(!(v>=0.5&&v<=1.5))return;const s=loadSettings();s.bgmRate=Math.round(v*100)/100;localStorage.setItem(SET_KEY,JSON.stringify(s));BGM.setRate(s.bgmRate);const el=$('#bgmRateVal');if(el)el.textContent=Math.round(s.bgmRate*100)+'%';},
   openSettings(p){
     if(phase==='PROFILE'){toast('请先确认档案');return}
@@ -9685,7 +9720,8 @@ const Game={
     UI.openSheet('设置');
   },
   saveSettingsFromUI(){
-    saveSettings({apiKey:$('#setKey').value.trim(),baseUrl:$('#setBase').value.trim()||'https://api.deepseek.com/v1',model:$('#setModel').value.trim()||'deepseek-chat',theme:$('#setTheme').value,stream:$('#setStream').value!=='0'});
+    const cur=loadSettings(); // 合并保存：别把背景音乐曲目、速率等本次没改的设置冲掉
+    saveSettings(Object.assign({},cur,{apiKey:$('#setKey').value.trim(),baseUrl:$('#setBase').value.trim()||'https://api.deepseek.com/v1',model:$('#setModel').value.trim()||'deepseek-chat',theme:$('#setTheme').value,stream:$('#setStream').value!=='0'}));
     toast('设置已保存');
   },
   testApi(){
