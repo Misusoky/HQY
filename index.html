@@ -3354,6 +3354,27 @@ function focusEnergyCost(focus){ // 各类行动精力消耗
   if(/家族|书信|抄经|妆奁/.test(f))return 10;
   return 20; // 社交拜访、宫务经营、子女教育、自定义
 }
+function customActionWho(text){ // 自拟行动里点到的已知人物：取其称谓或姓名最先出现者（配属宫女不算交涉对象）
+  const t=String(text||'');const npcs=(state&&state.npcs)||{};
+  const maids=new Set(((state&&state.protagonist&&state.protagonist.maids)||[]).map(String));
+  let best=null,bestAt=Infinity;
+  for(const id of Object.keys(npcs)){
+    const n=npcs[id]||{};
+    for(const nm of [id,n.name]){
+      const s=String(nm||'');if(s.length<2||maids.has(s))continue;
+      const at=t.indexOf(s);
+      if(at>=0&&at<bestAt){bestAt=at;best=id}
+    }
+  }
+  return best;
+}
+function customActionCtx(text){ // 自拟行动的呼应语境：点到的人物与宫中地点
+  const t=String(text||'');const out=[];
+  const who=customActionWho(t);
+  if(who){const n=(state&&state.npcs&&state.npcs[who])||{};out.push(who);if(n.name&&n.name!==who)out.push(n.name)}
+  ['御花园','藏书阁','墨妙斋','太医院','养心殿','六宫','慈宁宫','冷宫','戏台','马球场','太液池','宫外'].forEach(p=>{if(t.includes(p))out.push(p)});
+  return out;
+}
 /* 才艺池：可培养项固定清单，上限 10 项；解锁新才艺才新增数值行 */
 const SKILL_POOL=['琴','棋','书','画','歌','舞','女红','医术','莳花','香道'];
 const SKILL_INTEL_BOND=30;  // 好感达到此数，自然知晓对方才艺
@@ -5518,9 +5539,9 @@ const UI={
     return `<div class="focus-cap">— 行事 · 精力 ${state.energy}／${ENERGY_MAX} —</div>`+festNote+this.nightIntentHtml()+
       (pend?`<div class="sheet-note" style="margin:0 0 8px">临期引线：${esc(pend)}</div>`:'')+
       `<div class="sec"><div class="sec-cap">自己安排一件</div>
-        <textarea class="craftinsp" id="focusText" maxlength="80" placeholder="查一查份例的账 / 写封家书 / 差人去内务府领料 / 往慈宁宫抄经…"></textarea>
+        <textarea class="craftinsp" id="focusText" maxlength="120" placeholder="查一查份例的账 / 写封家书 / 差人去内务府领料 / 去给柳妃递句话…"></textarea>
         <div class="setbtns"><button class="btn btn-primary" onclick="Game.customFocus()">安排下去</button></div>
-        <div class="sheet-note">界面上没有专门入口的事——查账、领料、传话、家书、抄经、打点、安抚宫人——都在这里安排；这一旬办得成办不成、耗多少精力，由演绎结算。</div>
+        <div class="sheet-note">界面上没有专门入口的事都在这里安排。要人当面说话的事（请托、对质、问话、赏罚）会进对话窗细演，由你一句句接；派人去办的差事则当场给结果。无论哪一种，都照常扣精力，并留下实打实的后果。</div>
       </div>`;
   },
   gongMaidHtml(){ // 宫务·吩咐：召配属宫女问话
@@ -9111,15 +9132,25 @@ const Game={
     UI.closeSheet();
     this.round1(`第${xunNo()}旬第一轮：玩家消耗精力 ${focusEnergyCost(t)} 选定上旬生活重心「${t}」。按第一轮流程演绎本旬。`,t,focusEnergyCost(t));
   },
-  customFocus(){ // 吩咐表里自拟的一件事：查账、领料、家书、抄经等没有专门入口的都能在这里办
+  customFocus(){ // 宫务·行事里自拟的一件事：查账、领料、家书、抄经、传话、当面托请等都在这里办
     if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
     const el=document.getElementById('focusText');
     const t=el?String(el.value||'').trim():'';
     if(!t){toast('先写一句要吩咐的事');return}
     if((state.energy??0)<=0){this.collapse();return}
     const cost=focusEnergyCost(t);
+    const who=customActionWho(t);
+    const ctx=customActionCtx(t);
+    const hits=matchLeads(ctx);
+    const phits=matchPending(ctx);
+    const leadHint=hits.length?`\n【呼应引线】此事与在途引线相关（按要紧程度排序）：${hits.map(p=>`「${p.title}」（${p.line}）`).join('；')}。挑真相关的推进或了结：能兑现的当旬兑现并回写台账；暂不能的让此事与之产生实质关联（新信息、态度变化、埋下下一步）即可。每条引线最多被提示 ${ECHO_LEAD_TOTAL} 次，勿为凑交集硬编。`:'';
+    const pendHint=phits.length?`\n【呼应待续】此事与待续琐事相关：${phits.map(x=>pendText(x)).join('；')}。办妥的从 statePatch.pending 移除，未办妥的更新一句现状（回写即重置挂账计旬）。`:'';
+    const msg=`第${xunNo()}旬第一轮：玩家自行安排「${t}」（耗精力 ${cost}，精力由前端扣除，你不必也不得自行加减）。这是本旬的一件实际安排，按下列两种方式之一结算，由你依指令判断：
+【普通交代】若只是独自办事、派人去办、递话、查账、领料、写家书、抄经、整理妆奁等不必长时间当面周旋的事：hasEvent=false，完整结算；正文写清谁去办、怎么办、办到什么程度、最终成没成，办不成要写卡在哪一步。
+【当面详演】若要见某人、当面请托、对质、传召问话、赏罚或安抚下人、与人商议：hasEvent=true，用剧情对话 scene 结构开场（scene.state="ongoing"，scene.who 填对方，narrative 先交代主控在何处、如何见到此人，scene.parts 只写对方第一轮的动作与台词，顶层 options 给 2—4 个接话选项），就此停下、不结算应对后果（开场这一轮 changes 与 statePatch 留空，收场那一轮再统一结算）。这类交涉是玩家自己约的，不算另行生成剧情；但对方肯不肯应、提什么条件，须依其性情、立场、交情与位份礼制如实写，不得有求必应。
+无论走哪一路，此事都必须真正影响剧情：普通交代在本次结算里、当面详演在收场那一轮里，statePatch 必须写 log 一句话，并至少落下一项实质结果（银两、关系或恩宠、才艺、行囊、待续 pending、剧情账 plots 的推进或新立、状态、情报、机会）。办不成、被推诿、扑空、逾矩受斥同样是结果：写明卡在哪一步，并留下代价或后患（欠人情、走漏风声、失掉时机、被人记恨、下人抱怨等）；不得只写一段没有下文的过程，也不得把没请示过的事写成既成事实。${leadHint}${pendHint}`;
     UI.closeSheet();
-    this.round1(`第${xunNo()}旬第一轮：玩家吩咐「${t}」（耗精力 ${cost}）。这是本旬的一件实际安排：按世界规则演绎由谁去办、怎么办、办到什么程度，办不成也照实写、并给出卡在哪一步；若牵出剧情，按第一轮规则给 2—4 个选项并停下，不结算应对后果。`,`吩咐·${t.length>12?t.slice(0,12)+'…':t}`,cost);
+    this.round1(msg,`吩咐·${t.length>12?t.slice(0,12)+'…':t}`,cost,{leadIds:hits.map(p=>p.id),pendTexts:phits.map(pendText),whoHint:who||undefined});
   },
   handleCallErr(e){
     if(e.name==='AbortError')return;
