@@ -4153,13 +4153,20 @@ const BGM=(()=>{
   const FADE_MS=800,VOL=0.6;
   let audio=null,timer=null,playing=false,rate=1,track=1;
   function meta(id){return BGM_TRACKS.find(t=>t.id===id)||BGM_TRACKS[0]}
-  function ensure(id){
+  function ensure(id){ // 始终复用同一个 audio 元素：iOS 切曲时新建元素容易被拦成"无声"
     const m=meta(id||track);
-    if(audio&&audio.dataset.track===String(m.id))return true;
-    if(audio){try{audio.pause()}catch(e){}audio=null}
-    audio=new Audio(m.src);
-    audio.loop=true;audio.volume=0;audio.playbackRate=rate;
-    audio.dataset.track=String(m.id);
+    if(!audio){
+      audio=new Audio();
+      audio.loop=true;audio.preload='auto';
+      audio.volume=0;audio.playbackRate=rate;
+      try{audio.setAttribute('playsinline','');audio.style.display='none';document.body.appendChild(audio)}catch(e){} // 挂进 DOM：iOS 对游离的 audio 切源更挑剔
+    }
+    if(audio.dataset.track!==String(m.id)){
+      try{audio.pause()}catch(e){}
+      audio.src=m.src;
+      audio.dataset.track=String(m.id);
+      try{audio.load()}catch(e){}
+    }
     track=m.id;
     return true;
   }
@@ -4173,9 +4180,19 @@ const BGM=(()=>{
       audio.volume=Math.max(0,Math.min(1,nv));
     },100);
   }
-  function start(){if(playing)return;ensure(track);playing=true;
-    audio.playbackRate=rate;audio.volume=0;
-    audio.play().then(()=>fadeTo(VOL)).catch(()=>{playing=false});}
+  function playNow(){
+    ensure(track);playing=true;
+    clearInterval(timer);
+    audio.playbackRate=rate;
+    try{audio.volume=VOL}catch(e){} // 直接给足音量：不把出声与否押在 play() 的 promise 上
+    const p=audio.play();
+    if(p&&p.catch)p.catch(err=>{
+      playing=false;
+      const nm=(err&&(err.name||err.message))||'未知';
+      toast(err&&err.name==='NotAllowedError'?'浏览器拦住了播放：点一下页面再试':'背景音乐播放失败：'+nm);
+    });
+  }
+  function start(){if(playing)return;playNow()}
   function stop(){if(!playing)return;playing=false;
     fadeTo(0);setTimeout(()=>{if(!playing&&audio)audio.pause()},FADE_MS+100);}
   function setTrack(id,play){ // play=undefined 只换曲；true 立即播放；false 只记曲目不播
@@ -4183,11 +4200,9 @@ const BGM=(()=>{
     if(!BGM_TRACKS.some(t=>t.id===id))id=BGM_TRACKS[0].id;
     const wasPlaying=playing;
     clearInterval(timer);
-    if(audio){try{audio.pause()}catch(e){}audio=null}
-    track=id;
-    if(play===false||(!wasPlaying&&play!==true)){playing=false;return}
-    playing=false;
-    start();
+    ensure(id);
+    if(play===false||(!wasPlaying&&play!==true)){playing=false;try{audio.pause()}catch(e){}return}
+    playNow();
   }
   document.addEventListener('visibilitychange',()=>{ // 切后台暂停，回来自动续
     if(!audio)return;
