@@ -165,6 +165,7 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
 .tab{flex:1;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:12px;color:var(--ink);opacity:.72;transition:color .25s,opacity .25s}
 .tab svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
 .tab-label{letter-spacing:.28em;padding-left:.28em;line-height:1}
+.tab-dot{position:absolute;top:7px;right:calc(50% - 26px);width:7px;height:7px;border-radius:50%;background:var(--cinnabar);box-shadow:0 0 0 2px var(--card);font-size:0;color:transparent;overflow:hidden}
 /* 入口之间的界行细线 */
 .tab + .tab::before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:1px;height:32px;background:var(--line)}
 /* 朱砂小印点：选中标记 */
@@ -349,6 +350,15 @@ button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:cente
 .skillcell.sel{border-color:var(--cinnabar);color:var(--cinnabar)}
 .skillcell.sel .slv{color:var(--cinnabar)}
 .skillcell.lock{opacity:.42}
+/* 装潢：住处背景 */
+.decorgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:10px;margin:2px 0 12px}
+.decorcard{position:relative;border:1px solid var(--line);border-radius:14px;background:var(--card);box-shadow:var(--shadow);padding:6px 6px 8px;text-align:left;overflow:hidden}
+.decorcard .dc-thumb{display:block;width:100%;aspect-ratio:3/4;border-radius:10px;background:center 35%/cover no-repeat var(--paper-deep)}
+.decorcard .dc-name{display:block;margin-top:7px;font-size:15px;letter-spacing:.12em}
+.decorcard .dc-state{display:block;margin-top:1px;font-size:11px;color:var(--ink-soft);font-family:var(--sans);letter-spacing:.04em}
+.decorcard.on{border-color:var(--cinnabar);box-shadow:inset 0 0 0 1px var(--cinnabar),var(--shadow)}
+.decorcard.on .dc-state{color:var(--cinnabar)}
+.decorcard.lock .dc-thumb{opacity:.72}
 /* 传膳菜单 */
 .mealhead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px;font-size:13px;color:var(--ink-soft)}
 .mealhead span:first-child{color:var(--gold);letter-spacing:.1em}
@@ -490,7 +500,6 @@ button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:cente
   <div class="homebg"></div>
   <div class="hotspots" id="hotspots">
     <button class="hs hs-up" data-x="0.20" data-y="0.92" onclick="Game.restFlow()"><i></i><span>歇下一旬</span></button>
-    <button class="hs" data-x="0.12" data-y="0.50" onclick="Game.openFocus()"><i></i><span>吩咐</span><span class="hs-badge" id="hsBadge" style="display:none">有人扣门求见</span></button>
     <button class="hs" data-x="0.33" data-y="0.70" onclick="Game.openCraft()"><i></i><span>手作</span></button>
     <button class="hs" data-x="0.52" data-y="0.40" onclick="Game.hsGoOut()"><i></i><span>出门</span></button>
     <button class="hs" data-x="0.90" data-y="0.60" onclick="Game.openSkills()"><i></i><span>才艺修习</span></button>
@@ -520,9 +529,10 @@ button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:cente
       <svg viewBox="0 0 24 24"><rect x="6.6" y="4.6" width="10.8" height="14.8" rx="1.1"/><path d="M15.4 4.6v14.8"/><path d="M14.3 8.4h2.2M14.3 15.6h2.2"/><rect x="8.7" y="7" width="3.3" height="5.6" rx=".5"/></svg>
       <span class="tab-label">人物</span>
     </button>
-    <button class="tab" data-tab="设置" onclick="UI.openSheet('设置',this)" aria-label="设置">
-      <svg viewBox="0 0 24 24"><rect x="5.2" y="5.2" width="13.6" height="13.6" rx="1.4"/><path d="M12 5.2v13.6M5.2 12h13.6"/><rect x="9.9" y="9.9" width="4.2" height="4.2" rx=".6"/></svg>
-      <span class="tab-label">设置</span>
+    <button class="tab" data-tab="宫务" onclick="UI.openSheet('宫务',this)" aria-label="宫务">
+      <svg viewBox="0 0 24 24"><path d="M4.5 10.5 12 5l7.5 5.5"/><path d="M6.5 10.5V18M17.5 10.5V18M4 19h16"/><path d="M10 19v-4.6h4V19"/></svg>
+      <span class="tab-label">宫务</span>
+      <span class="tab-dot" id="hsBadge" style="display:none"></span>
     </button>
   </nav>
   <!-- 隐藏叙事流：结算卡片仍写入（历史/导出用），不再作为界面呈现 -->
@@ -1316,6 +1326,33 @@ const PROMPT_TEMPLATE = "# 系统提示词模板（网页版每次请求拼接�
 const CHRONICLE_MD = "---\nname: chronicle\ntype: project\ndescription: 《带着系统去宫斗》剧情大事记，仅保留仍影响后续的重要历史。\n---\n\n# 剧情大事记 · 带着系统去宫斗\n\n## 元朔元年：入宫与慢药案\n- 你以云麾将军崔家嫡女身份入宫，初册正七品常在，居披香殿侧殿，主位韦昭仪；系统激活。\n- 初入宫时得帝点名，柳妃由此记恨。诗会夺魁后入御前。\n- 与帝逐渐亲近；元年五月首次侍寝，获御赐安息香。\n- 与韦昭仪建立假冷淡掩护与实际信任；开始抄经，与太后结缘。\n- 郑贵人元年六月小产，太后暗查，旧案至今未结。\n- 柳妃实施慢药与云锦逾制双线构陷。你装病查链、取证设局反杀，九月圣裁：柳妃降从四品嫔、禁足半年、罚俸一年。柳氏成为长期死敌。\n- 大案后闭门谢客半月稳住声望；十月菊宴复出。\n\n## 元朔二年：经营根基\n- 逐步经营太后、皇后、韦昭仪与林守拙关系，完成主线四至六。\n- 林守拙收为半师，教授医术药理；获准赴太医院抄书。\n- 你从慈宁宫抄经升为校经，得太后信任与澄心堂旧墨。\n- 韦昭仪授藏证之道、开蒙琴艺，双方成稳定盟谊。\n- 二年腊月晋正六品美人，三年晋从五品才人。\n\n## 元朔四年：柳氏案终局与当前格局\n- 柳嫔密信案由皇后查办，其兄长外放江南道，处境转危。\n- 八月初二你奉皇后口谕探病，坐实柳嫔假病，脉案呈中宫。\n- 九月中旬：柳氏降美人、幽禁听雨轩（无诏不得出）；被幽禁前递密信给你——求递话＋附\"郑贵人案有两份脉案底档、经手人原稿藏江南\"的消息。你焚帕、密信藏于藏锋匣，按下查证，真伪未证。\n- 帝九月上旬夜访披香殿，赐先皇后旧绣样一匣，宠爱82。\n- 十一月初三赏菊宴：你以\"残雪缺月\"答皇后问缺角菊，中宫称善，你的\"雪点妆\"被挪至菊山正面；裴贵妃侧目记怨。\n- 当前未结事项以最新存档为准。";
 const DEFAULT_SAVE = {"game": "带着系统去宫斗", "saveVersion": "v36", "turn": 127, "time": {"era": "元朔", "year": 4, "month": 12, "xun": "下旬", "note": "四年十二月下旬，年度结算毕；入腊月尽，即将进入元朔五年正月"}, "location": "披香殿侧殿", "lastNode": "腊月下旬闭门练琴收官；《平沙》小成", "world": {"dynasty": "晟朝", "emperor": {"name": "李衍", "age": 22, "traits": "念旧而寡情，重视旧物与\"不取\"", "recent": "冬至宴亲赞崔\"字比诗好\"；曾在御苑菊山\"雪点妆\"前驻足，说\"缺一角才有意思\"（高德全转述）"}, "factions": ["含凉殿", "流霞阁", "听雨轩"], "heirs": "无皇嗣", "keyServants": ["高德全", "秦狰", "沈姑姑", "林守拙（半师）"]}, "protagonist": {"name": "崔明蘅", "age": 16, "rank": "从五品才人", "family": "云麾将军崔家嫡女", "personality": ["机敏", "谨慎", "隐忍"], "attributes": {"外貌": 71, "才华": 73, "交际": 58, "忌惮": 60, "手段": 55, "威望": 95, "体质": 81, "孕率": 63}, "skills": {"书法": 77, "琴艺": 31, "医术·药理": 60, "棋艺": 21, "女红": 20, "莳花": 12}, "skillNotes": "《平沙》渐入佳境；能闻味辨药、认脉", "silver": 68, "points": 90, "health": "康健", "salary": "每月15两，下旬末统一结算", "special": "子嗣缘符已启用，贴身香囊暗格；温补方照用，数月无信", "maids": ["春韶", "晚晴"], "security": "入口四道手，药可闻不可尝", "settleRule": "并行多事时主收益打折＋一项附带收益"}, "items": {"systemItems": ["避毒珠×1（贴身，已购）", "藏锋匣（夹墙暗格，钥匙贴身）：先皇后旧式鲤鱼灯、慢药样本、柳美人密信一封（私藏中，风险自担；鲤鱼帕已焚毁）"], "medical": ["清暑香露一瓶", "《各宫平安脉脉案抄本》（查无先皇后病中脉案，中宫脉案单独立档）", "皇后赏药材匣"], "empressDowager": ["青年自抄《地藏经》旧函（每旬初一读一页）", "澄心堂旧墨", "旧檀木手串", "菊饼余量将尽"], "emperor": ["御赐安息香", "白玉镇纸", "金错刀", "先皇后旧绣样一匣十二幅（滚针、抢针已至山茶第三层色，一幅将收尾）", "松香一小包"], "others": ["《兰亭序》唐摹本", "泥金团扇", "《棋经》", "兔子宫灯", "赤金缠枝红宝石簪（封存）", "云锦四匹（御赐，不当不送不裁）", "宫扇", "东珠一匣", "自书字与七夕诗二首", "冬衣、素珍珠簪、吉服", "素缎兰草帕", "杏子红海棠帕（已完工）"], "pawned": "安神香两盒，已逾期，赎当须加价", "misc": ["手膏\"甘菊冷香\"版", "三元羹", "自抄《菊谱》《花镜》条目册一册"], "plants": "\"雪点妆\"盆菊两株：一株根未冻实明春可期，一株仍在暖阁休养（十二月中旬自御苑起回侧殿）"}, "relationships": {"皇帝": {"type": "宠爱", "value": 83}, "皇后萧氏": {"type": "好感", "value": 55}, "太后": {"type": "好感", "value": 52}, "韦昭仪": {"type": "好感", "value": 85}, "郑贵人": {"type": "好感", "value": 19}, "裴贵妃": {"type": "好感", "value": 1, "note": "记怨未发"}, "柳美人": {"type": "仇恨", "value": "长期死敌，幽禁听雨轩；密信求情未答，玩家按下查证"}, "林守拙": {"type": "半师", "note": "棋约已清"}, "杜选侍": "畏惧", "高德全": "态度偏软", "薛女史": "可靠补台"}, "system": {"mainQuests": "主线一至十已完成；隐藏成就\"引蛇出洞\"", "activeQuest": "当前无在途主线任务（子嗣线开启，等待中）", "points": 90, "shop": [{"name": "读心笺", "cost": 15}, {"name": "玉容散", "cost": 45}, {"name": "益气丸", "cost": 50}, {"name": "静心香篆", "cost": 50}, {"name": "双鲤笺", "cost": 40}, {"name": "传声鹤", "cost": 55}, {"name": "避毒珠", "cost": 70, "status": "已购"}, {"name": "免罪金牌（小）", "cost": 80}, {"name": "驻颜膏", "cost": 60}, {"name": "子嗣缘符", "cost": 100, "status": "已用"}, {"name": "藏锋匣", "cost": 90, "status": "已购"}]}, "recentConfirmedFacts": ["十一月上旬：太后请脉赠菊饼；赏菊宴\"残雪缺月\"答皇后，菊挪菊山正面，裴贵妃记怨", "十一月中旬：练绣样；拜访韦昭仪问先皇后，获线索——先皇后信佛病中少传太医、中宫脉案单独立档、太医院秦院判在其走后半年致仕回乡；抄本无载", "十一月下旬：闭门练琴《平沙》小成；冬至宴（腊月初）即兴作诗，帝赞\"字比诗好\"；探望韦昭仪咳疾送温方受赏", "十二月中旬：休养闲逛；御苑收菊回殿；传闻裴贵妃宫里寻了崔冬至诗字拓样（存疑）", "十二月下旬：潜心练琴收官；《平沙》渐入佳境，琴艺29→31"], "pending": ["裴贵妃：记怨未发；拓字传闻存疑，留意", "先皇后旧档线索：秦院判（致仕回乡）＋中宫脉案单独立档＋柳氏密信\"两份底档\"——三线方向相近，宜慢查", "柳氏密信：藏于藏锋匣；求情之请未答", "郑贵人小产旧案：真伪未证", "安神香当票已逾期", "子嗣线：缘符随身，等待中", "正月里节令（元旦、人日）将至，可预备露脸或礼数"], "npcGoalCards": {"裴贵妃": "目标不明，对崔记怨未动；冬至宴全程冷淡。期限：不可再无限观望，正月内须有一次可见动作", "柳美人": "幽禁听雨轩，无诏不得出；递信求援未得回音", "韦昭仪": "维持与崔的盟谊；咳疾渐愈", "林守拙": "任太医院职务如常；与崔有随时手谈之约"}, "emperor": {"intimacy": 55, "lastContact": 94, "absence": null, "hisState": "前朝岁暮政繁，节令宴饮多", "memories": [{"xun": "元朔元年五月", "text": "首次侍寝，获赐安息香", "type": "共历", "open": false}, {"xun": "元朔二年七夕", "text": "以自书字与七夕诗二首相赠", "type": "信物", "open": false}, {"xun": "元朔四年九月上旬", "text": "夜访披香殿，赐先皇后旧绣样一匣", "type": "信物", "open": false}, {"xun": "元朔四年十一月初三", "text": "御苑菊山“雪点妆”前驻足，说“缺一角才有意思”（高德全转述）", "type": "共历", "open": false}, {"xun": "元朔四年冬至宴", "text": "帝亲赞“字比诗好”", "type": "共历", "open": false}, {"xun": "元朔四年腊月初", "text": "旧绣样滚针山茶第三层色，一幅将收尾，约完工之日呈御览", "type": "约定", "open": true}]}, "nextStep": "元朔五年正月上旬，由玩家安排生活重心；正月节令可留意"};
 
+/* 装潢：住处背景。素居默认拥有，其余每幅 10 两解锁，解锁后免费更换。 */
+const DECOR_COST=10;
+const DECOR_ROOMS=[
+  {id:'suju',name:'素居',file:'assets/room.jpg',thumb:'assets/rooms/thumbs/suju.jpg',cost:0},
+  {id:'qingling',name:'青绫',file:'assets/rooms/qingling.jpg',thumb:'assets/rooms/thumbs/qingling.jpg',cost:DECOR_COST},
+  {id:'zixiao',name:'紫绡',file:'assets/rooms/zixiao.jpg',thumb:'assets/rooms/thumbs/zixiao.jpg',cost:DECOR_COST},
+  {id:'xuanlu',name:'玄炉',file:'assets/rooms/xuanlu.jpg',thumb:'assets/rooms/thumbs/xuanlu.jpg',cost:DECOR_COST},
+  {id:'zhuwei',name:'朱帷',file:'assets/rooms/zhuwei.jpg',thumb:'assets/rooms/thumbs/zhuwei.jpg',cost:DECOR_COST},
+  {id:'bisha',name:'碧纱',file:'assets/rooms/bisha.jpg',thumb:'assets/rooms/thumbs/bisha.jpg',cost:DECOR_COST}
+];
+function ensureDecor(s){
+  s=s||state;if(!s)return {unlocked:['suju'],current:'suju'};
+  const d=(s.decor&&typeof s.decor==='object')?s.decor:(s.decor={});
+  if(!Array.isArray(d.unlocked))d.unlocked=[];
+  d.unlocked=d.unlocked.filter(id=>DECOR_ROOMS.some(r=>r.id===id));
+  if(!d.unlocked.includes('suju'))d.unlocked.unshift('suju');
+  if(!DECOR_ROOMS.some(r=>r.id===d.current))d.current='suju';
+  return d;
+}
+function applyDecor(){
+  if(!state)return;
+  const d=ensureDecor(state);
+  const room=DECOR_ROOMS.find(r=>r.id===d.current)||DECOR_ROOMS[0];
+  const el=document.querySelector('.homebg');
+  if(el)el.style.backgroundImage=`url("${room.file}")`;
+}
+
 /* NPC 双层档案系统：实现 design/FEATURE-NPC档案.md，追加进系统提示词 */
 const NPC_MODULE = [
 '## 六、NPC 双层档案（严格遵守）',
@@ -1583,7 +1620,7 @@ function repairPlotTimes(){ // 旧档纠偏：起于不得晚于本旬；写明�
   }
 }
 const GRACE_GUIDE=[ // 新入宫引导旬：缓冲期内每旬一项指引，借剧情带玩家认识玩法（融在叙事里，不说破系统与界面）
-'认住处——借掌事宫女之口带主控走一遍寝殿：何处可静养、何处吩咐本旬行事与召宫人问话、从哪儿出门往宫城去、何处可修习才艺；挑两处自然带入行文',
+'认住处——借掌事宫女之口带主控走一遍寝殿：何处可静养、何处打开宫务安排本旬行事、召宫人问话、从哪儿出门往宫城去、何处可修习才艺；挑两处自然带入行文',
 '识宫人——把配属的掌事姑姑与宫女演活（姓名、性情、可靠与否的初印象），顺势演一场主仆对话，让主控试着吩咐一件小事，带出"吩咐下去、日后某旬兑现"的章法',
 '立章法——借日常带过精力与作息的讲究：乏了可传膳进补，撑不住就早些歇下、一旬便过去；若主控尚未出过门，可演一回往六宫或御花园方向的认路，提点请安与位份礼数'];
 function describePlot(p){return `「${p.title}」(${p.line}，${p.dueText||(p.latest!=null?'有期限':'缓图')})`}
@@ -2633,7 +2670,7 @@ const EMPEROR_MODULE = [
 
 /* ============================================================ 承宠与子嗣（前端裁决）
    侍寝、夜账、孕事、生产都由前端结算：模型只写戏，不得改写招幸对象、日期、孕事与皇嗣性别。
-   每旬一次「帝召谁」：主控可在【吩咐】里争取／静候／避宠，旬末结账，点「结束本旬」后弹出夜账。 */
+   每旬一次「帝召谁」：主控可在【宫务·行事】里争取／静候／避宠，旬末结账，点「结束本旬」后弹出夜账。 */
 const CHAMBER_MODULE = [
 '## 十四、承宠与子嗣（bedchamber / pregnancy / heirs；前端裁决，覆盖世界书冲突处）',
 '1. 每旬的侍寝由前端结算：存档 bedchamber 记最近若干旬「帝召幸谁」的公开记档，last 为最近一夜；夜账由前端在玩家点「结束本旬」后呈现，不再等到次旬早晨。主控若在夜账点「入帐相见」，会另开一段承宠夜话（scene 对话，只演那一夜，不结算本旬）；模型写正文时须与夜账和夜话相符，不得改写招幸对象、时间与结果。帝召幸他人是六宫可见的公开消息，可写入 haremNews 与宫人议论；主控不可知的私下细节不得写。',
@@ -2979,7 +3016,7 @@ function dawnReportHtml(r){
   return `<div style="font-size:14px;line-height:1.9;color:var(--ink)">${esc(head)}</div>`
     +(rows.length?`<div style="font-size:13px;line-height:1.85;color:var(--ink-soft);margin-top:8px">${rows.map(x=>`<div>${x}</div>`).join('')}</div>`:'')
     +recentHtml
-    +`<div class="sheet-note" style="margin-top:12px">本旬末只记敬事房的明面记档与宫人议论；${r.kind==='me'?'要入帐，点下面「入帐相见」；不想去，也可略过。':'想争一争，可在【吩咐】里递牌子；想避，也可称病。'}</div>`;
+    +`<div class="sheet-note" style="margin-top:12px">本旬末只记敬事房的明面记档与宫人议论；${r.kind==='me'?'要入帐，点下面「入帐相见」；不想去，也可略过。':'想争一争，可在【宫务·行事】里递牌子；想避，也可称病。'}</div>`;
 }
 
 /* 帝设：玩家亲撰的皇帝人设（开局捏主控时自定义，商城「移性符」可改一次）。覆盖世界书与随机性情中对帝的默认描写。 */
@@ -3158,7 +3195,7 @@ const PRESENCE_MODULE = [
 const PLAY_UI_MODULE = [
 '## 二十二、玩家界面（正文只能指这里有的东西）',
 '玩家点得到的入口只有这些，别的一律不存在：',
-'- 住处：吩咐（既可召宫人问话、交代差事、打听消息，也可自己写一句要做的事：查账、领料、写家书、抄经、打点宫人，都从这里办）、手作、才艺修习、传膳、出门。',
+'- 住处：宫务（分三栏：行事——自己安排本旬要做的事，查账、领料、写家书、抄经、打点宫人，以及承宠打算；装潢——换住处背景；吩咐——召配属宫人问话、交代差事、打听消息）、手作、才艺修习、传膳、出门。',
 '- 宫城图（点「出门」后）：养心殿（求见帝）、六宫（拜访后妃、太后、皇后）、藏书阁（寻书、借阅、研读）、墨妙斋（写字作画）、太医院（问医、抄书）、御花园（散步、偶遇）。',
 '- 顶栏：状态（局面、剧情账、命途）、行囊（使用／典卖／赠礼）、人物、时间、银两（遣人出宫采买）、积分（商城换道具）。',
 '规则：',
@@ -4276,6 +4313,7 @@ function ensureNpcRealNames(s){ // 幂等：已有本名不动，缺的按名讳
 }
 function normalizeState(s){
   s.npcs=(s.npcs&&typeof s.npcs==='object'&&!Array.isArray(s.npcs))?s.npcs:{};
+  ensureDecor(s); // 装潢：旧档/新档补默认房间
   s.items=(s.items&&typeof s.items==='object')?s.items:{};
   s.relationships=(s.relationships&&typeof s.relationships==='object'&&!Array.isArray(s.relationships))?s.relationships:{};
   ensureNpcMeets(s); // 会面账：旧档按既有好感折回次数，新档从零计
@@ -4504,6 +4542,7 @@ let lastRequest=null;        // {userMsg, round:1|2} 供重试
 let impView={};              // 读心笺窥见缓存：{npcId:{text,turn}}；仅存本次会话不落档，每次窥见按次消耗、即时生成
 let soldNotes=[];            // 典卖通报队列（并入下一次主持人请求）
 let setPane='存档';          // 设置面板当前栏：存档|API|音乐|脱困
+let gongPane='行事';         // 宫务面板当前栏：行事|装潢|吩咐
 let selSkill=null;          // 才艺修习面板当前选中项
 let craftSel={mats:{},energy:20,inspiration:'',kind:null}; // 手作面板当前选料/精力/灵感/所做类别
 function craftQuestHint(){ // 手作/书画成品可能对应任务：相赠收场时提醒主持人把 plots 条目兑现落账
@@ -4608,7 +4647,7 @@ function compactState(s,focusMsg){ // 只压缩送入模型的那一份，localS
   const out=Object.assign({},s);
   out.turn=xunNoOf(s.turn); // 对外统一 1 起旬号，与指令里的「第N旬」一致
   // 前端内部标记与展示字段不送模型
-  for(const k of ['avatarMap','plotMeta','schemeMeta','xunBook','saveVersion','plotLedgerV1','pawnFix1','itemFlagV1','readMindV1','energyWarned','mealCount','lastSalaryMonth','lastFestSerial','items','craftV1','chamberV1','xunIntent','postpartumUntil'])delete out[k];
+  for(const k of ['avatarMap','plotMeta','schemeMeta','xunBook','saveVersion','plotLedgerV1','pawnFix1','itemFlagV1','readMindV1','energyWarned','mealCount','lastSalaryMonth','lastFestSerial','items','craftV1','chamberV1','xunIntent','postpartumUntil','decor'])delete out[k];
   if(out.protagonist&&typeof out.protagonist==='object'){
     out.protagonist=Object.assign({},s.protagonist);
     delete out.protagonist.avatar; // 头像由前端按身份分配
@@ -5406,7 +5445,7 @@ const UI={
     const ae=document.activeElement;
     if(ae&&/^(INPUT|TEXTAREA)$/.test(ae.tagName))ae.blur(); // 收起手机键盘，避免键盘把视口顶偏后只看到空白
     window.scrollTo(0,0);
-    this.updateHomebar();this.layoutHotspots();
+    this.updateHomebar();this.layoutHotspots();applyDecor();
   },
   pushCard(html){
     const stream=$('#stream');
@@ -5474,18 +5513,37 @@ const UI={
     }
     const adj=(state.plots&&state.plots.length)?adjudicatePlots():{due:[],overdue:[],stale:[],pendStale:[]};
     const pend=[...[...adj.overdue,...adj.due].map(p=>'【到期】'+p.title),...(adj.stale||[]).map(p=>'【发酵】'+p.title),...(adj.pendStale||[]).map(x=>'【发酵·琐事】'+pendText(x)),(state.pending||[]).slice(0,2).map(x=>'【琐事】'+pendText(x))].flat().slice(0,6).join('；');
-    const maids=(state.protagonist&&state.protagonist.maids)||[];
-    const maidRows=maids.map(m=>`<button class="npcrow" onclick="Game.maidTalk('${esc(m)}')"><span class="nr-name">${esc(m)}</span><span class="nr-depth">配属宫女</span></button>`).join('');
     const fest=festivalOf(state.time);
     const festNote=fest?`<div class="sheet-note" style="margin:0 0 8px">本旬节宴：<b>${esc(fest.name)}</b>（${esc(fest.scale)}）——座次、仪注与席上机缘见「局面」。</div>`:'';
-    return `<div class="focus-cap">— 吩咐 · 精力 ${state.energy}／${ENERGY_MAX} —</div>`+festNote+this.nightIntentHtml()+
+    return `<div class="focus-cap">— 行事 · 精力 ${state.energy}／${ENERGY_MAX} —</div>`+festNote+this.nightIntentHtml()+
       (pend?`<div class="sheet-note" style="margin:0 0 8px">临期引线：${esc(pend)}</div>`:'')+
-      `<div class="sec"><div class="sec-cap">自己吩咐一件</div>
+      `<div class="sec"><div class="sec-cap">自己安排一件</div>
         <textarea class="craftinsp" id="focusText" maxlength="80" placeholder="查一查份例的账 / 写封家书 / 差人去内务府领料 / 往慈宁宫抄经…"></textarea>
-        <div class="setbtns"><button class="btn btn-primary" onclick="Game.customFocus()">吩咐下去</button></div>
-        <div class="sheet-note">界面上没有专门入口的事——查账、领料、传话、家书、抄经、打点、安抚宫人——都在这里吩咐；这一旬办得成办不成、耗多少精力，由演绎结算。</div>
-      </div>`+
-      (maidRows?`<div class="sec"><div class="sec-cap">召宫人问话</div>${maidRows}<div class="sheet-note" style="margin-top:6px">进对话、开口问话都不耗精力：交代差事、打听消息、问办差进度皆可，吩咐下去的事日后兑现。</div></div>`:'<div class="sheet-note">暂无配属宫人。</div>');
+        <div class="setbtns"><button class="btn btn-primary" onclick="Game.customFocus()">安排下去</button></div>
+        <div class="sheet-note">界面上没有专门入口的事——查账、领料、传话、家书、抄经、打点、安抚宫人——都在这里安排；这一旬办得成办不成、耗多少精力，由演绎结算。</div>
+      </div>`;
+  },
+  gongMaidHtml(){ // 宫务·吩咐：召配属宫女问话
+    const maids=(state.protagonist&&state.protagonist.maids)||[];
+    const rows=maids.map(m=>`<button class="npcrow" onclick="Game.maidTalk('${esc(m)}')"><span class="nr-name">${esc(m)}</span><span class="nr-depth">配属宫女</span></button>`).join('');
+    return rows?`<div class="sec"><div class="sec-cap">召宫人问话</div>${rows}<div class="sheet-note" style="margin-top:6px">进对话、开口问话都不耗精力：交代差事、打听消息、问办差进度皆可，吩咐下去的事日后兑现。</div></div>`:'<div class="sheet-note">暂无配属宫人。</div>';
+  },
+  gongDecorHtml(){ // 宫务·装潢：住处背景
+    const d=ensureDecor(state),silver=Number(state.protagonist.silver)||0;
+    return `<div class="sheet-note" style="margin:0 0 10px">每幅装潢 ${DECOR_COST} 两；解锁后可随时更换，不再花银。</div>`+
+      `<div class="decorgrid">`+DECOR_ROOMS.map(r=>{
+        const on=d.current===r.id,owned=d.unlocked.includes(r.id);
+        return `<button class="decorcard${on?' on':''}${owned?'':' lock'}" onclick="Game.pickDecor('${r.id}')">
+          <span class="dc-thumb" style="background-image:url('${r.thumb}')"></span>
+          <span class="dc-name">${esc(r.name)}</span>
+          <span class="dc-state">${on?'使用中':owned?'已解锁':r.cost+' 银两解锁'}</span>
+        </button>`;
+      }).join('')+`</div><div class="sheet-note">现有银两 ${silver} 两。</div>`;
+  },
+  sheetGongwu(){
+    const tab=(k,label)=>`<button class="${gongPane===k?'on':''}" onclick="Game.setGongPane('${k}')">${label}</button>`;
+    const body=gongPane==='装潢'?this.gongDecorHtml():(gongPane==='吩咐'?this.gongMaidHtml():this.sheetFocus());
+    return `<div class="setnav">${tab('行事','行事')}${tab('装潢','装潢')}${tab('吩咐','吩咐')}</div>`+body;
   },
   nightIntentHtml(){ // 承宠：本旬争/候/避；结果在旬末结算，点结束本旬后弹出夜账
     const turn=state.turn||0;
@@ -6006,6 +6064,7 @@ const UI={
   /* 面板 */
   sheetStack:[],
   openSheet(name,tabEl){
+    if(name==='吩咐'){gongPane='吩咐';name='宫务'} // 旧入口兜底：吩咐归入宫务
     document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t===tabEl));
     this.sheetStack=[];this.renderSheet(name);
     $('#scrim').classList.add('on');$('#sheet').classList.add('on');
@@ -6017,6 +6076,7 @@ const UI={
     flushQuestQueue(); // 面板关掉后，排队的主线弹窗可以出来了
   },
   renderSheet(name,param){
+    if(name==='吩咐'){gongPane='吩咐';name='宫务'}
     $('#sheetTitle').textContent=name;
     const B=$('#sheetBody');
     if(name==='状态')B.innerHTML=this.sheetStatus();
@@ -6044,6 +6104,7 @@ const UI={
     else if(name==='太医院')B.innerHTML=this.sheetVisit('医');
     else if(name==='人物')B.innerHTML=this.sheetNpcs();
     else if(name==='NPC详情')B.innerHTML=this.sheetNpcDetail(param);
+    else if(name==='宫务')B.innerHTML=this.sheetGongwu();
     else if(name==='设置')B.innerHTML=this.sheetSettings();
     B.scrollTop=0;
   },
@@ -8009,7 +8070,22 @@ const Game={
     this.round1(msg,'旬首·节宴 '+f.name,0,{skipDice:true,_xunPop:true});
     return true;
   },
-  openFocus(){if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}UI.openSheet('吩咐')}, // 吩咐：自拟本旬要做的事
+  openFocus(){if(phase!=='FOCUS_SELECT'&&phase!=='FOCUS_PICK'){toast('请先结束当前旬务');return}gongPane='行事';UI.openSheet('宫务',document.querySelector('.tab[data-tab="宫务"]'))},
+  setGongPane(p){if(!['行事','装潢','吩咐'].includes(p))return;gongPane=p;UI.renderSheet('宫务')},
+  pickDecor(id){ // 装潢：未解锁先花银，已解锁直接换
+    if(!state)return;
+    const room=DECOR_ROOMS.find(r=>r.id===id);if(!room)return;
+    const d=ensureDecor(state),p=state.protagonist,silver=Number(p.silver)||0;
+    if(!d.unlocked.includes(id)){
+      if(silver<room.cost){toast(`银两不足：装潢「${room.name}」需 ${room.cost} 两`);return}
+      if(!confirm(`花 ${room.cost} 两装潢「${room.name}」？解锁后可随时换回。`))return;
+      p.silver=silver-room.cost;
+      d.unlocked.push(id);
+      toast(`已装潢「${room.name}」，银两 -${room.cost}`,3000);
+    }
+    d.current=id;
+    persistCurrent();markSafe();applyDecor();UI.updateStatusbar();UI.renderSheet('宫务');
+  },
   setNightIntent(mode){ // 承宠打算：争取（耗精力10、打点10两）/ 静候 / 避宠；结果在歇下一旬时结算
     if(!state||phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
     if(state.pregnancy){toast('有孕在身，太医嘱咐静养，不宜承宠');return}
@@ -8025,18 +8101,18 @@ const Game={
       if(pay)p.silver=silver-10;
       state.xunIntent={turn,mode:'strive',paid:pay};
       logXunAction('承宠·争取');
-      persistCurrent();markSafe();UI.updateStatusbar();UI.renderSheet('吩咐');
+      persistCurrent();markSafe();UI.updateStatusbar();gongPane='行事';UI.renderSheet('宫务');
       toast(pay?'牌子递上去了，敬事房也打点过了':'银两不足，只递了牌子；敬事房那边未必肯上心',3000);
       if(state.energy<=0){UI.closeSheet();this.collapse();return}
       checkRestWarn();
     }else if(mode==='avoid'){
       state.xunIntent={turn,mode:'avoid',paid:false};
       logXunAction('承宠·避宠');
-      persistCurrent();markSafe();UI.renderSheet('吩咐');
+      persistCurrent();markSafe();gongPane='行事';UI.renderSheet('宫务');
       toast('你称病避了牌子：这一旬图个安稳，恩宠会缓跌');
     }else{
       state.xunIntent={turn,mode:'wait',paid:false};
-      persistCurrent();markSafe();UI.renderSheet('吩咐');
+      persistCurrent();markSafe();gongPane='行事';UI.renderSheet('宫务');
       toast('本旬静候敬事房安排');
     }
   },
