@@ -24,7 +24,8 @@
 - 剧情只能指向真实入口：`PLAY_UI_MODULE` 把玩家点得到的界面写成清单（吩咐／手作／才艺修习／传膳／出门·宫城图七处／顶栏），并要求正文与 pending 不得出现「账房」「内务府值房」这类点不到的地方，改写成差人去办或并入既有去处。吩咐面板另有 `#focusText` + `Game.customFocus` 承接查账、领料、家书、抄经这类没有专门入口的事——别把它删了，删了模型给的指示就又落不了地。自拟行动按玩家指令走两种结算：纯办事 / 派人去办走普通结果弹窗（`hasEvent=false`），要当面交涉、问话、请托、赏罚的走 `scene` 对话细演（`hasEvent=true`，收场再结算）；精力由前端照扣，两种都必须落账（`log` + 至少一项实质结果）。指名到的人物与地点用 `customActionWho` / `customActionCtx` 接上引线与待续的呼应。
 - 来客与相邀：`_xunStartPop` 处理旬首来客（帝按 `emperorVisitChance`，恩宠越高越常来；妃嫔走 `pickConsortVisitor`），`Game.maybeIncomingVisit` 在精力降到本旬阈值（`VISIT_MID_THRESHOLDS`，`meta.midVisitThreshold`）时补一场旬中来客；`meta.visitThisTurn` 是旬号，保证一旬至多一回。不熟的人不能凭空登门：`consortVisitReason` 只放行相熟以上，或剧情账／待续里同在一件事（共同 stake）、目标卡里与主控同怨一人（敌人的敌人）的人。相邀在宫务·行事（`UI.inviteHtml` → `Game.inviteNpc`），成算 `inviteChance` 由好感（帝看恩宠）× `INVITE_RATE` 直接算，先掷骰：应了才调模型进 `scene`，不应则用 `inviteRefusalText` 弹写好的回绝；能耗 `INVITE_ENERGY` 成与不成照扣，一旬一帖（`state.inviteTurn`）。中宫与太后不列来访／相邀名单。
 - 新得物品当场提示：`addToInventory` 入账即用 350ms 防抖调 `flushAcquired`，`finalize` 也调一次兜底。不要改回「攒到下一次模型结算时统一弹」——那会让上一旬画的画拖到下一旬某场剧情时才蹦出来。
-- 才艺修习的本地结算在 `focusEnergyCost` / `skillGainAt` / `skillGainAtBook`：每修一次耗 15 精力；无谱册未满 100 得 1—3 点，手头有同艺谱册（借阅中或案头，`libHeldBook`）得 3—4 点；过 100 后一律按递减规则，谱册只上调得点概率，不直接给 3—4。
+- 才艺修习的本地结算在 `focusEnergyCost` / `skillGainAt` / `skillGainAtBook`：每修一次耗 15 精力。修习面板先选技艺，再选练法（`Game.practiceSkill` / `localPractice`）：独自苦练未满 100 得 1—2 点；临帖读谱须手头有同艺谱册（`libHeldBook`），得 3—4 点；请教陪练须 `practiceTeacherFor` 找到相熟（好感≥30）、此艺高于主控且听说过的对象，按交情掷是否应允，应了得 3—4 点并用 `addPending` 记一份人情，婉拒则只按独练结算。过 100 后一律按递减规则，谱册与陪练只上调得点概率，不直接给 3—4。
+- 节宴献艺是本地即时结算（`UI.festPerfHtml` → `UI.sheetFestPerf` → `Game.festPerform`）：只在有固定节宴、非初入宫缓冲、且本旬未献过（`state.lastFestPerfSerial`）时出现；耗 15 精力，按才艺值＋临场浮动＋大宴加成－精力不足惩罚分四档，影响威望／宠爱／银两／积分，失手记一条待续议论；不调模型。
 
 ## 开局页
 
