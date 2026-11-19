@@ -5580,12 +5580,13 @@ const UI={
       ${recent?`<div class="sheet-note" style="margin-top:10px">承宠录</div>${recent}`:''}
     </div>`;
   },
-  plotRow(p,adj){ // 剧情账一行：点开看任务说明与期限（active only 也用它）
+  plotRow(p,adj){ // 剧情账一行：点开看任务说明与期限（active only 也用它）；adj 在时把「将到期／搁置」标在行上，几张面板不必再另列一节
     if(!p)return '';
     const stale=!!(adj&&Array.isArray(adj.stale)&&adj.stale.some(s=>String(s.id)===String(p.id)));
+    const soon=!!(adj&&Array.isArray(adj.due)&&adj.due.some(s=>String(s.id)===String(p.id)));
     const now=xunSerial(state.time);
     const overdue=p.latest!=null&&now>p.latest;
-    const cnt=`${overdue?'已逾期·':''}${esc(p.dueText||(p.latest!=null?'有期限':(stale?'搁置发酵':'缓图')))}`;
+    const cnt=`${overdue?'已逾期·':(soon?'将到期·':(stale?'搁置发酵·':''))}${esc(p.dueText||(p.latest!=null?'有期限':'缓图'))}`;
     return `<button class="itemrow" onclick="UI.goSheet('剧情详情','${esc(p.id)}')"><span>${esc(p.title)}　<span class="tag">${esc(p.line)}</span></span><span class="cnt">${cnt}</span><span class="go">详情›</span></button>`;
   },
   sheetPlotDetail(id){ // 剧情账详情：任务说明、期限、当前进展与相关记事
@@ -5691,25 +5692,26 @@ const UI={
     if(!confirm('硬撑下去：此后每次到期直接扣威望与宠爱，不再给考场。'))return;
     ml.hard=true;mainLineSync();this.renderSheet('命途');
   },
-  sheetState(){ // 局面：当前处境 + 剧情到期 + 剧情账 + 待续（原"本旬纪事"的信息归此）
+  sheetState(){ // 局面：当前局面 + 节令 + 剧情账（急的排前，行上标到期）+ 待续 + 命途/大事记
     const adj=(state.plots&&state.plots.length)?adjudicatePlots():{due:[],overdue:[],stale:[],pendStale:[]};
-    const due=[...adj.overdue,...adj.due];
-    const stale=adj.stale||[];
-    const plots=(state.plots||[]).filter(p=>p.stage==='进行中').map(p=>this.plotRow(p,adj)).join('')||'<div class="sheet-note">暂无在途剧情线。</div>';
+    const idOf=o=>String(o&&o.id);
+    const over=new Set((adj.overdue||[]).map(idOf)),soon=new Set((adj.due||[]).map(idOf)),stale=new Set((adj.stale||[]).map(idOf));
+    const rank=p=>over.has(String(p.id))?0:soon.has(String(p.id))?1:stale.has(String(p.id))?2:3;
+    const active=(state.plots||[]).filter(p=>p.stage==='进行中').slice().sort((a,b)=>rank(a)-rank(b)); // 同一件事只列一次，紧急程度标在行上
+    const plots=active.map(p=>this.plotRow(p,adj)).join('')||'<div class="sheet-note">暂无在途剧情线。</div>';
     const pStale=(adj.pendStale||[]).map(x=>pendText(x));
     const pend=(state.pending||[]).map(x=>`<div class="itemrow"><span>${esc(pendText(x))}</span><span class="cnt">${pStale.includes(pendText(x))?'搁置发酵·须处理':'缓办'}</span></div>`).join('')||'<div class="sheet-note">暂无待续事项</div>';
     const fest=festivalOf(state.time);
-    const soon=festivalSoon(state.time);
+    const soonFest=festivalSoon(state.time);
     const festSoft=fest&&(ensurePlotMeta().graceTurn||0)>(state.turn||0);
     const festSec=`<div class="sec"><div class="sec-cap">节令</div>
         ${fest?`<div class="itemrow"><span>本旬 · ${esc(fest.name)}</span><span class="cnt">${esc(fest.scale)}${festSoft?'·初入宫仅作背景':''}</span></div><div class="sheet-note" style="margin-top:4px">${esc(fest.scene)}</div>`:'<div class="sheet-note">本旬无固定节宴。</div>'}
-        ${soon?`<div class="itemrow" style="margin-top:6px"><span>下一场 · ${esc(soon.fest.name)}</span><span class="cnt">${esc(festWhen(soon.fest))}</span></div>`:''}</div>`;
+        ${soonFest?`<div class="itemrow" style="margin-top:6px"><span>下一场 · ${esc(soonFest.fest.name)}</span><span class="cnt">${esc(festWhen(soonFest.fest))}</span></div>`:''}</div>`;
     return `<div class="sec"><div class="sec-cap">当前局面</div>
         <div class="itemrow"><span>${esc(state.lastNode||'—')}</span></div>
         ${state.time&&state.time.note?`<div class="itemrow"><span>${esc(state.time.note)}</span></div>`:''}
         ${state.nextStep?`<div class="itemrow"><span>下一步：${esc(state.nextStep)}</span></div>`:''}</div>
       ${festSec}
-      ${due.length||stale.length?`<div class="sec"><div class="sec-cap">剧情到期</div>${due.map(p=>this.plotRow(p,adj)).join('')}${stale.map(p=>this.plotRow(p,adj)).join('')}</div>`:''}
       <div class="sec"><div class="sec-cap">剧情账</div>${plots}</div>
       <div class="sec"><div class="sec-cap">待续事项</div>${pend}</div>
       <div class="setbtns"><button class="btn btn-line" onclick="UI.goSheet('命途')">${state.mainLine?'命途 · '+esc(MAIN_LINES[state.mainLine.id].name):'命途 · 未定'}</button><button class="btn btn-line" onclick="UI.goSheet('大事记')">剧情大事记</button></div>`;
@@ -6108,15 +6110,12 @@ const UI={
       :(base>0&&tiNow===base)?'<div class="sheet-note">气血已达根基：散步、药膳只作维持；欲拔高根基，须长期锻炼或药物调理。</div>':'';
     const skills=Object.entries(sk).map(([k,v])=>this.meter(k,v,(Number(v)||0)>100?'m-gold':'m-indigo')).join('');
     const talent=`<div class="itemrow"><span>才华</span><span class="cnt num">${esc(at.才华??'—')}</span></div>`;
-    const pend=(state.pending||[]).map(x=>`<div class="itemrow"><span>${esc(pendText(x))}</span></div>`).join('')||'<div class="sheet-note">暂无待续事项</div>';
-    const plotRows=(state.plots||[]).filter(p=>p.stage==='进行中').map(p=>this.plotRow(p)).join('')||'<div class="sheet-note">暂无在途剧情线。</div>';
     return `<div class="sec"><div class="sec-cap">属性</div>${this.meter('精力',Math.round(state.energy??ENERGY_MAX),'m-cinnabar')}${tiMeter}${attrs||'<div class="sheet-note">—</div>'}${stance?`<div class="sheet-note">言行：${esc(stance)}</div>`:''}${baseNote}
         <div class="itemrow"><span>月俸</span><span class="cnt num">每月 ${esc(salary)} 两</span></div>
         <div class="sheet-note">按位份发放，每月下旬末自动入账；位份升降后随新月俸结算。</div></div>
       <div class="sec"><div class="sec-cap">才艺</div>${skills||'<div class="sheet-note">—</div>'}${talent}</div>
       ${this.nightLedgerHtml()}
-      <div class="sec"><div class="sec-cap">剧情账</div>${plotRows}<div class="setbtns"><button class="btn btn-line" onclick="UI.goSheet('命途')">${state.mainLine?'命途 · '+esc(MAIN_LINES[state.mainLine.id].name):'命途 · 未定'}</button></div></div>
-      <div class="sec"><div class="sec-cap">待续事项</div>${pend}</div>`;
+      <div class="sheet-note">剧情账与待续事项在顶栏「时间」打开的局面页里。</div>`;
   },
   sheetChronicle(){
     const entries=state&&Array.isArray(state.chronicle)?state.chronicle:null;
