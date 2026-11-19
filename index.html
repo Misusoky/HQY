@@ -1407,7 +1407,7 @@ const ENERGY_MODULE = [
 '## 七、精力与旬制（本条覆盖世界书一切冲突表述）',
 '1. 每月只分上旬、下旬两旬：上旬为初一至十五，下旬为十六至月末。日历一律由前端推进（上旬→同月下旬；下旬→次月正月，跨年自动），time 键由前端维护；正文与状态一律以存档中的年月旬次为准。',
 '2. 每旬主控精力值 0—100，旬首自动回满（存档 energy 字段为当前剩余精力）。',
-'3. 一旬内玩家可消耗精力依次安排多件事；每件事按第一轮（可能含第二轮应对）完整结算。精力消耗由前端自结：才艺修习 20、社交拜访 20、宫务经营 20、子女教育 20、外出散步闲逛 10、家族书信 10、承宠争取 10、使用道具 5；精力由前端结算。',
+'3. 一旬内玩家可消耗精力依次安排多件事；每件事按第一轮（可能含第二轮应对）完整结算。精力消耗由前端自结：才艺修习 15、社交拜访 20、宫务经营 20、子女教育 20、外出散步闲逛 10、家族书信 10、承宠争取 10、使用道具 5；精力由前端结算。',
 '4. 传膳（前端自结：每旬至多三次，菜色随菜单而定，耗银与回精力各不相同，最贵一味另加属性；菜单每三旬轮换）与精力扣减、昏迷只在剧情本身需要时写入正文与 statePatch。',
 '5. 精力≤20 前端会弹窗建议休息；精力归零主控当场昏迷、体质 -5 并被抬回寝殿强制休息——皆为前端已结算事实，正文写感受与场面。',
 '6. 同旬内第二件事起，玩家指令为「第N旬又一轮：玩家再安排……」，照常先演绎该事过程再检查剧情；时间保持本旬不变。',
@@ -3456,7 +3456,7 @@ function inviteRefusalText(who){ // 相邀落空：写好的回绝话，按对�
 function focusEnergyCost(focus){ // 各类行动精力消耗
   const f=String(focus||'');
   if(/使用道具|使用物品/.test(f))return 5; // 用物最轻
-  if(/才艺/.test(f))return 20;
+  if(/才艺/.test(f))return 15;
   if(/休养|闲逛|散步/.test(f))return 10;
   if(/家族|书信|抄经|妆奁/.test(f))return 10;
   return 20; // 社交拜访、宫务经营、子女教育、自定义
@@ -3555,8 +3555,8 @@ function libHeldBook(s,k){ // 手头（借阅中或案头）有 k 艺谱册 → 
   }
   return null;
 }
-function skillGainAtBook(v){ // 有谱册在旁：修习取高档——未满100时2—3点；过百后得点概率上调
-  if(v<100)return 2+Math.floor(Math.random()*2);
+function skillGainAtBook(v){ // 有谱册在旁：修习取高档——未满100时3—4点；过百后仍按递减规则，只上调得点概率
+  if(v<100)return 3+Math.floor(Math.random()*2);
   const p=Math.min(1,Math.max(0.12,1-(v-100)/220)*1.5);
   if(Math.random()>=p)return 0;
   return (v<130&&Math.random()<0.35)?2:1;
@@ -5707,17 +5707,21 @@ const UI={
       <div class="sheet-note" style="margin-top:6px">结果在点「结束本旬」后结算并弹出夜账。帝召幸他人属公开记档，会记入承宠录。</div>
     </div>`;
   },
-  nightLedgerHtml(){ // 状态页：昨夜记档、孕事、皇嗣、近旬承宠录
-    const b=state.bedchamber||{log:[]};
-    const last=b.last?nightRecordText(b.last):'尚无记档';
+  nightLedgerHtml(){ // 状态页：只放主控自己的孕事与皇嗣；帝的侍寝记档在局面页
     const preg=state.pregnancy?(()=>{const p=state.pregnancy,m=Math.max(1,Math.min(10,Number(p.month)||1)),left=Math.max(0,(Number(p.dueTurn)||state.turn)-state.turn);return `<div class="meter m-cinnabar"><span class="meter-nm">孕期</span><span class="meter-track"><span class="meter-fill" style="width:${m*10}%"></span></span><span class="meter-v num">${m}/10</span></div><div class="itemrow"><span>胎象</span><span class="cnt">${esc(p.health||'平稳')}${p.doctor?` · ${esc(p.doctor)}请脉`:''} · 约${left}旬后临盆</span></div>`})():'';
     const heirs=(state.heirs||[]).map(h=>`<div class="itemrow"><span>${esc(h.gender)}${esc(h.name)}</span><span class="cnt">${h.age}岁 · 生母${esc(h.mother||'—')}${h.health==='偏弱'?' · 体弱':''}</span></div>`).join('');
-    const recent=(b.log||[]).slice(-4).reverse().map(x=>`<div class="itemrow"><span>第${xunNoOf(x.turn)}旬</span><span class="cnt">${esc(nightRecordText(x))}</span></div>`).join('');
-    return `<div class="sec"><div class="sec-cap">承宠与子嗣</div>
-      <div class="itemrow"><span>昨夜</span><span class="cnt">${esc(last)}</span></div>
-      ${preg}
+    return `<div class="sec"><div class="sec-cap">孕事与皇嗣</div>
+      ${preg||'<div class="sheet-note">尚无身孕。</div>'}
       ${heirs||'<div class="sheet-note">尚无皇嗣。</div>'}
-      ${recent?`<div class="sheet-note" style="margin-top:10px">承宠录</div>${recent}`:''}
+    </div>`;
+  },
+  chamberLedgerHtml(){ // 局面页：帝的侍寝记档（谁是公开记档，主控可见）
+    const b=state.bedchamber||{log:[]};
+    const last=b.last?nightRecordText(b.last):'尚无记档';
+    const recent=(b.log||[]).slice(-6).reverse().map(x=>`<div class="itemrow"><span>第${xunNoOf(x.turn)}旬</span><span class="cnt">${esc(nightRecordText(x))}</span></div>`).join('');
+    return `<div class="sec"><div class="sec-cap">帝的侍寝</div>
+      <div class="itemrow"><span>昨夜</span><span class="cnt">${esc(last)}</span></div>
+      ${recent?`<div class="sheet-note" style="margin-top:8px">承宠录 · 近旬</div>${recent}`:'<div class="sheet-note">承宠录尚空。</div>'}
     </div>`;
   },
   plotRow(p,adj){ // 剧情账一行：点开看任务说明与期限（active only 也用它）；adj 在时把「将到期／搁置」标在行上，几张面板不必再另列一节
@@ -5852,6 +5856,7 @@ const UI={
         ${state.time&&state.time.note?`<div class="itemrow"><span>${esc(state.time.note)}</span></div>`:''}
         ${state.nextStep?`<div class="itemrow"><span>下一步：${esc(state.nextStep)}</span></div>`:''}</div>
       ${festSec}
+      ${this.chamberLedgerHtml()}
       <div class="sec"><div class="sec-cap">剧情账</div>${plots}</div>
       <div class="sec"><div class="sec-cap">待续事项</div>${pend}</div>
       <div class="setbtns"><button class="btn btn-line" onclick="UI.goSheet('命途')">${state.mainLine?'命途 · '+esc(MAIN_LINES[state.mainLine.id].name):'命途 · 未定'}</button><button class="btn btn-line" onclick="UI.goSheet('大事记')">剧情大事记</button></div>`;
@@ -6255,7 +6260,7 @@ const UI={
         <div class="sheet-note">按位份发放，每月下旬末自动入账；位份升降后随新月俸结算。</div></div>
       <div class="sec"><div class="sec-cap">才艺</div>${skills||'<div class="sheet-note">—</div>'}${talent}</div>
       ${this.nightLedgerHtml()}
-      <div class="sheet-note">剧情账与待续事项在顶栏「时间」打开的局面页里。</div>`;
+      <div class="sheet-note">剧情账、待续事项与帝的侍寝记档在顶栏「时间」打开的局面页里。</div>`;
   },
   sheetChronicle(){
     const entries=state&&Array.isArray(state.chronicle)?state.chronicle:null;
@@ -7592,7 +7597,7 @@ function buildOpeningWorld(proto){
       text:paras[2]+'\n\n'+`掌事姑姑说，几处派系各有领头的人：${state.world.factionLeaders.map(f=>`${f.name}以${f.leader}为首`).join('；')}。这些名字先记下，往后遇上了，才知谁该敬、谁该避。`,
       unlock:[main.name,...state.world.factionLeaders.map(f=>f.leader),...heirs.map(h=>h.name)]},
     {title:'住处与身边人',depth:'初识',
-      text:paras[3]+'\n\n'+`往后每一旬，你有精力一百：修习才艺、出门拜访、料理宫务各耗二十，往御花园散步闲逛耗十，用一件东西耗五；精力见了底会当场昏厥，伤的是体质。乏了不必硬撑——就此歇下、进入下一旬，精力自然回满，不耗什么。日子怎么排，要你自己拿主意。\n\n体质是气血，先天根基各有高下，状态页写作「体质　气血／根基」。散步、药膳能把气血养回根基，却养不过根基，高出的部分每旬还会回落；想拔高根基，得靠长期的锻炼与调理。气血太低易病，孕产也多凶险。`,
+      text:paras[3]+'\n\n'+`往后每一旬，你有精力一百：修习才艺耗十五，出门拜访、料理宫务各耗二十，往御花园散步闲逛耗十，用一件东西耗五；精力见了底会当场昏厥，伤的是体质。乏了不必硬撑——就此歇下、进入下一旬，精力自然回满，不耗什么。日子怎么排，要你自己拿主意。\n\n体质是气血，先天根基各有高下，状态页写作「体质　气血／根基」。散步、药膳能把气血养回根基，却养不过根基，高出的部分每旬还会回落；想拔高根基，得靠长期的锻炼与调理。气血太低易病，孕产也多凶险。`,
       unlock:[headMaid.name,...maids.map(m=>m.name)]},
     {title:'宫斗系统',depth:'',
       text:paras[4]+'\n\n'+`系统只对你一人可见。它替你在入梦里定下一条路（命途）：五阶，每阶有门槛与一场必须演出来的关目，期限到了会有人来考你。点【局面】里的剧情账，或底下的「命途」，随时可看走到第几阶、还差什么。\n\n完成任务得积分，积分可在商城换道具；道具能改属性、改关系，也能在要紧时救你一命。便宜的读心笺还能窥见一人此刻对你的真实心意。当前积分 100，点顶栏「积分」即可打开商城；商城道具每三旬刷新。`,

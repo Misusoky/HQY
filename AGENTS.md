@@ -5,7 +5,7 @@
 - 交付物是单文件 `index.html`：CSS/JS 内联，无构建步骤、无外部依赖（字体、图片与音频放 `assets/`）。不要拆分为外部 CSS/JS。
 - 内联文案（世界书、叙事文风、提示词、默认档）的源头是 `宫斗模拟器原料/`；改源文件后同步 `index.html` 中的常量。
 - 样式与脚本按 `index.html` 顶部的目录注释分区，新增代码放进对应分区，不要到处散落。
-- 面板分工：`状态`只放主控自身（属性、言行档位、月俸、才艺、承宠与子嗣）；剧情账与待续事项只在 `局面`（点顶栏时间）里列一次，按紧急度排序，将到期／已逾期／搁置发酵标在行内（`plotRow(p,adj)`），别再另立「剧情到期」一节，也别在两处重复列账。帝前只在人物详情里看，局面不列排名。
+- 面板分工：`状态`只放主控自身（属性、言行档位、月俸、才艺、孕事与皇嗣）；帝的侍寝记档与近旬承宠录放 `局面`（点顶栏时间，`chamberLedgerHtml`），与剧情账、待续事项同页，别在状态页重复列。剧情账与待续事项只在 `局面` 里列一次，按紧急度排序，将到期／已逾期／搁置发酵标在行内（`plotRow(p,adj)`），别再另立「剧情到期」一节，也别在两处重复列账。帝前只在人物详情里看，局面不列排名。
 - 对主控出手的行动由前端「暗流账」（`state.schemes`）排期与结账：布子、发难、胜负、扣减都在前端定；模型只负责演，不得自行决定是否触发、是否得手。
 - 玩家的选择不掷骰：选项不带 `check`，成败与后果由模型按玩家选择、当下局势与 NPC 性情推断，并写进 `changes`／`statePatch`；暗流收尾由模型给 `schemeOutcome`（win/draw/lose/defuse），前端只落账、不代改数值。失败仍须留下可结算的实际损失。
 - 旧版设计稿、Kimi Project 文档只作参考，不参与网页运行。
@@ -24,6 +24,7 @@
 - 剧情只能指向真实入口：`PLAY_UI_MODULE` 把玩家点得到的界面写成清单（吩咐／手作／才艺修习／传膳／出门·宫城图七处／顶栏），并要求正文与 pending 不得出现「账房」「内务府值房」这类点不到的地方，改写成差人去办或并入既有去处。吩咐面板另有 `#focusText` + `Game.customFocus` 承接查账、领料、家书、抄经这类没有专门入口的事——别把它删了，删了模型给的指示就又落不了地。自拟行动按玩家指令走两种结算：纯办事 / 派人去办走普通结果弹窗（`hasEvent=false`），要当面交涉、问话、请托、赏罚的走 `scene` 对话细演（`hasEvent=true`，收场再结算）；精力由前端照扣，两种都必须落账（`log` + 至少一项实质结果）。指名到的人物与地点用 `customActionWho` / `customActionCtx` 接上引线与待续的呼应。
 - 来客与相邀：`_xunStartPop` 处理旬首来客（帝按 `emperorVisitChance`，恩宠越高越常来；妃嫔走 `pickConsortVisitor`），`Game.maybeIncomingVisit` 在精力降到本旬阈值（`VISIT_MID_THRESHOLDS`，`meta.midVisitThreshold`）时补一场旬中来客；`meta.visitThisTurn` 是旬号，保证一旬至多一回。不熟的人不能凭空登门：`consortVisitReason` 只放行相熟以上，或剧情账／待续里同在一件事（共同 stake）、目标卡里与主控同怨一人（敌人的敌人）的人。相邀在宫务·行事（`UI.inviteHtml` → `Game.inviteNpc`），成算 `inviteChance` 由好感（帝看恩宠）× `INVITE_RATE` 直接算，先掷骰：应了才调模型进 `scene`，不应则用 `inviteRefusalText` 弹写好的回绝；能耗 `INVITE_ENERGY` 成与不成照扣，一旬一帖（`state.inviteTurn`）。中宫与太后不列来访／相邀名单。
 - 新得物品当场提示：`addToInventory` 入账即用 350ms 防抖调 `flushAcquired`，`finalize` 也调一次兜底。不要改回「攒到下一次模型结算时统一弹」——那会让上一旬画的画拖到下一旬某场剧情时才蹦出来。
+- 才艺修习的本地结算在 `focusEnergyCost` / `skillGainAt` / `skillGainAtBook`：每修一次耗 15 精力；无谱册未满 100 得 1—3 点，手头有同艺谱册（借阅中或案头，`libHeldBook`）得 3—4 点；过 100 后一律按递减规则，谱册只上调得点概率，不直接给 3—4。
 
 ## 开局页
 
