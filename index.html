@@ -4488,7 +4488,7 @@ let currentEvent=null;       // {options:[]}
 let lastRequest=null;        // {userMsg, round:1|2} 供重试
 let impView={};              // 读心笺窥见缓存：{npcId:{text,turn}}；仅存本次会话不落档，每次窥见按次消耗、即时生成
 let soldNotes=[];            // 典卖通报队列（并入下一次主持人请求）
-let setPane='存档';          // 设置面板当前栏：存档|API
+let setPane='存档';          // 设置面板当前栏：存档|API|音乐|脱困
 let selSkill=null;          // 才艺修习面板当前选中项
 let craftSel={mats:{},energy:20,inspiration:'',kind:null}; // 手作面板当前选料/精力/灵感/所做类别
 function craftQuestHint(){ // 手作/书画成品可能对应任务：相赠收场时提醒主持人把 plots 条目兑现落账
@@ -6433,8 +6433,9 @@ const UI={
     return `<div class="setnav">
       <button class="${setPane==='存档'?'on':''}" onclick="Game.switchSetPane('存档')">存档</button>
       <button class="${setPane==='API'?'on':''}" onclick="Game.switchSetPane('API')">API 设置</button>
+      <button class="${setPane==='音乐'?'on':''}" onclick="Game.switchSetPane('音乐')">音乐</button>
       <button class="${setPane==='脱困'?'on':''}" onclick="Game.switchSetPane('脱困')">脱困</button>
-    </div>${setPane==='存档'?this.paneSaves():setPane==='脱困'?this.paneEscape():this.paneApi()}`;
+    </div>${setPane==='存档'?this.paneSaves():setPane==='音乐'?this.paneBgm():setPane==='脱困'?this.paneEscape():this.paneApi()}`;
   },
   paneEscape(){
     const hasState=!!state;
@@ -6442,6 +6443,13 @@ const UI={
       <div class="sheet-note" style="margin-top:0">生成卡住、对话界面点不动、或流程走不下去时，按下方按钮立即中止当前生成并回到住处。本次操作尚未落定的精力、银两、积分、属性、才艺、行囊与关系变化会一并退还；已经结算的旬不会回退。</div>
       <div class="setbtns"><button class="btn btn-primary" onclick="Game.escapeStuck()" ${hasState?'':'disabled'}>脱离卡死</button></div>
       <div class="sheet-note">${hasState?(safePoint?'已有可回的落定点：本次操作开始前的进度。':'进入对局后会记录落定点。'):'尚未开局，暂无可回的进度。'}</div></div>`;
+  },
+  paneBgm(){
+    const s=loadSettings();
+    return `<div class="sec"><div class="sec-cap">背景音乐</div>
+      <div class="setrow"><span class="sk">曲目</span><select onchange="Game.chooseBgm(this.value)"><option value="0" ${s.bgm===false?'selected':''}>关闭</option>${BGM_TRACKS.map(t=>`<option value="${t.id}" ${s.bgm!==false&&(Number(s.bgmTrack)||1)===t.id?'selected':''}>${t.name}</option>`).join('')}</select></div>
+      <div class="setrow"><span class="sk">速率</span><input type="range" id="setBgmRate" min="0.5" max="1.5" step="0.05" value="${s.bgmRate||1}" oninput="Game.setBgmRate(parseFloat(this.value))"><span class="sk num" id="bgmRateVal">${Math.round((s.bgmRate||1)*100)}%</span></div>
+      <div class="sheet-note" style="margin-top:6px">曲目按加入顺序命名为「一」「二」……；选中即切换播放。关闭后仍记得上次的曲目与速率。</div></div>`;
   },
   paneApi(){
     const s=loadSettings();
@@ -6451,8 +6459,6 @@ const UI={
       <div class="setrow"><span class="sk">模型</span><input id="setModel" placeholder="deepseek-chat" value="${esc(s.model)}"></div>
       <div class="setrow"><span class="sk">流式输出</span><select id="setStream"><option value="1" ${s.stream!==false?'selected':''}>开启（边写边看，推荐）</option><option value="0" ${s.stream===false?'selected':''}>关闭（接口不支持流式时）</option></select></div>
       <div class="setrow"><span class="sk">外观</span><select id="setTheme"><option value="auto" ${s.theme==='auto'?'selected':''}>跟随系统</option><option value="light" ${s.theme==='light'?'selected':''}>宣纸（浅色）</option><option value="dark" ${s.theme==='dark'?'selected':''}>墨底（深色）</option></select></div>
-      <div class="setrow"><span class="sk">背景音乐</span><select onchange="Game.chooseBgm(this.value)"><option value="0" ${s.bgm===false?'selected':''}>关闭</option>${BGM_TRACKS.map(t=>`<option value="${t.id}" ${s.bgm!==false&&(Number(s.bgmTrack)||1)===t.id?'selected':''}>${t.name}</option>`).join('')}</select></div>
-      <div class="setrow"><span class="sk">BGM 速率</span><input type="range" id="setBgmRate" min="0.5" max="1.5" step="0.05" value="${s.bgmRate||1}" oninput="Game.setBgmRate(parseFloat(this.value))"><span class="sk num" id="bgmRateVal">${Math.round((s.bgmRate||1)*100)}%</span></div>
       <div class="sheet-note" style="margin-top:6px">${lastApiStat?`上次请求：${lastApiStat.sec.toFixed(1)} 秒 · 输入 ${lastApiStat.in??'?'}${lastApiStat.cache!=null?`（缓存命中 ${lastApiStat.cache}）`:''} / 输出 ${lastApiStat.out??'?'} tokens`:'尚无请求记录'}<br>输入大、缓存命中为 0 → 提示词过长或前缀失效；输出大而耗时长 → 是生成慢，可换更快的模型。</div>
       <div class="setbtns"><button class="btn btn-primary" onclick="Game.saveSettingsFromUI()">保存设置</button><button class="btn btn-line" id="btnTestApi" onclick="Game.testApi()">测试连通</button></div>
       <div id="apiTestRes" style="display:none;margin-top:10px;font-size:13px;line-height:1.7;border-radius:8px;padding:8px 10px"></div></div>
