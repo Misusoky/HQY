@@ -9,6 +9,7 @@
 - 样式与脚本按 `index.html` 顶部的目录注释分区，新增代码放进对应分区，不要到处散落。
 - 面板分工：`状态`只放主控自身（属性、言行档位、月俸、才艺、住处陈设、孕事与皇嗣）；帝的侍寝记档与近旬承宠录放 `局面`（点顶栏时间，`chamberLedgerHtml`），与剧情账、待续事项同页，别在状态页重复列。剧情账与待续事项只在 `局面` 里列一次，按紧急度排序，将到期／已逾期／搁置发酵标在行内（`plotRow(p,adj)`），别再另立「剧情到期」一节，也别在两处重复列账。帝前只在人物详情里看，局面不列排名。
 - 对主控出手的行动由前端「暗流账」（`state.schemes`）排期与结账：布子、发难、胜负、扣减都在前端定；模型只负责演，不得自行决定是否触发、是否得手。
+- 宫中派系（`state.factions`）同样是前端排期：`ensureFactions` 归一（新档取 `world.factionLeaders`，旧档从人物 `faction` 字段与关系账里按位份认领袖），`factionTick` 在每旬开头让最久没动的一派走一步（同一时间只许一条 `factionId` 剧情账在途），落成 `p-faction-<旬号>` 条目，到期由既有裁决强制兑现；到期无人应对时 `autoSettleDuePlots` 记「威望-2」并让该系实力 +3。模型只演：`factionMoveBrief()` 与 `npcMoveBrief()` 同处注入剧情裁决；回写只认 `statePatch.factions` 白名单（power 单旬 ±10、attitude 四档、members 限本档已有之人、step/note），`defunct` 须经 `factionCanCollapse`（领袖死亡或降至从四品以下）。态度由 `recalcFactionAttitude` 按领袖亲疏与立场每旬校正，敌对不自动降；条目结清时 `factionClearStep` 清掉「当前一步」，免得模型照着旧棋继续演。界面在顶栏「宫谱」内分「人物｜派系」（`gongpuPane`／`sheetFactions`），局面页另列「派系风向」；派系详情只列相识的成员，暗中图谋仍归暗流账。`compactState` 不送 `lastMove`／`stepPlotId` 等排期内部字段。
 - 玩家的选择不掷骰：选项不带 `check`，成败与后果由模型按玩家选择、当下局势与 NPC 性情推断，并写进 `changes`／`statePatch`；暗流收尾由模型给 `schemeOutcome`（win/draw/lose/defuse），前端只落账、不代改数值。失败仍须留下可结算的实际损失。
 - 旧版设计稿、Kimi Project 文档只作参考，不参与网页运行。
 - 剧情账（`state.plots`）的每一行都可点开 `剧情详情` 页（`UI.plotRow` / `UI.sheetPlotDetail`）：字段 `goal` 是任务说明、`note` 是当前进展，新条目须写 `goal`，经 `sanitizePlot` / `mergePlots` 落账；详情页还显示期限倒计时、起于/限期与相关大事记，进行中的条目可用 `UI.dropPlot` 由玩家作废（模型硬编的线索不必留着）。

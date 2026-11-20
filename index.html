@@ -202,6 +202,18 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
 .rel-nm{flex:1}
 .relpill{flex:none;font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid currentColor;letter-spacing:.12em}
 .relpill.p-good{color:var(--gold)}.relpill.p-mid{color:var(--ink-soft)}.relpill.p-bad{color:var(--cinnabar)}
+/* 宫谱分段：人物／派系 */
+.segline{display:flex;gap:8px;margin:0 0 14px}
+.segline .seg{flex:1;min-height:38px;border:1px solid var(--line);border-radius:999px;background:var(--card);font-size:14px;letter-spacing:.14em;text-indent:.14em;color:var(--ink-soft)}
+.segline .seg.on{border-color:var(--cinnabar);color:var(--cinnabar);background:rgba(166,58,46,.06)}
+/* 派系一系一卡 */
+.faccard{border:1px solid var(--line);border-radius:14px;background:var(--card);box-shadow:var(--shadow);padding:12px 14px;margin-bottom:10px}
+.faccard.off{opacity:.62}
+.fac-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:3px}
+.fac-nm{font-size:16px;letter-spacing:.08em}
+.fac-meta{font-size:12px;color:var(--ink-soft);line-height:1.75}
+.fac-step{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);font-size:13px;line-height:1.75}
+.fac-step b{font-weight:400;color:var(--cinnabar)}
 .rel-v{flex:none;width:64px;text-align:right;font-size:13px;color:var(--ink-soft)}
 .itemrow{display:flex;align-items:center;gap:10px;min-height:38px;font-size:14px;border-bottom:1px dashed var(--line)}
 .itemrow:last-child{border-bottom:0}
@@ -1360,9 +1372,9 @@ ${STYLE_CORE}
 正例（清楚、自然、明确表达，应当这样写）：
 
 > 柳妃在廊下叫住你，先问你病后可还服药，随后才提起去岁那匹云锦。“事情过去这些日子，我并非还要与你争一时长短。只是宫里人来人往，妹妹如今得太后青眼，说话行事也该替旁人留些余地。”这话听着像劝诫，也明明白白带着警告。你没有立刻答应，只道：“娘娘肯把话说开，是肯指点我。只是哪些余地该留，我还想请教娘娘。”柳妃看了你一会儿，命宫人把新做的护膝留下，转身离开。你回到殿中，才发觉方才一直攥着袖口。你让春韶将护膝收进箱里，没有佩戴；柳妃主动来谈和是事实，是否可信，还要看日后。`;
-const PROMPT_TEMPLATE = "# 系统提示词模板（网页版每次请求拼接使用）\n\n> 使用方式：把下方「世界书」「叙事文风」「当前存档」三个占位块替换为对应文件全文（02、03、04），作为请求的 system 内容；用户消息再附上本旬指令（如「第 N 旬第一轮：玩家选择生活重心为 X」）。\n\n---\n\n你是文字游戏《带着系统去宫斗》的主持人。你严格遵守以下全部设定与纪律，只输出 JSON。\n\n## 一、世界书（固定事实与长期规则）\n\n{{世界书全文：02-世界书.md}}\n\n## 二、叙事文风（表达方式以此为准）\n\n{{叙事文风全文：03-叙事文风.md}}\n\n## 三、当前存档（动态进度的唯一依据，覆盖世界书默认值）\n\n{{当前存档 JSON：04-当前存档-v36.json 或玩家当前档}}\n\n## 四、主持人纪律（每次输出前静默自查）\n\n1. 每次只推进一个时间单位（一旬），由玩家决定何时继续；死亡先呈现局面。\n2. 每旬流程：先演绎本旬养成/重心过程，再依【剧情裁决】块判断剧情是否触发（触发权在前端，不由你掷骰）；有剧情时给 2—4 个有实质差异的选项并停下等玩家抉择，后果在应对之后结算。\n3. 每旬至多一条需应对的主要剧情；冲突可以连着来，但同旬只演一条主线，不因「隔了多久」而强行降温；到期引线优先兑现但合进已有轮次。\n4. 数值结算：普通事件单次 ±1—5，重大 ±5—20 且须有前置或代价；失败、失势、失宠、失物一律照实结算，不得只涨不跌；基础属性钳制 0—100，才艺不设 100 上限；才艺过 100 后仍可增长，但进益递减——100—130 每旬多为 +1，130 以上多为不增或 +1；体质（气血）永不高于根基（存档 protagonist.constitutionBase）：恢复气血只在气血低于根基时结算，拔高根基单次至多+1、上限90，且必须同写 protagonist.constitutionBase 与 protagonist.attributes.体质；只结算真实发生的事，不因同一事件重复加减；不影响不知情或无关角色。\n5. 银两对账：逐笔记收支；月俸由前端按位份自动发放（每月下旬末入账，俸额见世界书），不要重复加减；下旬末其余月结照常。\n6. 知情边界：NPC 只依据亲历、目睹、听说或合理推断知情；私密互动不外溢；针对主控的阴谋在主控视角中突然发生，不提前剧透；不写主控不可知的上帝视角内容。\n7. NPC 言行持续符合身份、性格、关系阶段与情绪；到期引线（裴贵妃正月内须有可见动作等）到点即兑现。\n8. 宠爱须转化为实际相处：宠爱 83 的帝应有召见、共膳、书信、记住细节等实际接触，不只用赏赐糊数字。\n9. 选项设计：围绕不同目标、手段或代价拉开；允许稳妥回避、直接应对、借助他人、主动担险；每个选项写当下可见的机会或代价；至少一项选择可能带来明确损失，任何选择都不保证成功，不得把同一条路换个说法充数。\n10. 正文严格遵守叙事文风：第二人称限定视角，叙述一律以“你”称呼主控，写“你抬眼”“你听见”，以“你”指代主控；全程贴主控所见所感，既往摘要与旧档中的第三人称只作事实参考。narrative 与 haremNews 中凡涉及主控，一律称“你”；清楚顺畅可读优先；对话有实际信息与来回反应；普通旬 250—400 字，剧情/感情/重大应对 450—700 字，单次正文一律不超过 900 字，开局、侍寝、生产、死亡、结局、番外等一切场景同受此限；scene.parts 总长每轮不超过 120 字；每句须推进事件或信息，细节服务于事件，环境铺陈、结尾感悟与面板复述从略；正文不用 emoji。\n11. 内容边界：现代概念与术语留在戏外；亲密与血腥细节点到为止，但失宠、降位、蒙冤、失子、被夺等后果照实写，不回避、不和稀泥；超现实元素仅宫斗系统，且只对主控可见。\n12. 自定义行动符合世界规则即认真承接；不合理、冒失或时机不对的行动，照世界内逻辑给出风险与失败，该丢脸就丢脸，该受罚就受罚。\n13. 恩宠账与剧情账一并兑现：【恩宠账·到期】所列之旬必须安排一场有内容的帝相处戏并写 statePatch[\"emperor.contact\"]；【恩宠账·搁置】所列之旬必须推进或消除所记的不召见原因。\n14. 日常不产剧情：修习、散步、传膳、手作、查账、献礼、市集等只是养成过程，不因「该有戏了」就平地起冲突；需要应对的剧情只从【剧情裁决】【暗流】块来。每场剧情都必须有一个正在得失的对手，没有对手与代价的场面，宁可写成日常；也不要把每场都收在转机、和解或帝王垂怜上。\n\n## 五、输出格式（只输出 JSON 本身，不加 markdown 代码块与额外文字）\n\n```json\n{\n  \"narrative\": \"本旬剧情正文\",\n  \"haremNews\": \"后宫动态（主控可感知的公开消息与传闻，传闻须可标注失真；无则空字符串）\",\n  \"changes\": [\"本旬变化条目，只列变化项\"],\n  \"hasEvent\": false,\n  \"options\": [],\n  \"todo\": [\"待续事项，只列临期约定、剧情引线、持续事件\"],\n  \"statePatch\": {\n    \"location\": \"地点\",\n    \"protagonist.attributes.体质\": 62,\n    \"protagonist.constitutionBase\": 70,\n    \"protagonist.skills.琴艺\": 33,\n    \"protagonist.silver\": 66,\n    \"protagonist.points\": 90,\n    \"relationships.韦昭仪.value\": 86,\n    \"inventory.add\": [{\"name\": \"泥金团扇\", \"count\": 1, \"note\": \"郑贵人赠\", \"usable\": true, \"pawnable\": true}],\n    \"pending\": [\"更新后的待兑现事项\"],\n    \"log\": \"本旬一句话摘要\"\n  }\n}\n```\n\n规则：\n- `hasEvent: true` 时 `options` 给 2—4 项（每项含 id 与 text）；选项不必写 check；后果由你依据玩家选择、当下局势与人物性情推断，并写进 changes/statePatch。正文与选项给出后停止，不结算应对后果；`hasEvent: false` 时 `options` 必须为空数组，同时完整结算本旬。\n- `statePatch` 只放本次实际变化的键；未变化的不写。键用点号路径对应存档 JSON 结构。\n- 体质（气血）≤根基（protagonist.constitutionBase）：恢复性提升（散步、药膳、静养）只在气血低于根基时每旬至多+1；拔高根基（锻炼、调理、系统道具）单次至多+1、上限90，须同写 constitutionBase 与体质。\n- 获得、用尽、送出、损毁物品一律写 `statePatch[\"inventory.add\"]`：`name` 物品名（短，不带件数与括号备注）、`count` 件数（消耗/送出/损毁用负数）、`note` 备注（如「已完工」「某人所赠」，持久显示）、`usable` 可否使用——药物、香露、吃食、符物、系统道具等能实际消耗或生效的为 true；信物、文书、手迹、衣饰、摆件等只能收藏或转赠的为 false。`pawnable` 可否典卖——御赐与御前之物、太后所赐、有情感羁绊之物（信物、手迹、旧函）、违禁或涉密之物为 false，寻常财物为 true。赠品若是净材料（香末、香料、药材、绣线、绢缎、干花等），另写 `\"mat\": true` 与 `\"matKind\"`（绣／香／药／花／杂），前端会收入手作材料；御赐、禁物、信物、已完工之物不算材料。物品统一走 `inventory.add`。行囊清单见存档 `inventory`，前端按名合并件数，归零除名。\n- 第二轮（玩家已作应对）请求到达时：演绎行动、他人反应与直接后果，统一结算本旬养成与剧情，`hasEvent` 恒为 false。\n- 旬首请求到达时：先推进世界后台（核心 NPC 目标卡见存档 npcGoalCards），再演绎主控所选重心的具体养成过程，然后决定是否触发剧情。\n- 显示顺序遵循世界书第 12 节：当前状态→本旬安排→剧情正文→后宫动态→本旬变化→（道具/商城提示按需）→待续事项→下一步。界面会按此渲染，无需在 JSON 里重复状态栏。\n- 正文用简体中文书面语，不用 emoji。\n";
+const PROMPT_TEMPLATE = "# 系统提示词模板（网页版每次请求拼接使用）\n\n> 使用方式：把下方「世界书」「叙事文风」「当前存档」三个占位块替换为对应文件全文（02、03、04），作为请求的 system 内容；用户消息再附上本旬指令（如「第 N 旬第一轮：玩家选择生活重心为 X」）。\n\n---\n\n你是文字游戏《带着系统去宫斗》的主持人。你严格遵守以下全部设定与纪律，只输出 JSON。\n\n## 一、世界书（固定事实与长期规则）\n\n{{世界书全文：02-世界书.md}}\n\n## 二、叙事文风（表达方式以此为准）\n\n{{叙事文风全文：03-叙事文风.md}}\n\n## 三、当前存档（动态进度的唯一依据，覆盖世界书默认值）\n\n{{当前存档 JSON：04-当前存档-v36.json 或玩家当前档}}\n\n## 四、主持人纪律（每次输出前静默自查）\n\n1. 每次只推进一个时间单位（一旬），由玩家决定何时继续；死亡先呈现局面。\n2. 每旬流程：先演绎本旬养成/重心过程，再依【剧情裁决】块判断剧情是否触发（触发权在前端，不由你掷骰）；有剧情时给 2—4 个有实质差异的选项并停下等玩家抉择，后果在应对之后结算。\n3. 每旬至多一条需应对的主要剧情；冲突可以连着来，但同旬只演一条主线，不因「隔了多久」而强行降温；到期引线优先兑现但合进已有轮次。\n4. 数值结算：普通事件单次 ±1—5，重大 ±5—20 且须有前置或代价；失败、失势、失宠、失物一律照实结算，不得只涨不跌；基础属性钳制 0—100，才艺不设 100 上限；才艺过 100 后仍可增长，但进益递减——100—130 每旬多为 +1，130 以上多为不增或 +1；体质（气血）永不高于根基（存档 protagonist.constitutionBase）：恢复气血只在气血低于根基时结算，拔高根基单次至多+1、上限90，且必须同写 protagonist.constitutionBase 与 protagonist.attributes.体质；只结算真实发生的事，不因同一事件重复加减；不影响不知情或无关角色。\n5. 银两对账：逐笔记收支；月俸由前端按位份自动发放（每月下旬末入账，俸额见世界书），不要重复加减；下旬末其余月结照常。\n6. 知情边界：NPC 只依据亲历、目睹、听说或合理推断知情；私密互动不外溢；针对主控的阴谋在主控视角中突然发生，不提前剧透；不写主控不可知的上帝视角内容。\n7. NPC 言行持续符合身份、性格、关系阶段与情绪；到期引线（裴贵妃正月内须有可见动作等）到点即兑现。\n8. 宠爱须转化为实际相处：宠爱 83 的帝应有召见、共膳、书信、记住细节等实际接触，不只用赏赐糊数字。\n9. 选项设计：围绕不同目标、手段或代价拉开；允许稳妥回避、直接应对、借助他人、主动担险；每个选项写当下可见的机会或代价；至少一项选择可能带来明确损失，任何选择都不保证成功，不得把同一条路换个说法充数。\n10. 正文严格遵守叙事文风：第二人称限定视角，叙述一律以“你”称呼主控，写“你抬眼”“你听见”，以“你”指代主控；全程贴主控所见所感，既往摘要与旧档中的第三人称只作事实参考。narrative 与 haremNews 中凡涉及主控，一律称“你”；清楚顺畅可读优先；对话有实际信息与来回反应；普通旬 250—400 字，剧情/感情/重大应对 450—700 字，单次正文一律不超过 900 字，开局、侍寝、生产、死亡、结局、番外等一切场景同受此限；scene.parts 总长每轮不超过 120 字；每句须推进事件或信息，细节服务于事件，环境铺陈、结尾感悟与面板复述从略；正文不用 emoji。\n11. 内容边界：现代概念与术语留在戏外；亲密与血腥细节点到为止，但失宠、降位、蒙冤、失子、被夺等后果照实写，不回避、不和稀泥；超现实元素仅宫斗系统，且只对主控可见。\n12. 自定义行动符合世界规则即认真承接；不合理、冒失或时机不对的行动，照世界内逻辑给出风险与失败，该丢脸就丢脸，该受罚就受罚。\n13. 恩宠账与剧情账一并兑现：【恩宠账·到期】所列之旬必须安排一场有内容的帝相处戏并写 statePatch[\"emperor.contact\"]；【恩宠账·搁置】所列之旬必须推进或消除所记的不召见原因。\n14. 日常不产剧情：修习、散步、传膳、手作、查账、献礼、市集等只是养成过程，不因「该有戏了」就平地起冲突；需要应对的剧情只从【剧情裁决】【暗流】【派系动向】块来。每场剧情都必须有一个正在得失的对手，没有对手与代价的场面，宁可写成日常；也不要把每场都收在转机、和解或帝王垂怜上。\n\n## 五、输出格式（只输出 JSON 本身，不加 markdown 代码块与额外文字）\n\n```json\n{\n  \"narrative\": \"本旬剧情正文\",\n  \"haremNews\": \"后宫动态（主控可感知的公开消息与传闻，传闻须可标注失真；无则空字符串）\",\n  \"changes\": [\"本旬变化条目，只列变化项\"],\n  \"hasEvent\": false,\n  \"options\": [],\n  \"todo\": [\"待续事项，只列临期约定、剧情引线、持续事件\"],\n  \"statePatch\": {\n    \"location\": \"地点\",\n    \"protagonist.attributes.体质\": 62,\n    \"protagonist.constitutionBase\": 70,\n    \"protagonist.skills.琴艺\": 33,\n    \"protagonist.silver\": 66,\n    \"protagonist.points\": 90,\n    \"relationships.韦昭仪.value\": 86,\n    \"inventory.add\": [{\"name\": \"泥金团扇\", \"count\": 1, \"note\": \"郑贵人赠\", \"usable\": true, \"pawnable\": true}],\n    \"pending\": [\"更新后的待兑现事项\"],\n    \"log\": \"本旬一句话摘要\"\n  }\n}\n```\n\n规则：\n- `hasEvent: true` 时 `options` 给 2—4 项（每项含 id 与 text）；选项不必写 check；后果由你依据玩家选择、当下局势与人物性情推断，并写进 changes/statePatch。正文与选项给出后停止，不结算应对后果；`hasEvent: false` 时 `options` 必须为空数组，同时完整结算本旬。\n- `statePatch` 只放本次实际变化的键；未变化的不写。键用点号路径对应存档 JSON 结构。\n- 体质（气血）≤根基（protagonist.constitutionBase）：恢复性提升（散步、药膳、静养）只在气血低于根基时每旬至多+1；拔高根基（锻炼、调理、系统道具）单次至多+1、上限90，须同写 constitutionBase 与体质。\n- 获得、用尽、送出、损毁物品一律写 `statePatch[\"inventory.add\"]`：`name` 物品名（短，不带件数与括号备注）、`count` 件数（消耗/送出/损毁用负数）、`note` 备注（如「已完工」「某人所赠」，持久显示）、`usable` 可否使用——药物、香露、吃食、符物、系统道具等能实际消耗或生效的为 true；信物、文书、手迹、衣饰、摆件等只能收藏或转赠的为 false。`pawnable` 可否典卖——御赐与御前之物、太后所赐、有情感羁绊之物（信物、手迹、旧函）、违禁或涉密之物为 false，寻常财物为 true。赠品若是净材料（香末、香料、药材、绣线、绢缎、干花等），另写 `\"mat\": true` 与 `\"matKind\"`（绣／香／药／花／杂），前端会收入手作材料；御赐、禁物、信物、已完工之物不算材料。物品统一走 `inventory.add`。行囊清单见存档 `inventory`，前端按名合并件数，归零除名。\n- 第二轮（玩家已作应对）请求到达时：演绎行动、他人反应与直接后果，统一结算本旬养成与剧情，`hasEvent` 恒为 false。\n- 旬首请求到达时：先推进世界后台（核心 NPC 目标卡见存档 npcGoalCards），再演绎主控所选重心的具体养成过程，然后决定是否触发剧情。\n- 显示顺序遵循世界书第 12 节：当前状态→本旬安排→剧情正文→后宫动态→本旬变化→（道具/商城提示按需）→待续事项→下一步。界面会按此渲染，无需在 JSON 里重复状态栏。\n- 正文用简体中文书面语，不用 emoji。\n";
 const CHRONICLE_MD = "---\nname: chronicle\ntype: project\ndescription: 《带着系统去宫斗》剧情大事记，仅保留仍影响后续的重要历史。\n---\n\n# 剧情大事记 · 带着系统去宫斗\n\n## 元朔元年：入宫与慢药案\n- 你以云麾将军崔家嫡女身份入宫，初册正七品常在，居披香殿侧殿，主位韦昭仪；系统激活。\n- 初入宫时得帝点名，柳妃由此记恨。诗会夺魁后入御前。\n- 与帝逐渐亲近；元年五月首次侍寝，获御赐安息香。\n- 与韦昭仪建立假冷淡掩护与实际信任；开始抄经，与太后结缘。\n- 郑贵人元年六月小产，太后暗查，旧案至今未结。\n- 柳妃实施慢药与云锦逾制双线构陷。你装病查链、取证设局反杀，九月圣裁：柳妃降从四品嫔、禁足半年、罚俸一年。柳氏成为长期死敌。\n- 大案后闭门谢客半月稳住声望；十月菊宴复出。\n\n## 元朔二年：经营根基\n- 逐步经营太后、皇后、韦昭仪与林守拙关系，完成主线四至六。\n- 林守拙收为半师，教授医术药理；获准赴太医院抄书。\n- 你从慈宁宫抄经升为校经，得太后信任与澄心堂旧墨。\n- 韦昭仪授藏证之道、开蒙琴艺，双方成稳定盟谊。\n- 二年腊月晋正六品美人，三年晋从五品才人。\n\n## 元朔四年：柳氏案终局与当前格局\n- 柳嫔密信案由皇后查办，其兄长外放江南道，处境转危。\n- 八月初二你奉皇后口谕探病，坐实柳嫔假病，脉案呈中宫。\n- 九月中旬：柳氏降美人、幽禁听雨轩（无诏不得出）；被幽禁前递密信给你——求递话＋附\"郑贵人案有两份脉案底档、经手人原稿藏江南\"的消息。你焚帕、密信藏于藏锋匣，按下查证，真伪未证。\n- 帝九月上旬夜访披香殿，赐先皇后旧绣样一匣，宠爱82。\n- 十一月初三赏菊宴：你以\"残雪缺月\"答皇后问缺角菊，中宫称善，你的\"雪点妆\"被挪至菊山正面；裴贵妃侧目记怨。\n- 当前未结事项以最新存档为准。";
-const DEFAULT_SAVE = {"game": "带着系统去宫斗", "saveVersion": "v36", "turn": 127, "time": {"era": "元朔", "year": 4, "month": 12, "xun": "下旬", "note": "四年十二月下旬，年度结算毕；入腊月尽，即将进入元朔五年正月"}, "location": "披香殿侧殿", "lastNode": "腊月下旬闭门练琴收官；《平沙》小成", "world": {"dynasty": "晟朝", "emperor": {"name": "李衍", "age": 22, "traits": "念旧而寡情，重视旧物与\"不取\"", "recent": "冬至宴亲赞崔\"字比诗好\"；曾在御苑菊山\"雪点妆\"前驻足，说\"缺一角才有意思\"（高德全转述）"}, "factions": ["含凉殿", "流霞阁", "听雨轩"], "heirs": "无皇嗣", "keyServants": ["高德全", "秦狰", "沈姑姑", "林守拙（半师）"]}, "protagonist": {"name": "崔明蘅", "age": 16, "rank": "从五品才人", "family": "云麾将军崔家嫡女", "personality": ["机敏", "谨慎", "隐忍"], "attributes": {"外貌": 71, "才华": 73, "交际": 58, "忌惮": 60, "手段": 55, "威望": 95, "体质": 81, "孕率": 63}, "skills": {"书法": 77, "琴艺": 31, "医术·药理": 60, "棋艺": 21, "女红": 20, "莳花": 12}, "skillNotes": "《平沙》渐入佳境；能闻味辨药、认脉", "silver": 68, "points": 90, "health": "康健", "salary": "每月15两，下旬末统一结算", "special": "子嗣缘符已启用，贴身香囊暗格；温补方照用，数月无信", "maids": ["春韶", "晚晴"], "security": "入口四道手，药可闻不可尝", "settleRule": "并行多事时主收益打折＋一项附带收益"}, "items": {"systemItems": ["避毒珠×1（贴身，已购）", "藏锋匣（夹墙暗格，钥匙贴身）：先皇后旧式鲤鱼灯、慢药样本、柳美人密信一封（私藏中，风险自担；鲤鱼帕已焚毁）"], "medical": ["清暑香露一瓶", "《各宫平安脉脉案抄本》（查无先皇后病中脉案，中宫脉案单独立档）", "皇后赏药材匣"], "empressDowager": ["青年自抄《地藏经》旧函（每旬初一读一页）", "澄心堂旧墨", "旧檀木手串", "菊饼余量将尽"], "emperor": ["御赐安息香", "白玉镇纸", "金错刀", "先皇后旧绣样一匣十二幅（滚针、抢针已至山茶第三层色，一幅将收尾）", "松香一小包"], "others": ["《兰亭序》唐摹本", "泥金团扇", "《棋经》", "兔子宫灯", "赤金缠枝红宝石簪（封存）", "云锦四匹（御赐，不当不送不裁）", "宫扇", "东珠一匣", "自书字与七夕诗二首", "冬衣、素珍珠簪、吉服", "素缎兰草帕", "杏子红海棠帕（已完工）"], "pawned": "安神香两盒，已逾期，赎当须加价", "misc": ["手膏\"甘菊冷香\"版", "三元羹", "自抄《菊谱》《花镜》条目册一册"], "plants": "\"雪点妆\"盆菊两株：一株根未冻实明春可期，一株仍在暖阁休养（十二月中旬自御苑起回侧殿）"}, "relationships": {"皇帝": {"type": "宠爱", "value": 83}, "皇后萧氏": {"type": "好感", "value": 55}, "太后": {"type": "好感", "value": 52}, "韦昭仪": {"type": "好感", "value": 85}, "郑贵人": {"type": "好感", "value": 19}, "裴贵妃": {"type": "好感", "value": 1, "note": "记怨未发"}, "柳美人": {"type": "仇恨", "value": "长期死敌，幽禁听雨轩；密信求情未答，玩家按下查证"}, "林守拙": {"type": "半师", "note": "棋约已清"}, "杜选侍": "畏惧", "高德全": "态度偏软", "薛女史": "可靠补台"}, "system": {"mainQuests": "主线一至十已完成；隐藏成就\"引蛇出洞\"", "activeQuest": "当前无在途主线任务（子嗣线开启，等待中）", "points": 90, "shop": [{"name": "读心笺", "cost": 15}, {"name": "玉容散", "cost": 45}, {"name": "益气丸", "cost": 50}, {"name": "静心香篆", "cost": 50}, {"name": "双鲤笺", "cost": 40}, {"name": "传声鹤", "cost": 55}, {"name": "避毒珠", "cost": 70, "status": "已购"}, {"name": "免罪金牌（小）", "cost": 80}, {"name": "驻颜膏", "cost": 60}, {"name": "子嗣缘符", "cost": 100, "status": "已用"}, {"name": "藏锋匣", "cost": 90, "status": "已购"}]}, "recentConfirmedFacts": ["十一月上旬：太后请脉赠菊饼；赏菊宴\"残雪缺月\"答皇后，菊挪菊山正面，裴贵妃记怨", "十一月中旬：练绣样；拜访韦昭仪问先皇后，获线索——先皇后信佛病中少传太医、中宫脉案单独立档、太医院秦院判在其走后半年致仕回乡；抄本无载", "十一月下旬：闭门练琴《平沙》小成；冬至宴（腊月初）即兴作诗，帝赞\"字比诗好\"；探望韦昭仪咳疾送温方受赏", "十二月中旬：休养闲逛；御苑收菊回殿；传闻裴贵妃宫里寻了崔冬至诗字拓样（存疑）", "十二月下旬：潜心练琴收官；《平沙》渐入佳境，琴艺29→31"], "pending": ["裴贵妃：记怨未发；拓字传闻存疑，留意", "先皇后旧档线索：秦院判（致仕回乡）＋中宫脉案单独立档＋柳氏密信\"两份底档\"——三线方向相近，宜慢查", "柳氏密信：藏于藏锋匣；求情之请未答", "郑贵人小产旧案：真伪未证", "安神香当票已逾期", "子嗣线：缘符随身，等待中", "正月里节令（元旦、人日）将至，可预备露脸或礼数"], "npcGoalCards": {"裴贵妃": "目标不明，对崔记怨未动；冬至宴全程冷淡。期限：不可再无限观望，正月内须有一次可见动作", "柳美人": "幽禁听雨轩，无诏不得出；递信求援未得回音", "韦昭仪": "维持与崔的盟谊；咳疾渐愈", "林守拙": "任太医院职务如常；与崔有随时手谈之约"}, "emperor": {"intimacy": 55, "lastContact": 94, "absence": null, "hisState": "前朝岁暮政繁，节令宴饮多", "memories": [{"xun": "元朔元年五月", "text": "首次侍寝，获赐安息香", "type": "共历", "open": false}, {"xun": "元朔二年七夕", "text": "以自书字与七夕诗二首相赠", "type": "信物", "open": false}, {"xun": "元朔四年九月上旬", "text": "夜访披香殿，赐先皇后旧绣样一匣", "type": "信物", "open": false}, {"xun": "元朔四年十一月初三", "text": "御苑菊山“雪点妆”前驻足，说“缺一角才有意思”（高德全转述）", "type": "共历", "open": false}, {"xun": "元朔四年冬至宴", "text": "帝亲赞“字比诗好”", "type": "共历", "open": false}, {"xun": "元朔四年腊月初", "text": "旧绣样滚针山茶第三层色，一幅将收尾，约完工之日呈御览", "type": "约定", "open": true}]}, "nextStep": "元朔五年正月上旬，由玩家安排生活重心；正月节令可留意"};
+const DEFAULT_SAVE = {"game": "带着系统去宫斗", "saveVersion": "v36", "turn": 127, "time": {"era": "元朔", "year": 4, "month": 12, "xun": "下旬", "note": "四年十二月下旬，年度结算毕；入腊月尽，即将进入元朔五年正月"}, "location": "披香殿侧殿", "lastNode": "腊月下旬闭门练琴收官；《平沙》小成", "world": {"dynasty": "晟朝", "emperor": {"name": "李衍", "age": 22, "traits": "念旧而寡情，重视旧物与\"不取\"", "recent": "冬至宴亲赞崔\"字比诗好\"；曾在御苑菊山\"雪点妆\"前驻足，说\"缺一角才有意思\"（高德全转述）"}, "factions": ["含凉殿", "流霞阁", "听雨轩"], "heirs": "无皇嗣", "keyServants": ["高德全", "秦狰", "沈姑姑", "林守拙（半师）"]}, "protagonist": {"name": "崔明蘅", "age": 16, "rank": "从五品才人", "family": "云麾将军崔家嫡女", "personality": ["机敏", "谨慎", "隐忍"], "attributes": {"外貌": 71, "才华": 73, "交际": 58, "忌惮": 60, "手段": 55, "威望": 95, "体质": 81, "孕率": 63}, "skills": {"书法": 77, "琴艺": 31, "医术·药理": 60, "棋艺": 21, "女红": 20, "莳花": 12}, "skillNotes": "《平沙》渐入佳境；能闻味辨药、认脉", "silver": 68, "points": 90, "health": "康健", "salary": "每月15两，下旬末统一结算", "special": "子嗣缘符已启用，贴身香囊暗格；温补方照用，数月无信", "maids": ["春韶", "晚晴"], "security": "入口四道手，药可闻不可尝", "settleRule": "并行多事时主收益打折＋一项附带收益"}, "items": {"systemItems": ["避毒珠×1（贴身，已购）", "藏锋匣（夹墙暗格，钥匙贴身）：先皇后旧式鲤鱼灯、慢药样本、柳美人密信一封（私藏中，风险自担；鲤鱼帕已焚毁）"], "medical": ["清暑香露一瓶", "《各宫平安脉脉案抄本》（查无先皇后病中脉案，中宫脉案单独立档）", "皇后赏药材匣"], "empressDowager": ["青年自抄《地藏经》旧函（每旬初一读一页）", "澄心堂旧墨", "旧檀木手串", "菊饼余量将尽"], "emperor": ["御赐安息香", "白玉镇纸", "金错刀", "先皇后旧绣样一匣十二幅（滚针、抢针已至山茶第三层色，一幅将收尾）", "松香一小包"], "others": ["《兰亭序》唐摹本", "泥金团扇", "《棋经》", "兔子宫灯", "赤金缠枝红宝石簪（封存）", "云锦四匹（御赐，不当不送不裁）", "宫扇", "东珠一匣", "自书字与七夕诗二首", "冬衣、素珍珠簪、吉服", "素缎兰草帕", "杏子红海棠帕（已完工）"], "pawned": "安神香两盒，已逾期，赎当须加价", "misc": ["手膏\"甘菊冷香\"版", "三元羹", "自抄《菊谱》《花镜》条目册一册"], "plants": "\"雪点妆\"盆菊两株：一株根未冻实明春可期，一株仍在暖阁休养（十二月中旬自御苑起回侧殿）"}, "relationships": {"皇帝": {"type": "宠爱", "value": 83}, "皇后萧氏": {"type": "好感", "value": 55}, "太后": {"type": "好感", "value": 52}, "韦昭仪": {"type": "好感", "value": 85}, "郑贵人": {"type": "好感", "value": 19}, "裴贵妃": {"type": "好感", "value": 1, "note": "记怨未发"}, "柳美人": {"type": "仇恨", "value": "长期死敌，幽禁听雨轩；密信求情未答，玩家按下查证"}, "林守拙": {"type": "半师", "note": "棋约已清"}, "杜选侍": "畏惧", "高德全": "态度偏软", "薛女史": "可靠补台"}, "system": {"mainQuests": "主线一至十已完成；隐藏成就\"引蛇出洞\"", "activeQuest": "当前无在途主线任务（子嗣线开启，等待中）", "points": 90, "shop": [{"name": "读心笺", "cost": 15}, {"name": "玉容散", "cost": 45}, {"name": "益气丸", "cost": 50}, {"name": "静心香篆", "cost": 50}, {"name": "双鲤笺", "cost": 40}, {"name": "传声鹤", "cost": 55}, {"name": "避毒珠", "cost": 70, "status": "已购"}, {"name": "免罪金牌（小）", "cost": 80}, {"name": "驻颜膏", "cost": 60}, {"name": "子嗣缘符", "cost": 100, "status": "已用"}, {"name": "藏锋匣", "cost": 90, "status": "已购"}]}, "recentConfirmedFacts": ["十一月上旬：太后请脉赠菊饼；赏菊宴\"残雪缺月\"答皇后，菊挪菊山正面，裴贵妃记怨", "十一月中旬：练绣样；拜访韦昭仪问先皇后，获线索——先皇后信佛病中少传太医、中宫脉案单独立档、太医院秦院判在其走后半年致仕回乡；抄本无载", "十一月下旬：闭门练琴《平沙》小成；冬至宴（腊月初）即兴作诗，帝赞\"字比诗好\"；探望韦昭仪咳疾送温方受赏", "十二月中旬：休养闲逛；御苑收菊回殿；传闻裴贵妃宫里寻了崔冬至诗字拓样（存疑）", "十二月下旬：潜心练琴收官；《平沙》渐入佳境，琴艺29→31"], "pending": ["裴贵妃：记怨未发；拓字传闻存疑，留意", "先皇后旧档线索：秦院判（致仕回乡）＋中宫脉案单独立档＋柳氏密信\"两份底档\"——三线方向相近，宜慢查", "柳氏密信：藏于藏锋匣；求情之请未答", "郑贵人小产旧案：真伪未证", "安神香当票已逾期", "子嗣线：缘符随身，等待中", "正月里节令（元旦、人日）将至，可预备露脸或礼数"], "npcGoalCards": {"裴贵妃": "目标不明，对崔记怨未动；冬至宴全程冷淡。期限：不可再无限观望，正月内须有一次可见动作", "柳美人": "幽禁听雨轩，无诏不得出；递信求援未得回音", "韦昭仪": "维持与崔的盟谊；咳疾渐愈", "林守拙": "任太医院职务如常；与崔有随时手谈之约"}, "emperor": {"intimacy": 55, "lastContact": 94, "absence": null, "hisState": "前朝岁暮政繁，节令宴饮多", "memories": [{"xun": "元朔元年五月", "text": "首次侍寝，获赐安息香", "type": "共历", "open": false}, {"xun": "元朔二年七夕", "text": "以自书字与七夕诗二首相赠", "type": "信物", "open": false}, {"xun": "元朔四年九月上旬", "text": "夜访披香殿，赐先皇后旧绣样一匣", "type": "信物", "open": false}, {"xun": "元朔四年十一月初三", "text": "御苑菊山“雪点妆”前驻足，说“缺一角才有意思”（高德全转述）", "type": "共历", "open": false}, {"xun": "元朔四年冬至宴", "text": "帝亲赞“字比诗好”", "type": "共历", "open": false}, {"xun": "元朔四年腊月初", "text": "旧绣样滚针山茶第三层色，一幅将收尾，约完工之日呈御览", "type": "约定", "open": true}]}, "factions": [{"name":"含凉殿一系","leader":"裴贵妃","stance":"强硬","goal":"打压新贵","power":58,"attitude":"压制","members":["杜选侍"],"step":"借年节份例的由头，让披香殿的炭火与纸墨短了一截","stepLine":"敌对","stepGoal":"让你在宫人面前短了体面","lastMove":0,"lastMoveKind":"supply","notes":[{"xun":"元朔四年冬至宴","text":"全程冷淡；宫里在寻崔才人的诗字拓样（存疑）"}],"defunct":false},{"name":"流霞阁一系","leader":"韦昭仪","stance":"主和","goal":"争宠固位","power":66,"attitude":"拉拢","members":[],"step":"遣人来问你那服温方是从哪里得的，说也想讨一剂","stepLine":"支线","stepGoal":"先卖你一份人情","lastMove":0,"lastMoveKind":"probe","notes":[{"xun":"元朔四年十一月","text":"咳疾渐愈；与你往来渐密"}],"defunct":false},{"name":"听雨轩一系","leader":"柳美人","stance":"观望","goal":"争宠固位","power":16,"attitude":"敌对","members":[],"step":"","stepLine":"支线","stepGoal":"","lastMove":0,"lastMoveKind":"","notes":[{"xun":"元朔四年","text":"柳美人幽禁听雨轩，旧日来往的人各自散了"}],"defunct":true}], "nextStep": "元朔五年正月上旬，由玩家安排生活重心；正月节令可留意"};
 
 /* 装潢：住处背景。素居默认拥有，其余每幅 10 两解锁，解锁后免费更换。 */
 const DECOR_COST=10;
@@ -1601,7 +1613,8 @@ function sanitizePlot(p){ // 单条台账归一；字段缺失时给默认值（
     touch:numOrNull(p.touch),staleMiss:numOrNull(p.staleMiss)||0, // touch=最近推进旬号（xunSerial 单位，与裁决一致）；staleMiss=发酵后连续被无视次数
     echo:numOrNull(p.echo),echoMiss:numOrNull(p.echoMiss)||0, // echo=最近被呼应的旬号；echoMiss=连续被呼应却无台账回写的次数
     echoTotal:numOrNull(p.echoTotal)||0,// echoTotal=被呼应的总次数（到 ECHO_LEAD_TOTAL 后不再主动提示）
-    schemeId:p.schemeId?String(p.schemeId):undefined // 暗流账的镜像条目：到期/发酵结账交给暗流账，不让台账代结
+    schemeId:p.schemeId?String(p.schemeId):undefined, // 暗流账的镜像条目：到期/发酵结账交给暗流账，不让台账代结
+    factionId:p.factionId?String(p.factionId):undefined // 派系排期的条目：到期无人应对时由派系账记一笔损失
   };
 }
 function mergePlots(base,incoming,nowTurn){ // 增量回写：模型只给变化条目，未提及的保持不变；凡回写即记 touch=本旬
@@ -1782,7 +1795,7 @@ function adjudicatePlots(skipDice){ // 旬首裁决：到期强制兑现 + 前�
   }
   lines.push('结算只经 statePatch.plots 回写【发生变化】的台账条目：兑现者 stage 改"已兑现"；改写期限者须在 note 说明理由并给出新 dueText；新埋引线新增条目（id 用 "p-" 加短标题，与现存 id 区分，goal 写一句目标和怎样算成）；作废者 stage 改"已作废"并注明缘由。只回写变化的条目，前端按 id 合并。注意：条件已足的条目必须兑现（stage 改"已兑现"，可附积分与任务进度），只改写 note 不算办结；手作成品相赠、请托办妥皆可兑现任务，规则见系统提示词手作模块与剧情台账条。pending 只留非剧情琐事。');
   const before={};[...overdue,...due].forEach(p=>before[p.id]=p.dueText||'');
-  return {due,overdue,stale,pendStale,target,hit,mainPub:!!mainPub,needMain:!!needMain,fest:festNew?fest:null,festSoft,gardenMeet:'',empDue:emp.due,schemeFire:sch.fire,schemeClue:sch.clues,before,text:'【剧情裁决 · 本旬】（前端判定：固定节宴到旬必演＋到期/超期强制兑现＋搁置发酵强制处理＋主线断档强制发布＋剧情骰被动触发，覆盖"自行决定是否触发剧情"）\n'+lines.map((l,i)=>`${i+1}. ${l}`).join('\n')+(state.mainLine?mainLineBrief():'')+npcMoveBrief()};
+  return {due,overdue,stale,pendStale,target,hit,mainPub:!!mainPub,needMain:!!needMain,fest:festNew?fest:null,festSoft,gardenMeet:'',empDue:emp.due,schemeFire:sch.fire,schemeClue:sch.clues,before,text:'【剧情裁决 · 本旬】（前端判定：固定节宴到旬必演＋到期/超期强制兑现＋搁置发酵强制处理＋主线断档强制发布＋剧情骰被动触发，覆盖"自行决定是否触发剧情"）\n'+lines.map((l,i)=>`${i+1}. ${l}`).join('\n')+(state.mainLine?mainLineBrief():'')+npcMoveBrief()+factionMoveBrief()};
 }
 function matchLeads(ctxList){ // 与给定语境（人名/地名/事由）相关的在途引线：标题或备注含对方名讳/地名即命中
   const cvs=(ctxList||[]).map(s=>String(s||'').trim()).filter(s=>s.length>=2);
@@ -1813,7 +1826,14 @@ function autoSettleDuePlots(adj){ // 模型漏写台账时由前端结账；只�
     const snap=adj.before&&adj.before[old.id];
     if(snap!=null&&cur.dueText&&cur.dueText!==snap)continue; // 已改写期限并在 note 说明理由
     cur.stage='已兑现';
-    cur.note=(cur.note?cur.note+'；':'')+'前端自动结账：到期已兑现';
+    if(cur.factionId){ // 派系排的账：到期无人应对，这一步就真落了地，不能无声揭过
+      const f=(state.factions||[]).find(x=>x.name===cur.factionId);
+      const ch=factionLandUnopposed(f);
+      factionClearStep(f);
+      cur.note=(cur.note?cur.note+'；':'')+'无人应对，这一步落了地'+(ch?`（${ch}）`:'');
+    }else{
+      cur.note=(cur.note?cur.note+'；':'')+'前端自动结账：到期已兑现';
+    }
     settled.push(cur.title||cur.id);
   }
   if(settled.length)console.info('[台账] 前端自动结账：'+settled.join('、'));
@@ -2126,6 +2146,252 @@ function applySchemeOutcome(sc,result,opt){ // result: win 挫败 / draw 勉强�
   chronicleAdd(`暗流「${sc.who}」：${sc.methodName||sc.aim||'出手'}——${schemeOutcomeText(result)}`);
   try{if(sc.mainLine)mainLineOnScheme(sc,result)}catch(e){console.warn('[命途] 发难结账失败',e)}
   return ch.filter(Boolean);
+}
+
+/* ============================================================ 宫中派系（Factions）
+   前端管“谁在何时走哪一步”：每 2—4 旬由一派走一步，落成剧情账的一条；
+   模型只负责演这一步的痕迹与到期清算，态度、实力、成员变动只经 statePatch.factions 回写。
+   派系不是独立剧情通道：它的每一步都必须落到具体的人、物、差事上。 */
+const FACTION_ATTITUDES=['拉拢','观望','压制','敌对'];
+const FACTION_STANCES=['主和','主宠','观望','强硬','清流'];
+const FACTION_MOVE_GAP=2; // 同一派两次出手至少隔 2 旬（含出手那一旬共 3 旬）
+const FACTION_MOVES={
+  拉拢:[
+    {kind:'invite',title:'递帖相邀',line:'支线',goal:'把你拉到她这一边',step:'遣一位心腹宫女来递话，说她家主子想请你过宫坐坐，有件体己事想当面说'},
+    {kind:'gift',title:'节礼探意',line:'支线',goal:'先卖你一份人情',step:'借着节礼的名目送来一份不轻不重的东西，单子上写的却是“日常往来”'},
+    {kind:'praise',title:'帝前美言',line:'支线',goal:'让你欠她一句',step:'在帝前顺口提了你一句好，话说得不重，却刚好让该听见的人听见'},
+    {kind:'lend',title:'荐人帮衬',line:'支线',goal:'在你身边安一只眼',step:'说自家有一位得用的嬷嬷，想荐到你宫里帮衬几日'}
+  ],
+  观望:[
+    {kind:'probe',title:'探你口风',line:'支线',goal:'看清你站哪边',step:'遣人来问你对一桩宫里旧事怎么看，问得绕，听的却是你的立场'},
+    {kind:'seat',title:'席上试你',line:'支线',goal:'看你在人前怎么接话',step:'在席间把话头递到你面前，看你接不接、往哪边接'},
+    {kind:'word',title:'借话探路',line:'支线',goal:'试你会不会顺着往下问',step:'托旁人递一句似是而非的话，看你会不会追问下去'}
+  ],
+  压制:[
+    {kind:'supply',title:'份例做文章',line:'敌对',goal:'让你在宫人面前短了体面',step:'借份例发放的由头，让你宫里的炭火与纸墨短了一截，管事太监只说单子上就是这么写的'},
+    {kind:'rank',title:'座次挪位',line:'敌对',goal:'让六宫看见你被挪了位子',step:'在一场宴的座次上做了手脚，把你的位子挪到末席，理由挑不出错'},
+    {kind:'swap',title:'换你掌事',line:'敌对',goal:'让你宫里少一个得用的人',step:'把你宫里得用的掌事姑姑“调去别处帮几日忙”，换了个生面孔来'},
+    {kind:'warn',title:'捎话敲打',line:'敌对',goal:'让你自己收敛',step:'让人捎一句“年轻气盛，凡事收着些”，话说得客气，意思却不客气'}
+  ],
+  敌对:[
+    {kind:'rumor',title:'放话毁名',line:'敌对',goal:'把你往不安分上引',step:'在六宫放出一段话头，说你近来“走动得太勤”，要把你往不安分上引'},
+    {kind:'cut',title:'截你机会',line:'敌对',goal:'让你连御前的面都见不上',step:'抢在你前头把御前的一桩差事截了，连说辞都备得与你相仿'},
+    {kind:'audit',title:'查你的账',line:'敌对',goal:'从账目上拿你的把柄',step:'借核对份例的名目来查你宫里的账，查得细，问得也细'},
+    {kind:'turn',title:'挑你身边的人',line:'敌对',goal:'在你身边埋一颗子',step:'许了你身边一个宫女好处，要她留神你平日见谁、说什么'}
+  ]
+};
+function factionNpc(name){
+  if(!state||!name)return null;
+  const npcs=state.npcs||{};
+  return npcs[name]||Object.values(npcs).find(n=>n&&(n.name===name||n.realName===name))||null;
+}
+function factionRelValue(who,s){
+  if(!who)return null;
+  const rels=((s||state||{}).relationships)||{};
+  const r=rels[who];
+  if(r==null)return null;
+  const v=(r&&typeof r==='object')?Number(r.value):Number(r);
+  return Number.isFinite(v)?v:null;
+}
+function factionPowerOf(f,s){
+  const npcs=(s&&s.npcs)||{};
+  const lead=npcs[(f||{}).leader]||null;
+  const rk=lead?rankScoreOf(lead.rank):rankScoreOf((f||{}).leader);
+  const fav=lead?(Number(lead.favor)||0):0;
+  const mem=((f||{}).members||[]).length;
+  return clamp01_100(Math.round(12+Math.min(rk,18)*2+fav*0.2+mem*3));
+}
+function sanitizeFaction(raw,s){
+  if(!raw||typeof raw!=='object')return null;
+  const name=String(raw.name||'').trim().slice(0,20);
+  const leader=String(raw.leader||'').trim().slice(0,20);
+  if(!name&&!leader)return null;
+  const out={
+    name:name||leader+'一系',
+    leader,
+    stance:FACTION_STANCES.includes(raw.stance)?raw.stance:'观望',
+    goal:String(raw.goal||'').slice(0,40),
+    power:Number(raw.power)>0?clamp01_100(raw.power):0,
+    attitude:FACTION_ATTITUDES.includes(raw.attitude)?raw.attitude:'观望',
+    members:Array.isArray(raw.members)?raw.members.map(x=>String(x)).filter(Boolean).slice(0,12):[],
+    step:String(raw.step||'').slice(0,90),
+    stepPlotId:String(raw.stepPlotId||'').slice(0,40),
+    stepLine:['支线','敌对','引线'].includes(raw.stepLine)?raw.stepLine:'支线',
+    stepGoal:String(raw.stepGoal||'').slice(0,60),
+    lastMove:Number(raw.lastMove)||0,
+    lastMoveKind:String(raw.lastMoveKind||'').slice(0,20),
+    notes:Array.isArray(raw.notes)?raw.notes.slice(-4).map(n=>({xun:String((n&&n.xun)||'').slice(0,24),text:String((n&&n.text)||n||'').slice(0,90)})).filter(n=>n.text):[],
+    defunct:!!raw.defunct
+  };
+  if(!out.power)out.power=factionPowerOf(out,s);
+  if(!raw.attitude){
+    const v=factionRelValue(out.leader,s);
+    out.attitude=v==null?'观望':v<=-20?'敌对':v>=50?'拉拢':(out.stance==='强硬'?'压制':'观望');
+  }
+  return out;
+}
+function factionLeaderCandidates(s){ // 旧档没有 factionLeaders 时，从关系账里挑有妃嫔位号的人，位高者先
+  const out=[];
+  for(const who in ((s||{}).relationships||{})){
+    if(/皇帝|太后|皇后/.test(who))continue;
+    if(rankScoreOf(who)<=0)continue;
+    const r=s.relationships[who];
+    if(r&&typeof r==='object'&&r.type==='仇恨')continue;
+    if(/幽禁|冷宫|禁足|已故|薨/.test(String((r&&r.note)||'')))continue;
+    out.push(who);
+  }
+  out.sort((a,b)=>rankScoreOf(b)-rankScoreOf(a));
+  return out;
+}
+function ensureFactions(s){ // 旧档/新档归一：world.factionLeaders → 派系账；缺成员从人物归属反推
+  if(!s)return [];
+  const out=[];
+  const add=raw=>{
+    const f=sanitizeFaction(raw,s);
+    if(f&&!out.some(x=>x.name===f.name))out.push(f);
+  };
+  if(Array.isArray(s.factions))for(const f of s.factions)add(f);
+  const leaders=Array.isArray((s.world||{}).factionLeaders)?s.world.factionLeaders:[];
+  for(const r of leaders)add(r);
+  if(!out.length&&Array.isArray((s.world||{}).factions)){
+    for(const n of s.world.factions)add({name:n,leader:'',stance:'观望',goal:''});
+  }
+  for(const f of out){
+    if(!f.leader){ // 没有领袖：从本档人物的 faction 字段里找位份最高者
+      const mem=Object.keys(s.npcs||{}).filter(id=>{const n=s.npcs[id];return n&&String(n.faction||'')===f.name});
+      mem.sort((a,b)=>rankScoreOf((s.npcs[b]||{}).rank)-rankScoreOf((s.npcs[a]||{}).rank));
+      if(mem.length)f.leader=(s.npcs[mem[0]]||{}).name||mem[0];
+    }
+    for(const id in (s.npcs||{})){
+      const n=s.npcs[id];
+      if(!n||String(n.faction||'')!==f.name)continue;
+      const nm=n.name||id;
+      if(nm===f.leader||id===f.leader)continue;
+      if(!f.members.includes(nm))f.members.push(nm);
+    }
+    f.members=f.members.slice(0,12);
+    if(!f.power)f.power=factionPowerOf(f,s);
+  }
+  // 旧档兜底：仍无领袖的派系，从关系账里按位份高低认一位领头人（只改一次，之后以账上为准）
+  const need=out.filter(f=>!f.leader);
+  if(need.length){
+    const cands=factionLeaderCandidates(s).filter(w=>!out.some(f=>f.leader===w));
+    for(const f of need){
+      const who=cands.shift();
+      if(!who)continue;
+      f.leader=who;
+      if(!/一系$/.test(f.name))f.name=who+'一系';
+      const v=factionRelValue(who,s);
+      if(!f.goal)f.goal='争宠固位';
+      if(f.stance==='观望')f.stance=v<=10?'强硬':(v>=50?'主和':'观望');
+      f.attitude=v==null?'观望':v<=-20?'敌对':v>=50?'拉拢':(f.stance==='强硬'?'压制':'观望');
+      f.power=factionPowerOf(f,s);
+    }
+  }
+  if(!s.factionFix1){ // 旧档一次性校正：按领袖位份与交情重算实力与立场，之后以账上为准（模型可再改）
+    for(const f of out){
+      f.power=factionPowerOf(f,s);
+      const v=factionRelValue(f.leader,s);
+      if(f.stance==='观望'&&v!=null)f.stance=v<=10?'强硬':(v>=50?'主和':'观望');
+      if(v!=null&&f.attitude!=='敌对')f.attitude=v<=-20?'敌对':v>=50?'拉拢':(f.stance==='强硬'?'压制':'观望');
+    }
+    s.factionFix1=true;
+  }
+  s.factions=out;
+  return out;
+}
+function recalcFactionAttitude(f){ // 态度跟着领袖与主控的亲疏走；敌对不自动降，只有剧情能解
+  if(!f||f.defunct)return f?f.attitude:'观望';
+  const t=relTier(f.leader);
+  if(t.key==='feud'){f.attitude='敌对';return f.attitude}
+  if(t.key==='close'||t.key==='ally'){if(f.attitude!=='敌对')f.attitude='拉拢';return f.attitude}
+  if(f.stance==='强硬'&&(t.key==='new'||t.key==='cold')){if(f.attitude!=='拉拢')f.attitude='压制';return f.attitude}
+  if(f.attitude==='压制')f.attitude='观望';
+  return f.attitude;
+}
+function factionMovePick(f){
+  const pool=FACTION_MOVES[f.attitude]||FACTION_MOVES['观望'];
+  const fresh=pool.filter(m=>m.kind!==f.lastMoveKind);
+  const use=fresh.length?fresh:pool;
+  return use[Math.floor(Math.random()*use.length)];
+}
+function factionClearStep(f){ // 该步已结（兑现/作废/到期落地）：清掉当前一步，别让模型照着旧棋继续演
+  if(!f)return;
+  f.step='';f.stepPlotId='';
+}
+function factionCanCollapse(f){ // 世界书写死的瓦解条件：领袖死亡，或被降至从四品以下
+  if(!f)return false;
+  const lead=factionNpc(f.leader)||((state&&state.npcs)||{})[f.leader];
+  const rel=((state&&state.relationships)||{})[f.leader];
+  if(rel&&/薨|病逝|已故|殁/.test(String((rel&&rel.note)||'')))return true;
+  if(!lead)return false;
+  if(lead.dead||/薨|病逝|殁/.test(String(lead.health||lead.state||'')))return true;
+  return rankScoreOf(lead.rank)<rankScoreOf('嫔');
+}
+function factionLandUnopposed(f){ // 到期无人应对：这一步就真落了地，前端记一笔可见损失
+  if(!f||f.defunct)return '';
+  const at=state&&state.protagonist&&state.protagonist.attributes;
+  if(f.attitude!=='压制'&&f.attitude!=='敌对')return '';
+  if(at&&at['威望']!=null)at['威望']=clamp01_100(Number(at['威望'])-2);
+  f.power=clamp01_100((Number(f.power)||0)+3);
+  f.notes=[...(f.notes||[]),{xun:fmtTime(),text:'无人理会，这一步落了地'}].slice(-4);
+  return '威望-2';
+}
+function factionTick(){ // 旬首排期：一派一步，落成剧情账；一次只许一家走棋
+  if(!state||!Array.isArray(state.factions)||!state.factions.length)return null;
+  const now=xunSerial(state.time);
+  const meta=ensurePlotMeta();
+  if((state.turn||0)<(meta.graceTurn||0))return null; // 初入宫缓冲：先让玩家认路
+  if((state.plots||[]).some(p=>p&&p.factionId&&p.stage==='进行中'))return null;
+  for(const f of state.factions)recalcFactionAttitude(f);
+  const ready=state.factions.filter(f=>!f.defunct&&f.leader&&(!f.lastMove||now-(Number(f.lastMove)||0)>=FACTION_MOVE_GAP));
+  if(!ready.length)return null;
+  ready.sort((a,b)=>(Number(a.lastMove)||0)-(Number(b.lastMove)||0)); // 最久没动的一派先走
+  const f=ready[0],mv=factionMovePick(f);
+  f.step=mv.step;f.stepLine=mv.line;f.stepGoal=mv.goal;
+  f.stepPlotId='p-faction-'+now;
+  f.lastMove=now;f.lastMoveKind=mv.kind;
+  f.notes=[...(f.notes||[]),{xun:fmtTime(),text:`${mv.title}：${mv.step}`}].slice(-4);
+  const dueText=(now%2)?'四旬内':'三旬内';
+  state.plots=mergePlots(state.plots,[{
+    id:'p-faction-'+now,
+    line:mv.line,
+    title:f.name+'·'+mv.title,
+    stage:'进行中',
+    goal:mv.goal,
+    note:mv.step,
+    dueText,
+    factionId:f.name
+  }],now);
+  return f;
+}
+function factionMoveBrief(){ // 灌进剧情裁决：本旬各派各走哪一步、这一步要落到谁身上
+  if(!state||!Array.isArray(state.factions)||!state.factions.length)return '';
+  const live=state.factions.filter(f=>!f.defunct);
+  const dead=state.factions.filter(f=>f.defunct);
+  if(!live.length&&!dead.length)return '';
+  const active=(state.plots||[]).filter(p=>p&&p.factionId&&p.stage==='进行中');
+  const rows=live.map(f=>{
+    const npc=factionNpc(f.leader);
+    const tr=npc?normalizePersona((npc.profile||{}).traits||[]).join('、'):'';
+    const mem=(f.members||[]).filter(m=>{const n=factionNpc(m);return n&&n.known}).slice(0,6);
+    const pl=active.find(p=>p.factionId===f.name);
+    const due=pl?(pl.latest!=null?serialTimeText(pl.latest):pl.dueText||'缓图'):'';
+    return `${f.name}｜领袖 ${f.leader||'未明'}${npc&&npc.rank?`（${npc.rank}${tr?`，${tr}`:''}）`:''}｜${f.stance}·${f.goal||'目标未明'}｜实力 ${f.power}｜对你：${f.attitude}`
+      +`\n  成员：${mem.length?mem.join('、'):'尚无相识的成员'}`
+      +`\n  当前一步：${f.step||'按兵不动'}${pl?`（已立账「${pl.title}」，限期 ${due}前，id=${pl.id}）`:''}`;
+  }).join('\n');
+  const off=dead.length?`\n名存实亡：${dead.map(f=>f.name+(f.leader?`（${f.leader}）`:'')).join('、')}——旧人还在，人心已散，只可写她们的零星动静，不得当作活派系发号施令。`:'';
+  const anyStep=live.some(f=>f.step);
+  return `\n【派系动向·本旬】
+${rows}${off}
+规矩：
+1. 派系不是独立剧情通道：每一步都要落到具体的人、物、差事、座次、份例、传话上。禁止只写“宫里暗流涌动”“众人心思各异”这类空转；一场派系戏必须有人当场得失（位份、差事、份例、眼线、人情、把柄，至少一项）。
+2. ${anyStep?'本旬有“当前一步”的派系，先在正文或后宫动态里演出它的可见痕迹（谁来了、动了什么、传了什么话），让主控看见、听见、起疑；不要当旬就逼她当场表态——清算留给该账到期那一旬。玩家若主动查问、当面应对，照常接戏并可达标兑现（statePatch.plots，stage 改“已兑现”）。':'本旬各派按兵不动：只允许在 haremNews 留一条可见痕迹（谁得了差事、谁被赏、谁宫里换了人），不得平地起派系冲突。'}
+3. 主控不入党派，除非玩家明确应下；不得替玩家表态、站队或收下人情。
+4. 派系实力、成员、态度与近况只经 statePatch.factions 回写：{"派系名":{"power":数字,"attitude":"拉拢/观望/压制/敌对","members":["…"],"step":"一句话","note":"本旬近况","defunct":false}}。power 单旬变动不超过 ±10；members 只写本档已有的人物；note 会进“最近动向”。
+5. 派系不得凭空出现或瓦解：领袖死亡或被降至从四品以下，前端才认瓦解；你只演事件，不自行宣布某系散了。
+6. 与暗流账分工：暗流是个人手段针对主控，派系是立场与资源。同一件事只走一本账，不要重复扣减。`;
 }
 
 /* ============================================================ 三途 · 命途（写死的主线）
@@ -3097,6 +3363,19 @@ const SCHEME_MODULE = [
 '4. 胜败都要见血见肉：胜则她的布置败露、须承担后果（失面、失宠、被查、反被拿住把柄），但她不会就此消失，仇更深；败则 target 所指之物实打实受损，写出失宠、罚俸、蒙冤、被夺、动了胎气之类后果，不许"有惊无险"。',
 '5. 玩家也可以在发难前抢先按住：若已有足够证据并采取了封堵、反将、借势、示弱卸力的具体行动，写 statePatch.schemeDefuse={"id":"条目 id"}；前端按"提前化解"结账。没有实证的硬指认不算化解。',
 '6. 暗流与节宴、恩宠账、剧情账可同场：宴上发难、席散后清算皆可；同旬只演一条主戏，其余并入，不另开场。'
+].join('\n');
+
+/* 宫中派系：前端排期，模型只演；派系账的每一步都要落到具体的人与物 */
+const FACTION_MODULE = [
+'## 二十二、宫中派系（factions；前端排期，模型只演）',
+'1. 存档 state.factions 是派系账：每系含 name（系名）、leader（领袖称谓）、stance（主和/主宠/观望/强硬/清流）、goal（近来图什么）、power（实力 0—100）、attitude（对你：拉拢/观望/压制/敌对）、members（成员）、step（当前一步）、notes（最近动向）。它由前端按领袖亲疏与位份排期，不靠你临时起意。',
+'2. 每旬裁决块附【派系动向·本旬】：列出各系的领袖性情、实力、对你的态度与当前一步。有“当前一步”的系，本旬必须在正文或 haremNews 里演出它的可见痕迹——谁来了、动了什么、传了什么话；让主控看见、听见、起疑，但不要当旬就逼她当场表态。清算留给该账到期那一旬。',
+'3. 派系不是独立剧情通道：它的每一步都要落到具体的人、物、差事、座次、份例、传话上，并接上主控已有的处境与人物关系。禁止只写“宫里暗流涌动”“众人心思各异”这类空转；一场派系戏必须有人当场得失（位份、差事、份例、眼线、人情、把柄，至少一项）。',
+'4. 派系的账目在剧情账里，id 形如 “p-faction-…”，标题用“系名·动作”。到期那一旬由前端裁决强制兑现：写成一场当面逼迫（压份例、挪座次、当面递话、查账、截机会等），给 2—4 个应对选项，停下等玩家抉择；不能写成虚惊一场，也不能让出手的派系无代价退走。玩家应对后，照常经 statePatch.plots 把该条 stage 改“已兑现”，后果写进 narrative/changes/statePatch。',
+'5. 主控不入党派，除非玩家明确应下；不得替玩家表态、站队、收下人情或自作主张加入某系。玩家若明确应下，才可写她入系，并在 statePatch.factions 里改该系 members 与 attitude。',
+'6. 派系实力、成员、态度与近况只经 statePatch.factions 回写：{"派系名":{"power":数字,"attitude":"拉拢/观望/压制/敌对","members":["…"],"step":"一句话","note":"本旬近况","defunct":false}}。power 单旬变动不超过 ±10，members 只写本档已有的人物，note 进“最近动向”。',
+'7. 派系不得凭空出现或瓦解：领袖死亡或被降至从四品以下，前端才认瓦解；你只演事件，不自行宣布某系散了，也不得为凑戏新造派系。',
+'8. 与暗流账分工：暗流是个人手段针对主控，派系是立场与资源。同一件事只走一本账，不重复扣减；派系动作可作为暗流的由头，但不能替代暗流的发难与结账。'
 ].join('\n');
 
 /* 三途·命途：主线由前端写死，模型只演不判 */
@@ -4659,6 +4938,7 @@ function normalizeState(s){
     }
   }
   ensureNpcRealNames(s); // 旧档人物补本名；已有本名不覆盖
+  ensureFactions(s); // 派系账：由 world.factionLeaders 与人物归属折回；新档补领袖与成员
   s.protagonist=s.protagonist||{};s.protagonist.attributes=s.protagonist.attributes||{};s.protagonist.skills=s.protagonist.skills||{};
   s.world=(s.world&&typeof s.world==='object')?s.world:{};
   if(s.world.emperor!=null&&typeof s.world.emperor!=='object')delete s.world.emperor; // 旧档脏数据兜底
@@ -4851,6 +5131,7 @@ let impView={};              // 读心笺窥见缓存：{npcId:{text,turn}}；�
 let soldNotes=[];            // 典卖通报队列（并入下一次主持人请求）
 let setPane='存档';          // 设置面板当前栏：存档|API|音乐|脱困
 let gongPane='行事';         // 宫务面板当前栏：行事|装潢|吩咐
+let gongpuPane='人物';       // 宫谱面板当前栏：人物|派系
 let selSkill=null;          // 才艺修习面板当前选中项
 let craftSel={mats:{},energy:20,inspiration:'',kind:null}; // 手作面板当前选料/精力/灵感/所做类别
 function craftQuestHint(){ // 手作/书画成品可能对应任务：相赠收场时提醒主持人把 plots 条目兑现落账
@@ -4955,7 +5236,18 @@ function compactState(s,focusMsg){ // 只压缩送入模型的那一份，localS
   const out=Object.assign({},s);
   out.turn=xunNoOf(s.turn); // 对外统一 1 起旬号，与指令里的「第N旬」一致
   // 前端内部标记与展示字段不送模型
-  for(const k of ['avatarMap','plotMeta','schemeMeta','xunBook','saveVersion','plotLedgerV1','pawnFix1','itemFlagV1','readMindV1','energyWarned','mealCount','lastSalaryMonth','lastFestSerial','lastFestPerfSerial','items','skillWorks','pieceSeq','craftV1','chamberV1','xunIntent','inviteTurn','postpartumUntil','decor'])delete out[k];
+  for(const k of ['avatarMap','plotMeta','schemeMeta','xunBook','saveVersion','plotLedgerV1','pawnFix1','itemFlagV1','readMindV1','energyWarned','mealCount','lastSalaryMonth','lastFestSerial','lastFestPerfSerial','items','skillWorks','pieceSeq','craftV1','chamberV1','xunIntent','inviteTurn','postpartumUntil','decor','factionFix1'])delete out[k];
+  // 派系账：只送模型够写的部分；排期时刻与期限由前端管，不送出去免得照抄出错位的旬号
+  if(Array.isArray(s.factions)){
+    out.factions=s.factions.map(f=>({
+      name:f.name,leader:f.leader,stance:f.stance,goal:f.goal,power:f.power,attitude:f.attitude,
+      members:(f.members||[]).slice(0,10),
+      step:String(f.step||'').slice(0,90),
+      notes:(f.notes||[]).slice(-2).map(n=>({xun:n.xun,text:n.text})),
+      defunct:!!f.defunct
+    }));
+    out.world=Object.assign({},s.world,{factions:out.factions.map(f=>f.name)}); // 旧字段与派系账同名同源，别让模型看到两套名字
+  }
   if(out.protagonist&&typeof out.protagonist==='object'){
     out.protagonist=Object.assign({},s.protagonist);
     delete out.protagonist.avatar; // 头像由前端按身份分配
@@ -5086,7 +5378,7 @@ function buildStaticSystem(){
       .replace('{{世界书全文：02-世界书.md}}',WORLD_BOOK_RUNTIME)
       .replace('{{叙事文风全文：03-叙事文风.md}}',STYLE_GUIDE)
       .replace('{{当前存档 JSON：04-当前存档-v36.json 或玩家当前档}}','（见本提示词末尾「当前存档」段，动态存档在最后）')
-      +'\n\n'+NPC_MODULE+'\n\n'+ENERGY_MODULE+'\n\n'+PLOTS_MODULE+'\n\n'+MAIN_LINE_MODULE+'\n\n'+SCHEME_MODULE+'\n\n'+FESTIVAL_MODULE+'\n\n'+EMPEROR_MODULE+'\n\n'+EMPEROR_PERSONA_MODULE+'\n\n'+CHAMBER_MODULE+'\n\n'+SCENE_MODULE+'\n\n'+SKILL_MODULE+'\n\n'+CRAFT_MODULE+'\n\n'+STUDIO_MODULE+'\n\n'+GIFT_MODULE+'\n\n'+PERFORM_MODULE+'\n\n'+PERSONA_MODULE+'\n\n'+PERSONA_ACT_MODULE+'\n\n'+LENGTH_MODULE+'\n\n'+PRESENCE_MODULE+'\n\n'+PLAY_UI_MODULE; // 只放与存档无关的常量：本档人物性情表是动态的，见 buildSystem
+      +'\n\n'+NPC_MODULE+'\n\n'+ENERGY_MODULE+'\n\n'+PLOTS_MODULE+'\n\n'+MAIN_LINE_MODULE+'\n\n'+SCHEME_MODULE+'\n\n'+FACTION_MODULE+'\n\n'+FESTIVAL_MODULE+'\n\n'+EMPEROR_MODULE+'\n\n'+EMPEROR_PERSONA_MODULE+'\n\n'+CHAMBER_MODULE+'\n\n'+SCENE_MODULE+'\n\n'+SKILL_MODULE+'\n\n'+CRAFT_MODULE+'\n\n'+STUDIO_MODULE+'\n\n'+GIFT_MODULE+'\n\n'+PERFORM_MODULE+'\n\n'+PERSONA_MODULE+'\n\n'+PERSONA_ACT_MODULE+'\n\n'+LENGTH_MODULE+'\n\n'+PRESENCE_MODULE+'\n\n'+PLAY_UI_MODULE; // 只放与存档无关的常量：本档人物性情表是动态的，见 buildSystem
   }
   return _staticSystem;
 }
@@ -5462,10 +5754,39 @@ function applyPatch(patch){
     if(k==='npcArc'){ // 各人眼下的事：{称谓: "一句话（含期限）"}
       const obj=patch[k]||{};for(const w in obj){const n=(state.npcs||{})[w]||Object.values(state.npcs||{}).find(x=>x&&(x.name===w||x.realName===w));if(n)n.arc=String(obj[w]||'').slice(0,120)}
       continue}
+    if(k==='factions'){ // 派系账：只认白名单字段；实力单旬±10；瓦解须过前端条件
+      const obj=patch[k];
+      if(obj&&typeof obj==='object'&&!Array.isArray(obj))for(const nm in obj){
+        const f=(state.factions||[]).find(x=>x&&(x.name===nm||x.leader===nm));
+        if(!f)continue;
+        const v=obj[nm]||{};
+        if(v.power!=null&&Number.isFinite(+v.power)){
+          const old=Number(f.power)||0,d=Math.max(-10,Math.min(10,Math.round(+v.power)-old));
+          f.power=clamp01_100(old+d);
+        }
+        if(FACTION_ATTITUDES.includes(v.attitude))f.attitude=v.attitude;
+        if(Array.isArray(v.members)){
+          const known=new Set([...Object.keys(state.npcs||{}).map(id=>((state.npcs[id]||{}).name||id)),...Object.keys(state.relationships||{})]);
+          f.members=[...new Set(v.members.map(String).filter(m=>known.has(m)))].slice(0,12);
+        }
+        if(v.step!=null)f.step=String(v.step).slice(0,90);
+        if(v.note)f.notes=[...(f.notes||[]),{xun:fmtTime(),text:String(v.note).slice(0,90)}].slice(-4);
+        if(v.defunct===true&&factionCanCollapse(f))f.defunct=true;
+        if(v.defunct===false)f.defunct=false;
+      }
+      continue;
+    }
     if(k==='turn')continue; // 回合数前端自管
     if(k==='time')continue;  // 日历前端自管（两旬制固定规则，避免与模型重复推进）
     if(k==='inventory.add'){addToInventory(Array.isArray(patch[k])?patch[k]:[patch[k]]);continue} // 行囊入库（前端合并件数）
-    if(k==='plots'){state.plots=mergePlots(state.plots,patch[k],xunSerial(state.time));continue} // 剧情台账按 id 增量合并；回写即记 touch=本旬（统一用 xunSerial 旬号，与发酵裁决同一单位）
+    if(k==='plots'){ // 剧情台账按 id 增量合并；回写即记 touch=本旬（统一用 xunSerial 旬号，与发酵裁决同一单位）
+      state.plots=mergePlots(state.plots,patch[k],xunSerial(state.time));
+      for(const f of (state.factions||[])){ // 派系那一步已结：清掉当前一步，免得模型照着旧棋继续演
+        if(!f.stepPlotId)continue;
+        const p=(state.plots||[]).find(x=>x.id===f.stepPlotId);
+        if(!p||p.stage!=='进行中')factionClearStep(f);
+      }
+      continue}
     if(k==='schemeExpose'){ // 玩家查实了暗流征兆：降难度、把图谋推到明处
       const raw=Array.isArray(patch[k])?patch[k]:[patch[k]];
       for(const x of raw){if(!x||!x.id)continue;const sc=(state.schemes||[]).find(y=>y&&y.id===String(x.id));if(!sc||sc.stage==='已了')continue;
@@ -6051,6 +6372,13 @@ const UI={
     if(!confirm('硬撑下去：此后每次到期直接扣威望与宠爱，不再给考场。'))return;
     ml.hard=true;mainLineSync();this.renderSheet('命途');
   },
+  factionWindHtml(){ // 局面里的派系风向：只写主控可知的公开态势，暗中图谋仍归暗流账
+    const fs=state.factions||[];
+    if(!fs.length)return '';
+    const rows=fs.map(f=>`<div class="itemrow"><span>${esc(f.name)}${f.defunct?' · 名存实亡':''}</span><span class="cnt">${esc(f.defunct?'旧人已散':f.attitude)} · ${esc(f.defunct?'渐无人提起':(f.step||'按兵不动'))}</span></div>`).join('');
+    return `<div class="sec"><div class="sec-cap">派系风向</div>${rows}
+      <div class="setbtns"><button class="btn btn-line" onclick="UI.openFactions()">宫中派系详情</button></div></div>`;
+  },
   sheetState(){ // 局面：当前局面 + 节令 + 剧情账（急的排前，行上标到期）+ 待续 + 命途/大事记
     const adj=(state.plots&&state.plots.length)?adjudicatePlots():{due:[],overdue:[],stale:[],pendStale:[]};
     const idOf=o=>String(o&&o.id);
@@ -6071,6 +6399,7 @@ const UI={
         ${state.time&&state.time.note?`<div class="itemrow"><span>${esc(state.time.note)}</span></div>`:''}
         ${state.nextStep?`<div class="itemrow"><span>下一步：${esc(state.nextStep)}</span></div>`:''}</div>
       ${festSec}
+      ${this.factionWindHtml()}
       ${this.festPerfHtml()}
       ${this.chamberLedgerHtml()}
       <div class="sec"><div class="sec-cap">剧情账</div>${plots}</div>
@@ -6569,7 +6898,7 @@ const UI={
     else if(name==='大事记')B.innerHTML=this.sheetChronicle();
     else if(name==='六宫')B.innerHTML=this.sheetVisit('妃');
     else if(name==='太医院')B.innerHTML=this.sheetVisit('医');
-    else if(name==='宫谱'||name==='人物')B.innerHTML=this.sheetNpcs();
+    else if(name==='宫谱'||name==='人物')B.innerHTML=(gongpuPane==='派系'?this.sheetFactions():this.sheetNpcs());
     else if(name==='NPC详情')B.innerHTML=this.sheetNpcDetail(param);
     else if(name==='宫务')B.innerHTML=this.sheetGongwu();
     else if(name==='设置')B.innerHTML=this.sheetSettings();
@@ -6936,17 +7265,49 @@ const UI={
     const tag=num==null?'—':(num>=50?'往来密切':(num>=20?'相熟':(num>0?'相识':(num===0?'初识':'有隙')))); // 只按数值客观描述熟悉程度：不用友善/敌意等感情词，也不采信模型自填的 type/note 标签
     return `<span class="relpill ${cls}">${esc(tag)}</span><span class="rel-v num">${num==null?'':num}</span>`;
   },
+  gongpuSeg(){
+    const b=(k,label)=>`<button class="seg ${gongpuPane===k?'on':''}" onclick="UI.setGongpuPane('${k}')">${label}</button>`;
+    return `<div class="segline">${b('人物','人物')}${b('派系','派系')}</div>`;
+  },
+  setGongpuPane(p){gongpuPane=(p==='派系')?'派系':'人物';UI.renderSheet('宫谱')},
+  openFactions(){gongpuPane='派系';UI.goSheet('宫谱')},
   sheetNpcs(){
+    const seg=this.gongpuSeg();
     const npcs=state.npcs||{};
     const ids=Object.keys(npcs).filter(id=>npcs[id].known);
     const rels=Object.keys(state.relationships||{});
     const metOnly=rels.filter(who=>!ids.includes(who));
-    if(!ids.length&&!metOnly.length)return '<div class="sec"><div class="sheet-note">尚无相识之人。</div></div>';
+    if(!ids.length&&!metOnly.length)return seg+'<div class="sec"><div class="sheet-note">尚无相识之人。</div></div>';
     const row=who=>this.npcRowHtml(who,`UI.goSheet('NPC详情','${esc(who)}')`);
-    return `<div class="sec"><div class="sec-cap">人物谱（${ids.length+metOnly.length}）</div>`+
+    return seg+`<div class="sec"><div class="sec-cap">人物谱（${ids.length+metOnly.length}）</div>`+
       ids.map(row).join('')+
       metOnly.map(row).join('')+
       `</div>`;
+  },
+  sheetFactions(){ // 宫中派系：只列主控可知的部分，暗中图谋仍在暗流账
+    const fs=(state.factions||[]).slice();
+    const seg=this.gongpuSeg();
+    if(!fs.length)return seg+'<div class="sec"><div class="sheet-note">宫中尚无成形的派系。</div></div>';
+    const order={敌对:0,压制:1,观望:2,拉拢:3};
+    fs.sort((a,b)=>(a.defunct?9:(order[a.attitude]??8))-(b.defunct?9:(order[b.attitude]??8)));
+    const cards=fs.map(f=>{
+      const npc=factionNpc(f.leader);
+      const rk=npc&&npc.rank?String(npc.rank):'';
+      const tr=npc?normalizePersona((npc.profile||{}).traits||[]).join('、'):'';
+      const mem=(f.members||[]).filter(m=>{const n=factionNpc(m);return n&&n.known});
+      const notes=(f.notes||[]).slice(-2).map(n=>`${n.xun?esc(n.xun)+'　':''}${esc(n.text)}`).join('<br>');
+      const pill=f.defunct?'p-mid':(f.attitude==='敌对'||f.attitude==='压制')?'p-bad':f.attitude==='拉拢'?'p-good':'p-mid';
+      return `<div class="faccard${f.defunct?' off':''}">
+        <div class="fac-head"><span class="fac-nm">${esc(f.name)}</span><span class="relpill ${pill}">${f.defunct?'名存实亡':esc(f.attitude)}</span></div>
+        <div class="fac-meta">领袖 ${esc(f.leader||'未明')}${rk?`（${esc(rk)}${tr?`，${esc(tr)}`:''}）`:''}　·　${esc(f.stance)}${f.goal?`　·　${esc(f.goal)}`:''}</div>
+        ${this.meter('实力',f.power,f.defunct?'m-ink':'m-indigo')}
+        <div class="rowline"><span class="rk">成员</span><span class="rv">${mem.length?mem.map(m=>esc(m)).join('、'):'尚无相识的成员'}</span></div>
+        ${f.defunct?'':(f.step?`<div class="fac-step"><b>当前一步</b>：${esc(f.step)}</div>`:`<div class="fac-step" style="color:var(--ink-soft)">按兵不动</div>`)}
+        ${notes?`<div class="sheet-note" style="margin-top:8px">最近动向<br>${notes}</div>`:''}
+      </div>`;
+    }).join('');
+    return seg+`<div class="sec"><div class="sec-cap">宫中派系（${fs.filter(f=>!f.defunct).length} 系在世）</div>${cards}</div>
+      <div class="sheet-note">只列你听说过的成员；没打过照面的人，名字不会凭空出现。派系的下一步与期限见「局面」的剧情账。</div>`;
   },
   mindSection(id){ // 对方对你：默认不可知；印象位即按钮，点击即耗读心笺一张即时生成，不落档
     const ta=npcSexOf(state,id)==='m'?'他':'她';
@@ -8819,6 +9180,7 @@ const Game={
     resetXunBook(); // 新的一旬从零开始记账
     if(salary&&state.xunBook)state.xunBook.salary=salary;
     refreshShop(state); // 商城三旬一换：跨入新一轮货色即重挑
+    try{factionTick()}catch(e){console.warn('[派系] 排期失败',e)} // 派系：一派一步，落成剧情账；本旬不用则静默
     persistCurrent();UI.updateStatusbar();
     if(salary)toast(`月俸入账：${salary.rank} ＋${salary.amount} 两`,3200);
     phase='FOCUS_SELECT'; // 新的一旬从住处即可直接安排行事
