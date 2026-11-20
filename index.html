@@ -271,6 +271,7 @@ button.itemrow .cnt{flex:none;max-width:48%;overflow:hidden;text-overflow:ellips
 .slot .sl-ops{display:flex;gap:8px}
 .slot .sl-ops button{flex:1;min-height:38px;border-radius:8px;border:1px solid var(--line);font-size:13px;color:var(--indigo)}
 .slot .sl-ops button.danger{color:var(--cinnabar)}
+.slot .sl-ops button[disabled]{opacity:.45}
 .slot.empty .sl-log{color:var(--ink-soft);font-style:italic}
 
 /* NPC */
@@ -4755,7 +4756,7 @@ function toast(msg,ms=2200){const el=$('#toast');el.textContent=msg;el.classList
 
 /* ============================================================ 设置 */
 const SET_KEY='sgd_settings';
-const DEFAULT_SETTINGS={apiKey:'',baseUrl:'https://api.deepseek.com/v1',model:'deepseek-chat',theme:'auto',stream:true,bgm:true,bgmTrack:1};
+const DEFAULT_SETTINGS={apiKey:'',baseUrl:'https://api.deepseek.com/v1',model:'deepseek-chat',theme:'auto',stream:true,bgm:true,bgmTrack:1,apiProfiles:[]};
 function loadSettings(){
   try{return Object.assign({},DEFAULT_SETTINGS,JSON.parse(localStorage.getItem(SET_KEY)||'{}'))}
   catch(e){return Object.assign({},DEFAULT_SETTINGS)}
@@ -4763,6 +4764,26 @@ function loadSettings(){
 function saveSettings(s){localStorage.setItem(SET_KEY,JSON.stringify(s));applyTheme()}
 function applyTheme(){const t=loadSettings().theme;document.documentElement.dataset.theme=t==='auto'?'':t}
 applyTheme();
+/* 常用接口：最多三份快照（地址＋模型＋Key＋流式）。切换只写回本机设置，不动存档。
+   去重按「地址＋模型＋Key」三样全同；同一份再存一次即覆盖。 */
+const API_PROFILES_MAX=3;
+function apiHostOf(u){
+  const raw=String(u||'').trim();
+  try{return new URL(raw).host||raw}
+  catch(e){return raw.replace(/^https?:\/\//,'').replace(/\/.*$/,'')||'自定义接口'}
+}
+function readApiProfiles(){
+  const list=loadSettings().apiProfiles;
+  return (Array.isArray(list)?list:[]).filter(p=>p&&p.baseUrl).slice(0,API_PROFILES_MAX);
+}
+function writeApiProfiles(list){
+  const s=loadSettings();s.apiProfiles=list.slice(0,API_PROFILES_MAX);saveSettings(s);
+}
+function apiProfileTail(key){const k=String(key||'');return k?('密钥 …'+k.slice(-4)):'未填密钥'}
+function apiProfileActive(p,s){
+  return !!p&&p.baseUrl===s.baseUrl&&(p.model||'deepseek-chat')===(s.model||'deepseek-chat')
+    &&(p.apiKey||'')===(s.apiKey||'')&&(p.stream!==false)===(s.stream!==false);
+}
 
 /* ============================================================ BGM
    曲目按加入顺序命名：一、二、三……；新增曲目只需在 BGM_TRACKS 末尾追加一项。
@@ -7414,7 +7435,17 @@ const UI={
   },
   paneApi(){
     const s=loadSettings();
-    return `<div class="sec"><div class="sec-cap">模型服务</div>
+    const profs=readApiProfiles();
+    const profHtml=profs.length?profs.map((p,i)=>`<div class="slot">
+        <div class="sl-head">${esc(apiHostOf(p.baseUrl))}<span class="sl-time">${apiProfileActive(p,s)?'使用中':''}</span></div>
+        <div class="sl-log">${esc(p.model||'deepseek-chat')} · ${esc(apiProfileTail(p.apiKey))}</div>
+        <div class="sl-ops"><button onclick="Game.applyApiProfile(${i})" ${apiProfileActive(p,s)?'disabled':''}>切换</button><button class="danger" onclick="Game.deleteApiProfile(${i})">删除</button></div>
+      </div>`).join(''):`<div class="slot empty"><div class="sl-head">还没有存过接口</div><div class="sl-log">填好下方配置后，点「存为常用」即可保存，最多三个。</div></div>`;
+    return `<div class="sec"><div class="sec-cap">常用接口 <span style="font-size:12px;font-weight:400;color:var(--ink-soft)">最多三个</span></div>
+      ${profHtml}
+      <div class="setbtns"><button class="btn btn-line" onclick="Game.saveApiProfile()">把当前填写存为常用</button></div>
+      <div class="sheet-note" style="margin-top:6px">点「切换」即刻换用，不必重填；只改本机配置，不影响存档。地址、模型与 Key 都相同的再存一次即覆盖，不另占一格。</div></div>
+      <div class="sec"><div class="sec-cap">模型服务</div>
       <div class="setrow"><span class="sk">API Key</span><input id="setKey" type="password" placeholder="sk-…" value="${esc(s.apiKey)}"></div>
       <div class="setrow"><span class="sk">接口地址</span><input id="setBase" placeholder="https://api.deepseek.com/v1" value="${esc(s.baseUrl)}"></div>
       <div class="setrow"><span class="sk">模型</span><input id="setModel" placeholder="deepseek-chat" value="${esc(s.model)}"></div>
@@ -11136,6 +11167,38 @@ const Game={
     const cur=loadSettings(); // 合并保存：别把背景音乐曲目、速率等本次没改的设置冲掉
     saveSettings(Object.assign({},cur,{apiKey:$('#setKey').value.trim(),baseUrl:$('#setBase').value.trim()||'https://api.deepseek.com/v1',model:$('#setModel').value.trim()||'deepseek-chat',theme:$('#setTheme').value,stream:$('#setStream').value!=='0'}));
     toast('设置已保存');
+  },
+  applyApiProfile(i){
+    const p=readApiProfiles()[i];if(!p){toast('没有这一份常用接口');return}
+    const s=loadSettings();
+    saveSettings(Object.assign({},s,{apiKey:p.apiKey||'',baseUrl:p.baseUrl,model:p.model||'deepseek-chat',stream:p.stream!==false}));
+    UI.renderSheet('设置');
+    toast('已切换到 '+apiHostOf(p.baseUrl));
+  },
+  deleteApiProfile(i){
+    const list=readApiProfiles();if(i<0||i>=list.length)return;
+    const gone=apiHostOf(list[i].baseUrl);
+    list.splice(i,1);writeApiProfiles(list);
+    UI.renderSheet('设置');toast('已删除 '+gone);
+  },
+  saveApiProfile(){
+    const base=$('#setBase').value.trim()||'https://api.deepseek.com/v1';
+    const model=$('#setModel').value.trim()||'deepseek-chat';
+    const key=$('#setKey').value.trim();
+    const stream=$('#setStream').value!=='0';
+    const s=loadSettings(); // 顺手把当前填写落成正在使用的配置
+    const list=readApiProfiles();
+    const entry={baseUrl:base,model,apiKey:key,stream};
+    const idx=list.findIndex(p=>p.baseUrl===base&&(p.model||'deepseek-chat')===model&&(p.apiKey||'')===key);
+    let msg;
+    if(idx>=0){list[idx]=entry;msg='已更新常用接口'}
+    else if(list.length>=API_PROFILES_MAX){
+      saveSettings(Object.assign({},s,{apiKey:key,baseUrl:base,model,stream}));
+      UI.renderSheet('设置');toast('当前配置已保存，但常用位已满（最多三个），请先删一个');
+      return;
+    }else{list.push(entry);msg='已存为常用接口'}
+    saveSettings(Object.assign({},s,{apiKey:key,baseUrl:base,model,stream,apiProfiles:list}));
+    UI.renderSheet('设置');toast(msg);
   },
   testApi(){
     this.saveSettingsFromUI();
