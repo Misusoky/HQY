@@ -5733,13 +5733,14 @@ async function callModel(userMsg,opts){
       if(!ok){const err=new Error('返回不是市集 JSON');err.raw=String(raw==null?'':raw).trim();err.invalidJson=true;throw err}
     }
   };
-  const send=async(messages,useStream=true)=>{
+  const send=async(messages,useStream=true,sansFormat=false)=>{
     const ctrl=new AbortController();abortCtrl=ctrl;
     let timedOut=false;
     const timer=setTimeout(()=>{timedOut=true;ctrl.abort()},timeoutMs);
     const started=Date.now();
     try{
-      const body={model:s.model||'deepseek-chat',messages,temperature:0.75,max_tokens:maxTokens,response_format:{type:'json_object'}};
+      const body={model:s.model||'deepseek-chat',messages,temperature:0.75,max_tokens:maxTokens};
+      if(!sansFormat)body.response_format={type:'json_object'};
       if(useStream)body.stream=true;
       const res=await fetch(s.baseUrl.replace(/\/+$/,'')+'/chat/completions',{
         method:'POST',signal:ctrl.signal,
@@ -5748,28 +5749,44 @@ async function callModel(userMsg,opts){
       });
       if(!res.ok){
         const text=(await res.text()).slice(0,300);
-        if(useStream&&(res.status===400||res.status===422)&&/stream|event-stream/i.test(text))return await send(messages,false); // 网关不支持流式：退回整包
+        if(useStream&&(res.status===400||res.status===422)&&/stream|event-stream/i.test(text))return await send(messages,false,sansFormat); // 网关不支持流式：退回整包
+        if(!sansFormat&&(res.status===400||res.status===422)&&/response_format|json_object|json mode/i.test(text))return await send(messages,useStream,true); // 网关不认 JSON 模式：去掉再要一次
         throw new Error('HTTP '+res.status+'：'+text);
       }
       const ctype=String(res.headers.get('content-type')||'');
       let content='',finish='',usage=null,respModel='';
+      const takeObj=obj=>{ // 一段增量或整包：OpenAI 的 choices、Gemini 原生 candidates、数组包体都认
+        if(!obj||typeof obj!=='object')return;
+        if(Array.isArray(obj)){for(const x of obj)takeObj(x);return}
+        if(obj.error){const em=obj.error.message||obj.error.code||JSON.stringify(obj.error);throw new Error('接口返回错误：'+em)}
+        if(obj.usage)usage=obj.usage;
+        else if(obj.usageMetadata&&!usage)usage={prompt_tokens:obj.usageMetadata.promptTokenCount,completion_tokens:obj.usageMetadata.candidatesTokenCount};
+        if(obj.model)respModel=obj.model;
+        const ch=obj.choices&&obj.choices[0];
+        if(ch){
+          const piece=modelText({content:(ch.delta&&ch.delta.content)||(ch.message&&ch.message.content)});
+          if(piece)content+=piece;
+          if(ch.finish_reason)finish=String(ch.finish_reason);
+          return;
+        }
+        const cand=obj.candidates&&obj.candidates[0];
+        if(!cand)return;
+        const parts=(cand.content&&Array.isArray(cand.content.parts))?cand.content.parts:[];
+        const piece=parts.map(x=>x&&typeof x.text==='string'?x.text:'').join('');
+        if(piece)content+=piece;
+        if(cand.finishReason)finish=String(cand.finishReason);
+      };
+      const onLine=line=>{
+        const str=line.replace(/\r$/,'').replace(/^\uFEFF/,'').trimStart();
+        if(!str||str.startsWith(':')||!str.startsWith('data:'))return;
+        const payload=str.slice(5).trim();
+        if(!payload||payload==='[DONE]')return;
+        let obj;try{obj=JSON.parse(payload)}catch(e){return}
+        takeObj(obj);
+      };
       if(useStream&&/text\/event-stream/i.test(ctype)&&res.body&&typeof res.body.getReader==='function'){
         const reader=res.body.getReader(),dec=new TextDecoder();
         let buf='';
-        const onLine=line=>{
-          const str=line.replace(/\r$/,'').replace(/^\uFEFF/,'').trimStart();
-          if(!str||str.startsWith(':')||!str.startsWith('data:'))return;
-          const payload=str.slice(5).trim();
-          if(!payload||payload==='[DONE]')return;
-          let obj;try{obj=JSON.parse(payload)}catch(e){return}
-          if(obj.error){const em=obj.error.message||obj.error.code||JSON.stringify(obj.error);throw new Error('接口返回错误：'+em)}
-          if(obj.usage)usage=obj.usage;
-          if(obj.model)respModel=obj.model;
-          const choice=obj.choices&&obj.choices[0];if(!choice)return;
-          const piece=modelText({content:choice.delta&&choice.delta.content});
-          if(piece)content+=piece;
-          if(choice.finish_reason)finish=String(choice.finish_reason);
-        };
         for(;;){
           const {done,value}=await reader.read();
           if(done)break;
@@ -5780,11 +5797,19 @@ async function callModel(userMsg,opts){
         buf+=dec.decode();
         if(buf.trim())onLine(buf);
       }else{
-        const data=await res.json();
-        usage=data.usage||null;respModel=data.model||'';
-        const choice=data.choices&&data.choices[0];
-        content=modelText(choice&&choice.message);
-        finish=String((choice&&choice.finish_reason)||'');
+        // 一律读文本再判：网关常把 SSE 标成 text/plain，或把限流/报错页当 HTTP 200 返回。
+        // res.json() 遇到非 JSON 时，Safari 抛的是「The string did not match the expected pattern.」，看不出所以然。
+        const raw=(await res.text()).trim();
+        if(raw&&/^data:/.test(raw)&&!/^[\[{]/.test(raw)){raw.split('\n').forEach(onLine)} // 标错类型的 SSE
+        else if(raw){
+          let data;
+          try{data=JSON.parse(raw)}catch(e){
+            const err=new Error(`接口返回的不是 JSON（HTTP ${res.status}${ctype?`，${ctype.split(';')[0]}`:''}）`);
+            err.raw=raw.slice(0,1200);
+            throw err;
+          }
+          takeObj(data);
+        }
       }
       if(usage){ // 耗时与 token 用量：用于判断慢在输入还是输出
         const u=usage;
@@ -5793,7 +5818,7 @@ async function callModel(userMsg,opts){
         console.info(`[API] ${sec.toFixed(1)}s  prompt ${u.prompt_tokens??'?'} / completion ${u.completion_tokens??'?'} tokens`
           +(u.prompt_cache_hit_tokens!=null?` / cache hit ${u.prompt_cache_hit_tokens}`:''));
       }
-      if(finish==='length'||finish==='max_tokens'){ // 截断的 JSON 必然解析失败，标记后由外层精简重试
+      if(finish==='length'||finish==='max_tokens'||finish==='MAX_TOKENS'){ // 截断的 JSON 必然解析失败，标记后由外层精简重试
         const err=new Error('输出达到长度上限被截断，JSON 未闭合');err.raw=content;err.truncated=true;throw err;
       }
       if(!String(content).trim()){ // JSON 模式会把无法识别的输出替换成空格：这是接口已知问题，自动重试
@@ -11584,14 +11609,18 @@ const Game={
       body:JSON.stringify({model:s.model||'deepseek-chat',messages:[{role:'user',content:'ping'}],max_tokens:1})
     }).then(async r=>{
       const ms=Date.now()-t0;
-      if(r.ok){
-        let model='';try{model=(await r.json()).model||''}catch(e){}
+      const txt=await r.text().catch(()=>'');
+      let j=null;try{j=JSON.parse(txt)}catch(e){}
+      if(r.ok&&j){ // 只认回得来的 JSON：HTTP 200 也可能是网关的错误页或纯文本
+        const model=j.model||'';
         res.style.background='var(--delta-down)';res.style.color='var(--indigo)';
         res.textContent='✓ 连通正常（'+ms+'ms'+(model?' · '+model:'')+'）';
-      }else{
-        const txt=(await r.text().catch(()=>'')).slice(0,300);
+      }else if(r.ok){
         res.style.background='var(--delta-up)';res.style.color='var(--cinnabar)';
-        res.textContent='✕ HTTP '+r.status+' '+r.statusText+(txt?'：'+txt:'');
+        res.textContent='✕ HTTP 200，但返回的不是 JSON：'+String(txt).slice(0,120);
+      }else{
+        res.style.background='var(--delta-up)';res.style.color='var(--cinnabar)';
+        res.textContent='✕ HTTP '+r.status+' '+r.statusText+(txt?'：'+String(txt).slice(0,300):'');
       }
     }).catch(e=>{
       res.style.background='var(--delta-up)';res.style.color='var(--cinnabar)';
