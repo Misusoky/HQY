@@ -458,6 +458,18 @@ button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:cente
 .chat-tool{flex:1;min-height:44px;border-radius:12px;border:1px solid var(--line);background:var(--paper);font-size:14px;letter-spacing:.14em;text-indent:.14em;color:var(--ink-soft)}
 .chat-tool.gift{border-color:var(--line-gold);color:var(--gold)}
 .chat-tool:active{border-color:var(--cinnabar);color:var(--cinnabar)}
+/* 对话中也留住底部页签：随时翻看状态、行囊、才艺 */
+.chatview .chat-opts{padding-bottom:10px}
+.chat-tabbar{position:relative;flex:none;z-index:2;height:calc(58px + var(--sab))}
+.chat-tabbar .tab svg{width:21px;height:21px}
+.chat-tabbar .tab{font-size:11px}
+/* 曲目／舞段／医案：不入行囊的成品 */
+.piececard{border:1px solid var(--line);border-radius:12px;background:var(--paper);padding:10px 12px;margin-bottom:8px}
+.piece-top{display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.4}
+.piece-top .pc-name{flex:1;letter-spacing:.06em}
+.pc-meta{font-size:12px;color:var(--ink-soft);margin-top:4px;line-height:1.65}
+.pc-btns{display:flex;gap:8px;margin-top:8px}
+.pc-btns .btn{flex:1;min-height:38px;font-size:13px;padding:0 8px}
 /* 宫城图：全屏目的地选择 */
 .mapview{position:fixed;inset:0;z-index:30;display:none;flex-direction:column;background:var(--paper)}
 .mapview.on{display:flex}
@@ -556,6 +568,25 @@ button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:cente
   <div class="chat-head num"><button onclick="Game.closeChat()">◀ 返回</button><span class="ch-ava" id="chatAva"></span><span class="ch-title" id="chatTitle">剧情对话</span><span class="fh-time" id="chatClock"></span></div>
   <div class="chat-body" id="chatBody"></div>
   <div class="chat-opts" id="chatOpts"></div>
+  <nav class="tabbar chat-tabbar" id="chatTabbar">
+    <i class="nav-corners"></i>
+    <button class="tab" data-tab="状态" onclick="UI.openSheet('状态',this)" aria-label="状态">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="4.9" r="1.7"/><path d="M12 6.6v1.2"/><rect x="7.4" y="7.8" width="9.2" height="11.6" rx="2.6"/><path d="M10 11.7h4M10 14.3h4"/><path d="M10.5 19.4v1.9M12 19.4v2.3M13.5 19.4v1.9"/></svg>
+      <span class="tab-label">状态</span>
+    </button>
+    <button class="tab" data-tab="行囊" onclick="UI.openSheet('行囊',this)" aria-label="行囊">
+      <svg viewBox="0 0 24 24"><path d="M12 7.6C10.3 5.4 8.3 5.8 8.6 7.9"/><path d="M12 7.6c1.7-2.2 3.7-1.8 3.4.3"/><path d="M12 8.6c-3.8 0-6.6 2-6.6 4.6 0 3.9 3 6.2 6.6 6.2s6.6-2.3 6.6-6.2c0-2.6-2.8-4.6-6.6-4.6Z"/><path d="M12 8.8 6.6 18.4M12 8.8l5.4 9.6"/></svg>
+      <span class="tab-label">行囊</span>
+    </button>
+    <button class="tab" data-tab="宫谱" onclick="UI.openSheet('宫谱',this)" aria-label="宫谱">
+      <svg viewBox="0 0 24 24"><rect x="6.6" y="4.6" width="10.8" height="14.8" rx="1.1"/><path d="M15.4 4.6v14.8"/><path d="M14.3 8.4h2.2M14.3 15.6h2.2"/><rect x="8.7" y="7" width="3.3" height="5.6" rx=".5"/></svg>
+      <span class="tab-label">宫谱</span>
+    </button>
+    <button class="tab" data-tab="宫务" onclick="UI.openSheet('宫务',this)" aria-label="宫务">
+      <svg viewBox="0 0 24 24"><path d="M4.5 10.5 12 5l7.5 5.5"/><path d="M6.5 10.5V18M17.5 10.5V18M4 19h16"/><path d="M10 19v-4.6h4V19"/></svg>
+      <span class="tab-label">宫务</span>
+    </button>
+  </nav>
 </div>
 <!-- 宫城图：出门选目的地 -->
 <div class="mapview" id="mapview">
@@ -3182,6 +3213,15 @@ const GIFT_MODULE = [
 '5. 若赠出的正是剧情账所系之物，对方收下时须同轮把对应 plots 条目 stage 改为"已兑现"，并完成任务积分与任务进度；只写"收下了"而漏账，视为未兑现。'
 ].join('\n');
 
+/* 献艺：对话中的独立行动，精力由前端照扣，模型只演反应并按 statePatch 结算关系 */
+const PERFORM_MODULE = [
+'## 二十、献艺与施治（剧情对话中的独立行动）',
+'1. 玩家可在对话中从「才艺」面板取出已成曲目或舞段当场献上，或取出一册亲录医案为对方施治；也可在节宴席上择曲献艺。对话中的献艺耗精力已由前端扣除，正文只演对方与在场者的反应，不得重复扣精力。',
+'2. 本轮只结算这次献艺／施治：关系、恩宠、任务、待续的变化可写入 statePatch；不得借献艺结算才艺、属性成长或与献艺无关的数值。',
+'3. 成色只看作品品质、熟练、场合、对方性情与眼前局势：听得入神、敷衍、挑剔、被勾起旧事、赞许或失礼都是有效结果；品质与熟练只是更好的起点，不保证得脸。',
+'4. 节宴献艺由前端本地结算，正文若提到席上献艺，以存档与前端结果为准，不另掷成败；同一场宴不重复献艺。'
+].join('\n');
+
 /* 言行态度：外貌与忌惮如何影响 NPC 的说话方式；本旬档位由 presenceBrief 动态追加进系统提示 */
 const PRESENCE_MODULE = [
 '## 十七、言行态度（外貌 × 忌惮，优先级高于旧例）',
@@ -3605,7 +3645,14 @@ const SKILL_WORK_TITLES={
 const SKILL_WORK_KIND={琴:'曲',棋:'棋谱',书:'字幅',画:'画稿',歌:'唱段',舞:'舞谱',女红:'绣样',医术:'医案',莳花:'花谱',香道:'香方'};
 const WORK_TRAITS=['清雅','端丽','古拙','温润','疏朗','绵密','灵动','沉静','妍秀','质朴','苍秀','妍雅'];
 const WORK_QUALITIES=['粗陋','寻常','精巧','珍品','绝品'];
+/* 歌、舞、医术的成品不占行囊：作为曲目／舞段／医案收进才艺面板，供温习与人前献艺 */
+const PIECE_SKILLS={歌:'唱段',舞:'舞段',医术:'医案'};
+const PIECE_LABELS={歌:'曲目',舞:'舞段',医术:'医案'};
 function skillWorks(){return state.skillWorks=state.skillWorks&&typeof state.skillWorks==='object'?state.skillWorks:{}}
+function repertoire(){return state.repertoire=Array.isArray(state.repertoire)?state.repertoire:[]}
+function piecesOfSkill(k){return repertoire().filter(pc=>pc&&pc.skill===k)}
+function pieceById(id){return repertoire().find(pc=>pc&&pc.id===id)||null}
+function nextPieceId(){state.pieceSeq=(Number(state.pieceSeq)||0)+1;return 'pc'+state.pieceSeq}
 function newSkillWork(k,skillName){
   const pool=SKILL_WORK_TITLES[k]||['《课业》'];
   const title=pool[Math.floor(Math.random()*pool.length)];
@@ -3631,10 +3678,33 @@ function advanceSkillWork(k,skillName,mode,accepted,skillValue){ // 推进一件
   for(let i=0;i<nTraits;i++){const t=WORK_TRAITS[Math.floor(Math.random()*WORK_TRAITS.length)];if(!traits.includes(t))traits.push(t)}
   const kindDesc={曲:'一支完整的曲子，指法、气口与收放都已齐备。',棋谱:'一局完整的棋谱，起手、中盘与收束都记了下来。',字幅:'一幅完整的字，笔意、间架与落款都成了。',画稿:'一幅完整的画稿，山石、留白与题款都已收拾停当。',唱段:'一支完整的唱段，字正腔圆，气口也顺了。',舞谱:'一段完整的舞，起势、回旋与收束都记成了谱。',绣样:'一件绣样收针，配色与针脚都已齐整。',医案:'一册医案理成，脉证与方药对得上。',花谱:'一册花谱记成，节候、土宜与接法都写清了。',香方:'一炉香合成了，底料与火候都记了下来。'}[w.kind]||'一件功课做成了。';
   const qDesc={粗陋:'手艺尚生，却是亲手做成的。',寻常:'中规中矩，拿得出手。',精巧:'看得出用了心，细处经得起看。',珍品:'在这一门里已是难得的佳作。',绝品:'可遇不可求，连你自己也知道这一件不同寻常。'}[quality];
-  const item={name:w.title,count:1,note:`功课·${skillName}`,usable:false,pawnable:true,crafted:true,category:w.kind,quality,traits,description:`${w.title}，${w.kind}，${traits.join('、')}。${kindDesc}${qDesc}`,src:'功课',maker:(state.protagonist&&state.protagonist.name)||'',inspiration:`${skillName}·${w.kind}`};
+  const description=`${w.title}，${w.kind}，${traits.join('、')}。${kindDesc}${qDesc}`;
+  if(PIECE_SKILLS[k]){ // 歌舞医：收进才艺面板，不入行囊
+    const pc={id:nextPieceId(),name:w.title,skill:k,skillName,kind:w.kind,quality,traits,description,mastery:0,madeTurn:Number(state.turn)||0,perfCount:0,lastPerfSerial:null};
+    repertoire().push(pc);
+    delete W[skillName];
+    return {work:w,completed:true,piece:pc};
+  }
+  const item={name:w.title,count:1,note:`功课·${skillName}`,usable:false,pawnable:true,crafted:true,category:w.kind,quality,traits,description,src:'功课',maker:(state.protagonist&&state.protagonist.name)||'',inspiration:`${skillName}·${w.kind}`};
   addToInventory([item]);
   delete W[skillName];
   return {work:w,completed:true,item};
+}
+function migratePieceItems(s){ // 旧档迁移：歌／舞／医术的功课成品原本压在行囊里，改收进才艺面板
+  if(!s||!Array.isArray(s.inventory)||!s.inventory.length)return false;
+  if(!Array.isArray(s.repertoire))s.repertoire=[];
+  const map={'歌艺':'歌','舞艺':'舞','医术':'医术'};
+  let moved=false;
+  for(let i=s.inventory.length-1;i>=0;i--){
+    const it=s.inventory[i];if(!it||it.src!=='功课')continue;
+    const m=String(it.inspiration||'').match(/^(歌艺|舞艺|医术)[·\s]/);if(!m)continue;
+    const k=map[m[1]];if(!k)continue;
+    s.pieceSeq=(Number(s.pieceSeq)||0)+1;
+    s.repertoire.push({id:'pc'+s.pieceSeq,name:it.name,skill:k,skillName:m[1],kind:it.category||PIECE_SKILLS[k],quality:it.quality||'寻常',traits:Array.isArray(it.traits)?it.traits:[],description:it.description||'',mastery:0,madeTurn:Number(s.turn)||0,perfCount:0,lastPerfSerial:null});
+    s.inventory.splice(i,1);
+    moved=true;
+  }
+  return moved;
 }
 function bondValue(s,who){ // 可作交情的数值：仇恨不算；帝的宠爱视同好感
   const rel=(s&&s.relationships||{})[who];
@@ -4534,6 +4604,8 @@ function normalizeState(s){
   if(typeof s.mealCount!=='number'||!(s.mealCount>=0))s.mealCount=0; // 本旬已传膳次数（每旬至多三次）
   libState(s); // 藏书阁账目：旧档首次编目上架，缺项补齐
   studioState(s); // 墨妙斋账目：旧档/新档补份例纸墨与作品记录
+  s.repertoire=Array.isArray(s.repertoire)?s.repertoire:[]; // 歌舞医的成品：曲目／舞段／医案
+  migratePieceItems(s); // 旧版功课成品若还在行囊，移入才艺面板
   for(const id in s.npcs){ // 人物档案补全：旧档或模型新建的人物缺字段时人物谱会直接报错
     const n=s.npcs[id];if(!n||typeof n!=='object')continue;
     ensureNpcSkills(n,id); // 补才艺：求师名单据此生成
@@ -4850,7 +4922,7 @@ function compactState(s,focusMsg){ // 只压缩送入模型的那一份，localS
   const out=Object.assign({},s);
   out.turn=xunNoOf(s.turn); // 对外统一 1 起旬号，与指令里的「第N旬」一致
   // 前端内部标记与展示字段不送模型
-  for(const k of ['avatarMap','plotMeta','schemeMeta','xunBook','saveVersion','plotLedgerV1','pawnFix1','itemFlagV1','readMindV1','energyWarned','mealCount','lastSalaryMonth','lastFestSerial','lastFestPerfSerial','items','skillWorks','craftV1','chamberV1','xunIntent','inviteTurn','postpartumUntil','decor'])delete out[k];
+  for(const k of ['avatarMap','plotMeta','schemeMeta','xunBook','saveVersion','plotLedgerV1','pawnFix1','itemFlagV1','readMindV1','energyWarned','mealCount','lastSalaryMonth','lastFestSerial','lastFestPerfSerial','items','skillWorks','pieceSeq','craftV1','chamberV1','xunIntent','inviteTurn','postpartumUntil','decor'])delete out[k];
   if(out.protagonist&&typeof out.protagonist==='object'){
     out.protagonist=Object.assign({},s.protagonist);
     delete out.protagonist.avatar; // 头像由前端按身份分配
@@ -4872,6 +4944,11 @@ function compactState(s,focusMsg){ // 只压缩送入模型的那一份，localS
     const h=Array.isArray(s.craft.history)?s.craft.history:[];
     out.craft={recent:h.slice(-3).map(x=>({time:x.time,name:x.name,quality:x.quality,traits:x.traits}))};
   }
+  // 曲目／舞段／医案：只送名目、品质与熟练度，内部 id 与旬号不送
+  if(Array.isArray(s.repertoire))out.repertoire=s.repertoire.map(pc=>({
+    name:pc.name,skill:pc.skill,kind:pc.kind,quality:pc.quality,mastery:Number(pc.mastery)||0,
+    traits:Array.isArray(pc.traits)?pc.traits.slice(0,3):[]
+  }));
   // 商城由前端管理，模型无需每旬背整张价目表
   if(out.system&&typeof out.system==='object'){out.system=Object.assign({},s.system);delete out.system.shop;delete out.system.shopCycle}
   // 关系备注截断
@@ -4976,7 +5053,7 @@ function buildStaticSystem(){
       .replace('{{世界书全文：02-世界书.md}}',WORLD_BOOK_RUNTIME)
       .replace('{{叙事文风全文：03-叙事文风.md}}',STYLE_GUIDE)
       .replace('{{当前存档 JSON：04-当前存档-v36.json 或玩家当前档}}','（见本提示词末尾「当前存档」段，动态存档在最后）')
-      +'\n\n'+NPC_MODULE+'\n\n'+ENERGY_MODULE+'\n\n'+PLOTS_MODULE+'\n\n'+MAIN_LINE_MODULE+'\n\n'+SCHEME_MODULE+'\n\n'+FESTIVAL_MODULE+'\n\n'+EMPEROR_MODULE+'\n\n'+EMPEROR_PERSONA_MODULE+'\n\n'+CHAMBER_MODULE+'\n\n'+SCENE_MODULE+'\n\n'+SKILL_MODULE+'\n\n'+CRAFT_MODULE+'\n\n'+STUDIO_MODULE+'\n\n'+GIFT_MODULE+'\n\n'+PERSONA_MODULE+'\n\n'+PERSONA_ACT_MODULE+'\n\n'+LENGTH_MODULE+'\n\n'+PRESENCE_MODULE+'\n\n'+PLAY_UI_MODULE; // 只放与存档无关的常量：本档人物性情表是动态的，见 buildSystem
+      +'\n\n'+NPC_MODULE+'\n\n'+ENERGY_MODULE+'\n\n'+PLOTS_MODULE+'\n\n'+MAIN_LINE_MODULE+'\n\n'+SCHEME_MODULE+'\n\n'+FESTIVAL_MODULE+'\n\n'+EMPEROR_MODULE+'\n\n'+EMPEROR_PERSONA_MODULE+'\n\n'+CHAMBER_MODULE+'\n\n'+SCENE_MODULE+'\n\n'+SKILL_MODULE+'\n\n'+CRAFT_MODULE+'\n\n'+STUDIO_MODULE+'\n\n'+GIFT_MODULE+'\n\n'+PERFORM_MODULE+'\n\n'+PERSONA_MODULE+'\n\n'+PERSONA_ACT_MODULE+'\n\n'+LENGTH_MODULE+'\n\n'+PRESENCE_MODULE+'\n\n'+PLAY_UI_MODULE; // 只放与存档无关的常量：本档人物性情表是动态的，见 buildSystem
   }
   return _staticSystem;
 }
@@ -5733,20 +5810,26 @@ const UI={
     const cost=focusEnergyCost('节宴献艺');
     return `<div class="sec"><div class="sec-cap">节宴献艺 · ${esc(fest.name)}</div>
       <div class="sheet-note" style="margin:0 0 6px">${done?'本旬已在席间献过艺，余下的工夫留给自己。':'趁宴未散，可当席献一门才艺。成算看才艺高低与当场精神；精力低于二十五时容易失手。一宴只可献一回。'}</div>
-      ${done?'':`<div class="setbtns" style="margin:0"><button class="btn btn-primary" onclick="UI.openSheet('节宴献艺')">择一门才艺献上 · 精力 −${cost}</button></div>`}</div>`;
+      ${done?'':`<div class="setbtns" style="margin:0"><button class="btn btn-primary" onclick="UI.openSheet('节宴献艺')">择一门才艺或曲目献上 · 精力 −${cost}</button></div>`}</div>`;
   },
-  sheetFestPerf(){ // 节宴献艺：选一门已入门的才艺
+  sheetFestPerf(){ // 节宴献艺：选一门已入门的才艺；歌舞若已成曲目，可直接择曲
     const fest=festivalOf(state.time);
     if(!fest)return '<div class="sec"><div class="sheet-note">本旬没有固定节宴。</div></div>';
     const done=state.lastFestPerfSerial===xunSerial(state.time);
     const sk=(state.protagonist&&state.protagonist.skills)||{};
     const rows=SKILL_POOL.filter(k=>skillKeyIn(sk,k)).map(k=>{
       const key=skillKeyIn(sk,k),v=Number(sk[key])||0;
+      if((k==='歌'||k==='舞')&&piecesOfSkill(k).length){
+        return piecesOfSkill(k).map(pc=>{
+          const mt=Math.max(0,Math.min(100,Number(pc.mastery)||0));
+          return `<button class="npcrow" ${done?'disabled style="opacity:.45"':''} onclick="Game.festPerform('${k}','${pc.id}')"><span class="nr-name">《${esc(pc.name)}》</span><span class="nr-depth">${esc(pc.quality||'寻常')} · 熟练 ${mt} · 成算更稳</span></button>`;
+        }).join('')+`<button class="npcrow" ${done?'disabled style="opacity:.45"':''} onclick="Game.festPerform('${k}')"><span class="nr-name">即席${k==='歌'?'唱':'舞'}一段</span><span class="nr-depth">${SKILL_LEVEL(v)} ${v} · 未成曲目，全看临场</span></button>`;
+      }
       const note=v>=70?'出众，压得住场':v>=50?'娴熟，不怯场':v>=30?'入门，看临场':'生疏，容易怯场';
       return `<button class="npcrow" ${done?'disabled style="opacity:.45"':''} onclick="Game.festPerform('${k}')"><span class="nr-name">${k}</span><span class="nr-depth">${SKILL_LEVEL(v)} ${v} · ${note}</span></button>`;
     }).join('');
     return `<div class="sec"><div class="sec-cap">${esc(fest.name)} · 席间献艺</div>
-      <div class="sheet-note">成算全看这门才艺与当场精神；大宴人多，压得住场便更露脸。献艺耗精力 ${focusEnergyCost('节宴献艺')}，一宴只可一回。${done?'<br>本旬已经献过了。':''}</div>
+      <div class="sheet-note">成算全看这门才艺、曲目成色与当场精神；大宴人多，压得住场便更露脸。献艺耗精力 ${focusEnergyCost('节宴献艺')}，一宴只可一回。${done?'<br>本旬已经献过了。':''}</div>
       ${rows||'<div class="sheet-note">你还没有可献的才艺——先去「才艺修习」入门一门。</div>'}
       <div class="setbtns"><button class="btn btn-line" onclick="UI.openSheet('宫务')">返回宫务</button></div></div>`;
   },
@@ -5964,6 +6047,7 @@ const UI={
   /* 才艺修习（v2 网格面板） */
   sheetSkills(){
     const sk=(state.protagonist&&state.protagonist.skills)||{};
+    const inScene=phase==='EVENT_CHOICE';
     const cells=SKILL_POOL.map(k=>{
       const key=skillKeyIn(sk,k),v=key?Number(sk[key])||0:0;
       if(!key)return `<button class="skillcell lock" onclick="UI.goSheet('求艺','${k}')"><span>${k}</span><span class="slv">未解锁 · 求师／寻书</span></button>`;
@@ -5971,24 +6055,57 @@ const UI={
       return `<button class="skillcell${sel}" onclick="UI.pickSkill('${k}')"><span>${k}</span><span class="slv">${v>0?SKILL_LEVEL(v)+' '+v:'未学'}</span></button>`;
     }).join('');
     const cost=focusEnergyCost('才艺修习');
+    const energy=Number(state.energy)||0;
     const bk=selSkill?libHeldBook(state,selSkill):null;
     const teacher=selSkill?practiceTeacherFor(selSkill):null;
     const workKey=selSkill?(CR_SKILLNAME[selSkill]||selSkill):'';
     const wk=workKey?skillWorks()[workKey]:null;
     const workHtml=selSkill?(wk?`<div class="sec"><div class="sec-cap">手上的功课</div>
         <div class="itemrow"><span>${esc(wk.title)}（${esc(wk.kind)}）</span><span class="cnt">${wk.progress}／${wk.need}</span></div>
-        <div class="sheet-note" style="margin:6px 0 0">再修习 ${Math.max(0,wk.need-wk.progress)} 次可成；临帖读谱、请人陪练会让成品更精。成件后入行囊，可赠、可献、可陈设。</div></div>`:`<div class="sheet-note" style="margin:8px 0 0">这门眼下没有起头的功课；下一次修习会起一件，三次成篇。</div>`):'';
+        <div class="sheet-note" style="margin:6px 0 0">再修习 ${Math.max(0,wk.need-wk.progress)} 次可成；临帖读谱、请人陪练会让成品更精。${PIECE_SKILLS[selSkill]?(selSkill==='医术'?'成件后列入下方医案，不入行囊，可温习、可在人前施治。':'成件后列入下方'+PIECE_LABELS[selSkill]+'，不入行囊，可温习、可在席间或人前献艺。'):'成件后入行囊，可赠、可献、可陈设。'}</div></div>`:`<div class="sheet-note" style="margin:8px 0 0">这门眼下没有起头的功课；下一次修习会起一件，三次成篇。</div>`):'';
     const modeHtml=selSkill?`<div class="sec"><div class="sec-cap">怎么练「${esc(selSkill)}」</div>
-        <div class="sheet-note" style="margin:0 0 6px">眼下 ${esc(SKILL_LEVEL(Number((sk[skillKeyIn(sk,selSkill)]||0))))}。三种练法同耗 ${cost} 精力，进益与代价不同。</div>
-        <button class="npcrow" onclick="Game.practiceSkill('solo')"><span class="nr-name">独自苦练</span><span class="nr-depth">稳进 1—2 点 · 无门槛</span></button>
-        <button class="npcrow" ${bk?'':'disabled style="opacity:.45"'} onclick="Game.practiceSkill('book')"><span class="nr-name">临帖／读谱</span><span class="nr-depth">${bk?`${esc(bk.name)}在案 · 进益 3—4 点`:'手边没有此艺谱册'}</span></button>
-        <button class="npcrow" ${teacher?'':'disabled style="opacity:.45"'} onclick="Game.practiceSkill('teacher')"><span class="nr-name">请教／陪练</span><span class="nr-depth">${teacher?`${esc(teacher.name)}（此艺 ${teacher.tv}）· 进益 3—4 点，也可能婉拒`:'没有可请教的人——须相熟、且此艺高过你'}</span></button>
+        <div class="sheet-note" style="margin:0 0 6px">眼下 ${esc(SKILL_LEVEL(Number((sk[skillKeyIn(sk,selSkill)]||0))))}。三种练法同耗 ${cost} 精力，进益与代价不同。${inScene?'<br>对话中只可查看，修习须回住处。':''}</div>
+        <button class="npcrow" ${(inScene||energy<cost)?'disabled style="opacity:.45"':''} onclick="Game.practiceSkill('solo')"><span class="nr-name">独自苦练</span><span class="nr-depth">稳进 1—2 点 · 无门槛</span></button>
+        <button class="npcrow" ${(!bk||inScene||energy<cost)?'disabled style="opacity:.45"':''} onclick="Game.practiceSkill('book')"><span class="nr-name">临帖／读谱</span><span class="nr-depth">${bk?`${esc(bk.name)}在案 · 进益 3—4 点`:'手边没有此艺谱册'}</span></button>
+        <button class="npcrow" ${(!teacher||inScene||energy<cost)?'disabled style="opacity:.45"':''} onclick="Game.practiceSkill('teacher')"><span class="nr-name">请教／陪练</span><span class="nr-depth">${teacher?`${esc(teacher.name)}（此艺 ${teacher.tv}）· 进益 3—4 点，也可能婉拒`:'没有可请教的人——须相熟、且此艺高过你'}</span></button>
       </div>`:`<button class="btn btn-primary" style="border-radius:22px;letter-spacing:.12em;font-size:14px" disabled>先在上头择一门技艺</button>`;
+    const pieceHtml=(selSkill&&PIECE_SKILLS[selSkill])?this.pieceListHtml(selSkill,cost):'';
     return `<div class="skillgrid">${cells}</div>
       ${workHtml}
+      ${pieceHtml}
       ${modeHtml}
       <div class="sheet-note">开局所习才艺共四十点。未解锁的技艺，先得打听谁会——与相识之人交好，或问身边侍女；知道后，再登门当面求师。</div>
-      <div class="setbtns"><button class="btn btn-line" onclick="Game.openCraft()">手作 · 用材料做一件东西</button></div>`;
+      <div class="setbtns"><button class="btn btn-line" ${inScene?'disabled style="opacity:.45"':''} onclick="Game.openCraft()">手作 · 用材料做一件东西</button></div>`;
+  },
+  pieceListHtml(k,cost){ // 歌舞医成品：温习与献艺／施治
+    const label=PIECE_LABELS[k]||'曲目';
+    const list=piecesOfSkill(k);
+    const inScene=phase==='EVENT_CHOICE'&&sceneCtx&&!sceneCtx.chamber;
+    const fest=festivalOf(state.time);
+    const festOk=!!fest&&state.lastFestPerfSerial!==xunSerial(state.time)&&(ensurePlotMeta().graceTurn||0)<=(state.turn||0);
+    const canPractice=phase==='FOCUS_SELECT'&&(Number(state.energy)||0)>=cost;
+    const mtext=v=>v>=100?'炉火纯青':v>=85?'烂熟':v>=60?'娴熟':v>=30?'渐熟':'生疏';
+    const rows=list.map(pc=>{
+      const canPerf=k==='医术'?inScene:(inScene||festOk);
+      const act=k==='医术'?'施治':'献艺';
+      const hint=k==='医术'
+        ?(canPerf?'':(sceneCtx&&sceneCtx.chamber?'夜话不必施治':'施治须与人相对：对话中再点'))
+        :(canPerf?'':(festOk?'':'献艺须有场合：节宴席上，或与人相对时'));
+      const mt=Math.max(0,Math.min(100,Number(pc.mastery)||0));
+      const traitText=Array.isArray(pc.traits)&&pc.traits.length?` · ${pc.traits.map(t=>esc(t)).join('、')}`:'';
+      return `<div class="piececard">
+        <div class="piece-top"><span class="pc-name">${esc(pc.name)}</span><span class="qbadge ${this.qualityClass(pc.quality)}">${esc(pc.quality||'寻常')}</span></div>
+        <div class="pc-meta">${esc(pc.kind)}${traitText}<br>熟练 ${mt}／100（${mtext(mt)}）${pc.perfCount?` · 已献 ${pc.perfCount} 回`:''}</div>
+        <div class="pc-btns">
+          <button class="btn btn-line" ${canPractice?'':'disabled style="opacity:.45"'} onclick="Game.practicePiece('${pc.id}')">温习 · 精力 −${cost}</button>
+          <button class="btn btn-line" ${canPerf?'':'disabled style="opacity:.45"'} onclick="Game.performPiece('${pc.id}')">${act}</button>
+        </div>
+        ${hint?`<div class="sheet-note" style="margin:6px 0 0">${esc(hint)}</div>`:''}
+      </div>`;
+    }).join('');
+    return `<div class="sec"><div class="sec-cap">手上的${label}（${list.length}）</div>
+      ${rows||`<div class="sheet-note" style="margin:0">还没有成品。同一门修习三次成一${label==='曲目'?'支曲子':label==='舞段'?'折舞':'册医案'}；成后列在这里，不占行囊。</div>`}
+      <div class="sheet-note">温习只精熟这一件，不会再起新功课；熟练越高，献艺时越压得住场。</div></div>`;
   },
   pickSkill(k){selSkill=(selSkill===k)?null:k;UI.renderSheet('才艺修习')},
   /* 求艺：未习之艺——先打听“谁会”，再登门求师 */
@@ -6373,7 +6490,8 @@ const UI={
     return `<div class="sec"><div class="sec-cap">属性</div>${this.meter('精力',Math.round(state.energy??ENERGY_MAX),'m-cinnabar')}${tiMeter}${attrs||'<div class="sheet-note">—</div>'}${stance?`<div class="sheet-note">言行：${esc(stance)}</div>`:''}${baseNote}
         <div class="itemrow"><span>月俸</span><span class="cnt num">每月 ${esc(salary)} 两</span></div>
         <div class="sheet-note">按位份发放，每月下旬末自动入账；位份升降后随新月俸结算。</div></div>
-      <div class="sec"><div class="sec-cap">才艺</div>${skills||'<div class="sheet-note">—</div>'}${talent}</div>
+      <div class="sec"><div class="sec-cap">才艺</div>${skills||'<div class="sheet-note">—</div>'}${talent}
+        <div class="setbtns"><button class="btn btn-line" onclick="UI.goSheet('才艺修习')">${phase==='EVENT_CHOICE'?'查看曲目／献艺':'才艺修习 · 温习与献艺'}</button></div></div>
       ${displaySec}
       ${this.nightLedgerHtml()}
       <div class="sheet-note">剧情账、待续事项与帝的侍寝记档在顶栏「时间」打开的局面页里。</div>`;
@@ -9214,9 +9332,9 @@ const Game={
       +(led.length?`\n【本场已确认】\n${led.map(x=>'·'+x).join('\n')}\n以上都已交代清楚或已有结论：不得再问、不得换个说法重提，也不要让玩家重复表态。\n`:'')
       +'\n请承接以上对话，不要重复已说过的话。';
   },
-  requestScene(msg,choice,maxTokens,noHistory,compact,endReq,gift){ // 场景请求统一出口：失败可重试；endReq=主控点「结束对话/就此告辞」的收尾请求，响应必须结算收场；gift=赠礼轮
+  requestScene(msg,choice,maxTokens,noHistory,compact,endReq,gift,perf){ // 场景请求统一出口：失败可重试；endReq=主控点「结束对话/就此告辞」的收尾请求，响应必须结算收场；gift=赠礼轮；perf=献艺轮
     phase='RESOLVING';this.chatBusy(true);
-    lastRequest={type:'sc',msg,choice,maxTokens,noHistory,compact,endReq,gift:gift||null};
+    lastRequest={type:'sc',msg,choice,maxTokens,noHistory,compact,endReq,gift:gift||null,perf:perf||null};
     const req={};if(maxTokens)req.maxTokens=maxTokens;
     if(compact)req.messages=[{role:'system',content:buildSceneSystem(sceneCtx?sceneCtx.who:'')},{role:'user',content:msg}]; // ongoing：精简提示词，不结算
     else if(noHistory)req.noHistory=true; // 收尾轮保留完整提示词，只省历史正文
@@ -9228,6 +9346,7 @@ const Game={
       const narr=filterText(p.narrative||'').trim();
       if(endReq){this._sceneResolve(p);return} // 只有玩家点「结束对话」才结算收场
       if(gift){this._giftResolve(p,gift);return} // 赠礼轮：当场结算关系与任务，对话继续
+      if(perf){this._perfResolve(p,perf);return} // 献艺轮：当场结算关系与任务，对话继续
       if(sc.state==='resolve'&&sceneCtx&&!sceneCtx.resolveRetried){ // 模型擅自收场：先纠正一次，要求先回应玩家这句话
         sceneCtx.resolveRetried=true;
         const fix=msg+'\n【纠正】你刚才把 scene.state 写成了 resolve，但玩家这句话还没有得到回应，玩家也没有点「结束对话」。请重新输出本轮：scene.state 只写 "ongoing"；scene.parts 必须先回应玩家这句话（可拒绝、反问、转移话题或明确婉拒），不得直接收场结算。';
@@ -9268,6 +9387,7 @@ const Game={
       this.chatBusy(false);
       if(e.name==='AbortError')return; // 脱困/取消已经复位界面，晚到的失败不再改状态
       if(gift&&sceneCtx)sceneCtx.giftBusy=false; // 赠礼未成：礼物不曾扣下，原样留在囊中
+      if(perf&&sceneCtx)sceneCtx.perfBusy=false; // 献艺未成：精力不曾扣下
       phase='EVENT_CHOICE';
       this.renderSceneOpts(sceneCtx?sceneCtx.lastOptions||[]:[]);
       this.handleCallErr(e);
@@ -9467,7 +9587,7 @@ const Game={
     if(!lastRequest)return;
     const r=lastRequest;
     if(r.type==='r1')this.round1(r.msg,r.focus,r.cost,r.opts);
-    else if(r.type==='sc')this.requestScene(r.msg,r.choice,r.maxTokens,r.noHistory,r.compact,r.endReq,r.gift);
+    else if(r.type==='sc')this.requestScene(r.msg,r.choice,r.maxTokens,r.noHistory,r.compact,r.endReq,r.gift,r.perf);
     else if(r.type==='craft')this.craftRun(r.input);
     else if(r.type==='newgame'){if(this._createdProtagonist)this.startWorldGen();else this.askNewGame()}
   },
@@ -9802,21 +9922,22 @@ const Game={
       ])[Math.floor(Math.random()*(gain>0?5:3))];
       if(book)flavor+=gain>0?` 手边${book.name}翻在膝上，章法可循，这一旬进益比平日扎实。`:` 手边${book.name}翻在膝上，章法虽明，这一旬仍差些火候。`;
     }
-    if(workRes.completed)flavor+=` 这一件功课终于成了：${workRes.item.name}，${workRes.item.quality}。`;
+    const made=workRes.completed?(workRes.item||workRes.piece):null;
+    if(made)flavor+=` 这一件功课终于成了：${made.name}，${made.quality}。${workRes.piece?`已列入「${PIECE_LABELS[k]||'曲目'}」，往后可温习、可献艺。`:''}`;
     const deltas=[];
     deltas.push(gain>0?`${k} +${gain}（${SKILL_LEVEL(before+gain)}）`:`${k} 无进益`);
     if(mode==='teacher'&&teacher){
       deltas.push(accepted?`${teacher.name}应了这次陪练`:`未能讨到${teacher.name}的指教`);
       if(iouNew)deltas.push(`欠${teacher.name}一份人情`);
     }
-    deltas.push(workRes.completed?`功课已成：${workRes.item.name}（${workRes.item.quality}）`:`功课《${workRes.work.title}》 ${workRes.work.progress}／${workRes.work.need}`);
+    deltas.push(made?`功课已成：${made.name}（${made.quality}）${workRes.piece?' · 入「'+(PIECE_LABELS[k]||'曲目')+'」':' · 入行囊'}`:`功课《${workRes.work.title}》 ${workRes.work.progress}／${workRes.work.need}`);
     history.push({turn:state.turn,focus:`才艺修习·${k}`,choice:'',narrative:flavor,log:`${k} +${gain}`});
     logXunAction(`才艺修习·${k}`);
     persistCurrent();markSafe();UI.updateStatusbar();checkRestWarn();
     UI.actResult('才艺修习 · '+k,flavor,deltas);
     if(state.energy<=0)setTimeout(()=>this.collapse(),600);
   },
-  festPerform(k){ // 节宴献艺：本地掷定成色与赏罚，不调模型
+  festPerform(k,pieceId){ // 节宴献艺：本地掷定成色与赏罚，不调模型；歌舞可指定已成曲目
     if(!state||!state.protagonist){toast('尚未开局');return}
     if(phase!=='FOCUS_SELECT'){toast('请先结束当前应对');return}
     const fest=festivalOf(state.time);
@@ -9827,6 +9948,7 @@ const Game={
     const p=state.protagonist,sk=p.skills||{};
     const key=skillKeyIn(sk,k);
     if(!key){toast('这门还没入门');return}
+    const pc=pieceId?pieceById(pieceId):null;
     const before=Number(sk[key])||0;
     UI.closeSheet();
     ensureXunBook();
@@ -9836,7 +9958,9 @@ const Game={
     const swing=Math.floor(Math.random()*25)-12; // 临场发挥
     const scaleBonus=fest.scale==='大宴'?5:0;
     const tired=(state.energy<25)?-8:0; // 精力见底，席上容易失手
-    const score=before+swing+scaleBonus+tired;
+    const pieceBonus=pc?(Math.max(0,WORK_QUALITIES.indexOf(pc.quality))*2+Math.floor((Number(pc.mastery)||0)/15)):0; // 曲目成色与熟练
+    const score=before+swing+scaleBonus+tired+pieceBonus;
+    if(pc){pc.perfCount=(Number(pc.perfCount)||0)+1;pc.lastPerfSerial=xunSerial(state.time)}
     const tier=score>=85?'great':score>=60?'good':score>=38?'plain':'fail';
     const deltas=[];
     const at=p.attributes=p.attributes||{};
@@ -9854,8 +9978,9 @@ const Game={
     if(silver){p.silver=(Number(p.silver)||0)+silver;deltas.push(`银两 +${silver}`)}
     const pts=tier==='great'?3:tier==='good'?1:0;
     if(pts){p.points=(Number(p.points)||0)+pts;deltas.push(`积分 +${pts}`)}
-    if(tier==='fail'&&addPending(`节宴失手：${fest.name}上${k}没演好，席间议论未平`))deltas.push('席间议论未平');
-    const act={琴:'抚了一曲',棋:'对了一局',书:'当席写了一幅字',画:'即席勾了一幅小景',歌:'起身唱了一支',舞:'在席前舞了一段',女红:'呈上一件绣样',医术:'讲了一段脉理',莳花:'呈上一盆新培的花',香道:'当席焚了一炉香'}[k]||'献了一艺';
+    if(tier==='fail'&&addPending(`节宴失手：${fest.name}上${pc?`《${pc.name}》`:`${k}`}没演好，席间议论未平`))deltas.push('席间议论未平');
+    if(pc)deltas.push(`所献：${pc.name}（${pc.quality}）`);
+    const act=pc?({歌:`唱起自己谱的《${pc.name}》`,舞:`当席舞了一折《${pc.name}》`}[k]||`献上《${pc.name}》`):({琴:'抚了一曲',棋:'对了一局',书:'当席写了一幅字',画:'即席勾了一幅小景',歌:'起身唱了一支',舞:'在席前舞了一段',女红:'呈上一件绣样',医术:'讲了一段脉理',莳花:'呈上一盆新培的花',香道:'当席焚了一炉香'}[k]||'献了一艺');
     const pick=a=>a[Math.floor(Math.random()*a.length)];
     const flavor=tier==='great'?pick([
         `你在「${fest.name}」上${act}。起势时席间还有低语，到一半便静了；收势后上首先有人击节，随后满席附和。这一回，你露了脸。`,
@@ -9871,13 +9996,135 @@ const Game={
         `你本想在「${fest.name}」上${act}，偏偏中途乱了一拍。你勉强收住，脸上发烫；席间已有人交换眼色。`
       ]);
     const tierText={great:'大放异彩',good:'得体',plain:'平平',fail:'失手'}[tier];
-    history.push({turn:state.turn,focus:`节宴献艺·${k}`,choice:'',narrative:flavor,log:`${fest.name}献${k}：${tierText}`});
-    state.lastNode=`节宴献艺·${k}（${tierText}）`; // 留给下一旬的模型承接席间余波
-    logXunAction(`节宴献艺·${k}`);
-    if(tier==='great')chronicleAdd(`节宴献艺：${fest.name}上${k}得彩`);
+    const perfName=pc?pc.name:k;
+    history.push({turn:state.turn,focus:`节宴献艺·${perfName}`,choice:'',narrative:flavor,log:`${fest.name}献${perfName}：${tierText}`});
+    state.lastNode=`节宴献艺·${perfName}（${tierText}）`; // 留给下一旬的模型承接席间余波
+    logXunAction(`节宴献艺·${perfName}`);
+    if(tier==='great')chronicleAdd(`节宴献艺：${fest.name}上${perfName}得彩`);
     persistCurrent();markSafe();UI.updateStatusbar();checkRestWarn();
-    UI.actResult('节宴献艺 · '+k,flavor,deltas);
+    UI.actResult('节宴献艺 · '+perfName,flavor,deltas);
     if(state.energy<=0)setTimeout(()=>this.collapse(),600);
+  },
+  practicePiece(id){ // 温习旧曲：只精熟这一件，不会再起新功课
+    if(!state||!state.protagonist){toast('尚未开局');return}
+    if(phase!=='FOCUS_SELECT'){toast('对话中只能查看，修习须回住处');return}
+    if((state.energy??0)<=0){this.collapse();return}
+    const pc=pieceById(id);if(!pc){toast('此作已不在');return}
+    const cost=focusEnergyCost('才艺修习');
+    if((state.energy??0)<cost){toast('精力不足，先歇一歇');return}
+    ensureXunBook();
+    const p=state.protagonist,sk=p.skills||{};
+    const key=skillKeyIn(sk,pc.skill);
+    const before=key?Number(sk[key])||0:0;
+    const skillName=CR_SKILLNAME[pc.skill]||pc.skill;
+    UI.closeSheet();
+    const gain=before<100?(1+Math.floor(Math.random()*2)):(Math.random()<0.55?1:0);
+    if(key)p.skills[key]=Math.min(SKILL_MAX,before+gain);
+    const mBefore=Math.max(0,Math.min(100,Number(pc.mastery)||0));
+    const mGain=mBefore>=100?0:(mBefore>=85?2:6+Math.floor(Math.random()*5));
+    pc.mastery=Math.min(100,mBefore+mGain);
+    state.energy=Math.max(0,Math.round((state.energy??0)-cost));
+    const label=PIECE_LABELS[pc.skill]||'曲目';
+    const flavor=(pc.skill==='医术'
+      ?`你把旧日那册《${pc.name}》重新翻出来，逐条对脉证与方药，又在空白处补了两笔。${mGain?`这一册又熟了 ${mGain} 分。`:'已到火候，再磨也只是守住。'}`
+      :pc.skill==='舞'
+        ?`你关起门来，把《${pc.name}》从起势到收束又走了几遍，回旋处比先前更稳。${mGain?`熟练 +${mGain}。`:'已到火候，再练也只是守住。'}`
+        :`你调息开嗓，把《${pc.name}》从头唱到尾，气口与转腔都按旧谱收着。${mGain?`熟练 +${mGain}。`:'已到火候，再唱也只是守住。'}`)
+      +(gain>0?` ${skillName}也长了 ${gain} 点。`:' 技艺未再进，手上却更熟了。');
+    const deltas=[];
+    if(gain>0)deltas.push(`${skillName} +${gain}（${SKILL_LEVEL(before+gain)}）`);
+    else deltas.push(`${skillName} 无进益`);
+    deltas.push(mGain?`《${pc.name}》熟练 +${mGain}（${pc.mastery}／100）`:`《${pc.name}》已至炉火纯青`);
+    history.push({turn:state.turn,focus:`温习·${pc.name}`,choice:'',narrative:flavor,log:`${label}《${pc.name}》熟练 ${pc.mastery}`});
+    logXunAction(`温习·${pc.name}`);
+    persistCurrent();markSafe();UI.updateStatusbar();checkRestWarn();
+    UI.actResult(`温习 · ${pc.name}`,flavor,deltas);
+    if(state.energy<=0)setTimeout(()=>this.collapse(),600);
+  },
+  performPiece(id){ // 献艺入口：在对话中当场献，或在节宴上献；医术走施治
+    if(!state||!state.protagonist){toast('尚未开局');return}
+    const pc=pieceById(id);if(!pc){toast('此作已不在');return}
+    if(phase==='EVENT_CHOICE'&&sceneCtx){
+      if(sceneCtx.chamber){toast('夜话不必献艺');return}
+      if(sceneCtx.perfBusy)return;
+      if((state.energy??0)<focusEnergyCost('献艺')){toast('精力不足，先歇一歇');return}
+      this.scenePerform(pc);
+      return;
+    }
+    if(phase!=='FOCUS_SELECT'){toast('此刻不便献艺');return}
+    if(pc.skill==='医术'){toast('医案要在人前施用：与人对谈时，从才艺面板取出');return}
+    const fest=festivalOf(state.time);
+    if(fest&&state.lastFestPerfSerial!==xunSerial(state.time)&&(ensurePlotMeta().graceTurn||0)<=(state.turn||0)){
+      this.festPerform(pc.skill,pc.id);
+      return;
+    }
+    toast('献艺须有场合：节宴席上，或与人相对时从才艺面板献上一段');
+  },
+  scenePerform(pc){ // 对话中当场献艺／施治：扣精力，由模型演反应并结算关系
+    if(!sceneCtx||!pc)return;
+    const cost=focusEnergyCost('献艺');
+    const beforeEnergy=Number(state.energy)||0;
+    if(beforeEnergy<cost){toast('精力不足，先歇一歇');return}
+    const isMed=pc.skill==='医术';
+    sceneCtx.perfBusy=true;
+    ensureXunBook();
+    UI.closeSheet();
+    const who=sceneCtx.who;
+    const act=isMed?`（取出一册亲录的医案《${pc.name}》，要为${dispName(who)}诊看）`
+      :pc.skill==='舞'?`（起身，当众舞了一折《${pc.name}》）`
+      :`（起身，当众唱了一曲《${pc.name}》）`;
+    this.bubble('me','',act);
+    this.recordLine('me',isMed?`（取出医案《${pc.name}》为${who}诊看）`:`（献上《${pc.name}》）`);
+    this.requestScene(this.perfMsg(pc,who),`${isMed?'施治':'献艺'}·${pc.name}`,MAX_OUTPUT_TOKENS,true,true,false,null,{piece:pc,who,beforeEnergy,cost});
+  },
+  perfMsg(pc,who){
+    const ta=npcSexOf(state,who)==='m'?'他':'她';
+    const isMed=pc.skill==='医术';
+    const bits=[
+      pc.quality?`品质：${pc.quality}`:'',
+      pc.kind?`形制：${pc.kind}`:'',
+      Array.isArray(pc.traits)&&pc.traits.length?`特质：${pc.traits.join('、')}`:'',
+      pc.mastery!=null?`熟练：${pc.mastery}/100`:'',
+      pc.description?`形貌：${String(pc.description).slice(0,120)}`:''
+    ].filter(Boolean).join('；');
+    const head=isMed
+      ?`玩家取出一册亲录的医案「${pc.name}」${bits?`（${bits}）`:''}，要为「${who}」诊看施治。`
+      :`玩家当着「${who}」的面献上一段${pc.skill==='舞'?'舞':'曲'}——「${pc.name}」${bits?`（${bits}）`:''}。`;
+    return `第${xunNo()}旬剧情对话（${isMed?'施治':'献艺'}）：${head}请只演${ta}与在场者的即时反应与场面（听得入神、敷衍挑剔、被勾起旧事、赞许或失礼皆可），用 scene.parts 呈现（1—4 段，act/say/quote/narr 规则同前，总长 ≤120 字），并给 2—3 个接话选项；scene.state 必须写 "ongoing"，不得替玩家结束对话。`+
+      `本轮只结算这次${isMed?'施治':'献艺'}，且必须结算：按作品品质、熟练度、场合、对方性情与眼前局势，用 statePatch 写关系、恩宠、任务或待续的变化；不得写才艺、属性成长或与本次${isMed?'施治':'献艺'}无关的数值，也不要改 energy（精力已由前端扣除）。changes 只列本次实际变化。narrative 可写空字符串。`+
+      `品质与熟练只是更好的起点，不保证得脸：对方正有心事、场合不合、此艺不对其脾胃，反应可以平淡甚至冷淡；${isMed?'若对方确实抱恙且这册医案对得上，可同轮以 statePatch.pending 清掉相应的病痛待续。':''}`+
+      this.sceneContextBlock();
+  },
+  _perfResolve(p,perf){
+    if(!sceneCtx||!perf)return;
+    p=stripStandaloneGrowth(p); // 献艺只结算关系/任务，不结算才艺与属性成长
+    const sc=p.scene||{};
+    const parts=this.sceneParts(sc);
+    const narr=filterText(p.narrative||'').trim();
+    try{
+      applyPatch(p.statePatch||{});
+      applyDossier(p.dossier);
+    }catch(e){console.warn('[献艺] 结算失败',e)}
+    const pc=perf.piece;
+    state.energy=Math.max(0,Math.round((Number(perf.beforeEnergy)||0)-(Number(perf.cost)||0))); // 精力由前端照扣，覆盖模型回写
+    if(pc){pc.perfCount=(Number(pc.perfCount)||0)+1;pc.lastPerfSerial=xunSerial(state.time)}
+    sceneCtx.perfBusy=false;
+    this.sceneMeta(sc);
+    if(parts){
+      this.sayParts(parts);
+      if(narr&&!parts.some(x=>x.type==='say'||x.type==='quote'))this.sayNarrative(narr,false);
+    }
+    else if(sc.line)this.sayLine(sc.line);
+    else if(narr)this.sayNarrative(narr,true);
+    const ch=(Array.isArray(p.changes)?p.changes:[]).filter(Boolean).map(String);
+    const head=`${pc&&pc.skill==='医术'?'施治':'献艺'} · ${pc?pc.name:''}${ch.length?'｜'+ch.join('；'):''}`;
+    this.bubble('sys','',head);
+    state.lastNode=`${pc&&pc.skill==='医术'?'施治':'献艺'}·${pc?pc.name:''}`;
+    logXunAction(`${pc&&pc.skill==='医术'?'施治':'献艺'}·${pc?pc.name:''}`);
+    const sopts=(Array.isArray(p.options)&&p.options.length)?p.options:(Array.isArray(sc.options)?sc.options:[]);
+    this.renderSceneOpts(sopts.length?sopts:(sceneCtx.lastOptions||[]));
+    $('#chatBody').scrollTop=$('#chatBody').scrollHeight;
+    persistCurrent();markSafe();UI.updateStatusbar();
   },
   askMaidSkill(k){ // 侍女打听：耗 5 精力，问出一位精于此道的能人，写入其 skillIntel
     if(!state||!state.protagonist){toast('尚未开局');return}
