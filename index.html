@@ -5617,6 +5617,7 @@ SCENE_PARTS_RULES,
 '【收尾】narrative 只写旁白，不写引号对白。',
 '【约束】scene.state 只写 "ongoing"；narrative 为空字符串，changes=[]，statePatch={}；scene.where 只在场景移动时写。不得替玩家结束对话：话已说尽也只写一句带去意的回应，仍给接话；玩家点「结束对话」后前端才另发收尾请求。对方必须回应玩家这一轮的言行，哪怕只是拒绝、反问或转移话题，不能不作答就走。换人（被传入阁面圣、正主登场）：把 scene.who 改写为新对象，过渡写进 narr；引见场景正主一开口就交出 scene.who（帝写「皇帝」），宫人只通传引路捧物，不得替主子发话、下令、代答。',
 '【承接】严格承接用户消息里的本场对话记录，把话题往前推；对方只依据自己的性情、目标、与主控的关系及已知信息回应。',
+'【旧事】soFar 里的 pending（在办与约定）、items（与他有关的旧物）、emperor.memories（共同经历）都是已经发生的事：给过的信物不再重给，定过的时辰不再重订，答应过的事照办、改口要说明缘由。再提旧事须写成“接着上次说”，不得演成“头一回提起”，也不得让同一件事重新走一遍初次安排。',
 '【信息】玩家直接问到对方知道的事，必须在本轮给出实质信息：具体名目、缘由、时间、经手人或明确去处。可以害怕、压低声音、提条件，但不能用“谁提谁落不是”“只当没听见”这类空话把话吊住；确实不能说时，须给出具体缘由与下一步可问的人或可查之处。不得凭空发明与存档无关的禁忌或旧案；若引入新的忌讳，必须同时讲清它是什么、为何犯忌、与谁相关。',
 '【戏核】brief 是这场戏的核心问题：玩家要得到/保住什么、谁在阻止、失败失去什么。每轮都让它前进一步，不另起无关小问题，也不能只有问答——每轮至少让事态变一点：有人来、物被拿走、传旨、搜检、证据出现、条件变化。本场若确实没有得失，一句交代即可，不要用追问硬撑。',
 '【暗流】若本场有 scheme：结果不掷骰。根据玩家本轮的选择、当前局势、对方性格与手段、既有准备推断成败；最终收尾时在 JSON 顶层写 schemeOutcome（win/draw/lose/defuse），并把实际后果写进 narrative/changes/statePatch，不得只判输赢不写后果。',
@@ -5644,6 +5645,15 @@ function buildSceneSystem(who){
   const w=state.world||{};
   const rels=state.relationships||{};
   const relationship=rels[who]!=null?rels[who]:(n.name&&rels[n.name]!=null?rels[n.name]:null);
+  const isEmp=typeof UI!=='undefined'&&UI.isEmperorId(who);
+  const isChamber=typeof sceneCtx!=='undefined'&&sceneCtx&&sceneCtx.chamber;
+  const nameOf=String(n.name||''),realOf=String(n.realName||'');
+  const relItems=(state.inventory||[]).filter(x=>x&&Number(x.count)!==0).filter(x=>{ // 与眼前这人有关的旧物：他赐的、他经手的、他给的
+    const s=String(x.note||'')+' '+String(x.src||'')+' '+String(x.name||'');
+    return isEmp?/御赐|御前|御笔|御用|御览|陛下|帝赐|帝所赐|先皇后|太后所赐/.test(s)
+      :(!!nameOf&&s.includes(nameOf))||(!!realOf&&s.includes(realOf));
+  }).slice(-8).map(x=>({name:x.name,count:Number(x.count)||1,note:String(x.note||'').slice(0,30),desc:String(x.description||'').slice(0,30)}));
+  const em=state.emperor||{};
   const payload={
     time:fmtTime(),location:state.location,residence:Game.homeLocation(),
     protagonist:{name:p.name,rank:p.rank,age:p.age,personality:normalizePersona(p.personality),look:p.look,stance:presenceCue(state)},
@@ -5658,6 +5668,23 @@ function buildSceneSystem(who){
     brief:(typeof sceneCtx!=='undefined'&&sceneCtx&&sceneCtx.brief)?sceneCtx.brief:null, // 本场戏核：目标/阻碍/得失
     scheme:(typeof sceneCtx!=='undefined'&&sceneCtx&&sceneCtx.scheme)?{who:sceneCtx.scheme.who,target:SCHEME_TARGET_TEXT[sceneCtx.scheme.target]||sceneCtx.scheme.target,severity:sceneCtx.scheme.severity,methodName:sceneCtx.scheme.methodName,exposed:!!sceneCtx.scheme.exposed}:null, // 暗流：结果由模型裁定
     recentFacts:(state.recentConfirmedFacts||[]).slice(-3),
+    // 已经发生过的旧账：约定、旧物、帝的共同经历。缺了这一块，本场就会把给过的信物、定过的时辰当成新事重提
+    soFar:{
+      pending:(state.pending||[]).slice(-6).map(x=>String(typeof pendText==='function'?pendText(x):((x&&(x.t||x.text))||x||'')).slice(0,60)).filter(Boolean),
+      items:relItems,
+      recentTurns:(typeof history!=='undefined'&&Array.isArray(history)?history.slice(-5):[])
+        .map(h=>`${h&&h.turn?`第${xunNoOf(h.turn)}旬`:'近旬'}：${String((h&&(h.log||h.focus))||'').slice(0,50)}`).filter(s=>s.length>4),
+      emperor:(isEmp||isChamber)?{
+        memories:(function(){ // 未了的约定优先留住，再补最近几条旧事
+          const all=(em.memories||[]).filter(Boolean);
+          const open=all.filter(m=>m.open).slice(-3),closed=all.filter(m=>!m.open).slice(-3);
+          const seen=new Set();
+          return [...closed,...open].filter(m=>{const k=String(m.xun||'')+String(m.text||'');if(seen.has(k))return false;seen.add(k);return true});
+        })().map(m=>`${m.xun||m.time||''}${m.type?`·${m.type}`:''}：${String(m.text||'').slice(0,40)}${m.open?'（未了）':''}`),
+        hisState:String(em.hisState||'').slice(0,60)||null,
+        absence:em.absence?String(em.absence.reason||'').slice(0,40):null
+      }:null
+    },
     destiny:(function(){const ml=state.mainLine;if(!ml||ml.finished)return null;const def=MAIN_LINES[ml.id];if(!def)return null;const st=def.stages[ml.stage-1];if(!st)return null;
       return {route:def.name,sub:def.sub,stage:ml.stage,title:st.title,goal:st.goal,beat:{id:st.beat.id,text:st.beat.text},slots:st.slots,dueText:serialTimeText(ml.dueAt)}})()
     // 本场账与轮次只放在每轮的用户消息里（sceneContextBlock/【节奏】）：system 保持整场不变，前缀缓存才命中
@@ -10422,7 +10449,7 @@ const Game={
       return;
     }
     const settle=sceneCtx.chamber
-      ?'这是帝召主控侍寝的夜话，不是本旬养成重心：不结算本旬养成、不写 changes 与 statePatch；只写一两句收场旁白（帘帐落下、烛尽、天将明、你告退等），不写露骨过程。'
+      ?'这是帝召主控侍寝的夜话，不是本旬养成重心：不结算本旬养成、不写 changes、不写数值。只写一两句收场旁白（帘帐落下、烛尽、天将明、你告退等），不写露骨过程。这一夜谈成的约定、给出的信物与值得记住的共同经历必须留痕：statePatch 只允许写 "pending"（约定与新待办）、"inventory.add"（他赏的东西）、"emperor.memories"（[{text,type,open}]，约定写 type="约定" 且 open=true）。'
       :(sceneCtx.standalone
       ?'这只是一位宫中人在旬中回话，并非本旬养成重心：只结算这场问话实际带来的关系、情报、交办差事与行囊变化；主角才艺与属性成长留到旬末小结，修习、散步等无关收益也留到那时。没有变化就不写 changes。'
       :'并完整结算本旬养成与剧情（changes、statePatch，含 statePatch.plots 的变动条目）；收场旁白只写一两句、不复述已演的场面与台词。'+craftQuestHint());
@@ -10442,7 +10469,12 @@ const Game={
       if(parts)this.sayParts(parts); // 收尾前若有最后一句对白，先按语义段渲染
       if(p.narrative)this.sayNarrative(p.narrative,!!parts); // 有 parts 时收尾 narrative 整段当旁白
     }
-    if(sceneCtx&&sceneCtx.chamber){ // 侍寝夜话：只收场、不结算本旬，也不写纪事卡
+    if(sceneCtx&&sceneCtx.chamber){ // 侍寝夜话：只收场、不结算本旬，也不写纪事卡；但这一夜谈成的约定、信物与旧事要留痕
+      try{
+        const sp=(p&&p.statePatch)||{},patch={};
+        for(const k of ['pending','inventory.add','emperor.memories'])if(sp[k]!=null)patch[k]=sp[k];
+        if(Object.keys(patch).length){applyPatch(patch);flushAcquired();persistCurrent();markSafe()}
+      }catch(e){console.warn('[夜话] 留痕失败',e)}
       body.scrollTop=body.scrollHeight;
       $('#chatOpts').innerHTML='<button class="btn btn-primary" style="letter-spacing:.2em;text-indent:.2em" onclick="Game.sceneDone()">继续</button>';
       return;
