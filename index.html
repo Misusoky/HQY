@@ -5829,6 +5829,11 @@ async function callModel(userMsg,opts){
       return content;
     }catch(e){
       if(timedOut){const err=new Error(`请求超时（${Math.round(timeoutMs/1000)} 秒），请重试或换更快的模型`);err.timeout=true;throw err}
+      if(e&&e.name==='TypeError'&&/load failed|failed to fetch|networkerror|network error/i.test(String(e.message||''))){ // Safari 只说 Load failed：多半是接口没允许本站来源
+        const err=new Error(`请求没有到达接口（跨域被拒或网络不可达）。若网络正常，请让中转站允许本站来源 ${location.origin}`);
+        err.cors=true;
+        throw err;
+      }
       throw e;
     }finally{
       clearTimeout(timer);
@@ -11622,9 +11627,14 @@ const Game={
         res.style.background='var(--delta-up)';res.style.color='var(--cinnabar)';
         res.textContent='✕ HTTP '+r.status+' '+r.statusText+(txt?'：'+String(txt).slice(0,300):'');
       }
-    }).catch(e=>{
+    }).catch(async e=>{
+      // 探一次 no-cors：能通说明主机可达，fetch 失败是被跨域（CORS）挡下，而不是网络问题
+      let reach=false;
+      try{await fetch(s.baseUrl.replace(/\/+$/,'')+'/chat/completions',{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:'{"probe":1}'});reach=true}catch(_){}
       res.style.background='var(--delta-up)';res.style.color='var(--cinnabar)';
-      res.textContent='✕ 请求失败：'+e.message+'（可能是网络不可达、跨域被拦截或地址填错）';
+      res.textContent=reach
+        ? '✕ 接口拒绝跨域：能连上 '+apiHostOf(s.baseUrl)+'，但它没允许本站来源 '+location.origin+'。让中转站把该来源加入允许列表（或设为 *）即可。'
+        : '✕ 请求失败：'+e.message+'（网络不可达或主机被拦截）';
     }).finally(()=>{btn.disabled=false});
   },
   clearAll(){
