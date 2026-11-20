@@ -2189,6 +2189,28 @@ function factionNpc(name){
   const npcs=state.npcs||{};
   return npcs[name]||Object.values(npcs).find(n=>n&&(n.name===name||n.realName===name))||null;
 }
+function factionMemberRank(name,s){ // 一个人物的位份排序：认称谓也认本名；0＝未定位份
+  const npcs=((s||state||{}).npcs)||{};
+  const n=npcs[name]||Object.values(npcs).find(x=>x&&(x.name===name||x.realName===name));
+  return n?rankScoreOf(n.rank):0;
+}
+function pruneFactionMembers(f,s){ // 尊卑不许倒置：帝、太后、皇后不入派系，位份高于领袖的也不算成员
+  if(!f||!Array.isArray(f.members))return f;
+  const npcs=((s||state||{}).npcs)||{};
+  const npcOf=nm=>npcs[nm]||Object.values(npcs).find(x=>x&&(x.name===nm||x.realName===nm));
+  const ls=f.leader?factionMemberRank(f.leader,s):0;
+  const seen=new Set();
+  const drop=nm=>{const n=npcOf(nm);if(n&&n.faction===f.name)n.faction=''}; // 清掉错挂的归属，重载时不再被反推回来
+  f.members=f.members.map(x=>String(x||'').trim()).filter(nm=>{
+    if(!nm||nm===f.leader||seen.has(nm))return false;
+    seen.add(nm);
+    if(/皇帝|皇上|太后|皇后/.test(nm)){drop(nm);return false}
+    const sc=factionMemberRank(nm,s);
+    if(sc>0&&ls>0&&sc>ls){drop(nm);return false}
+    return true;
+  }).slice(0,12);
+  return f;
+}
 function factionRelValue(who,s){
   if(!who)return null;
   const rels=((s||state||{}).relationships)||{};
@@ -2274,6 +2296,7 @@ function ensureFactions(s){ // 旧档/新档归一：world.factionLeaders → �
       if(!f.members.includes(nm))f.members.push(nm);
     }
     f.members=f.members.slice(0,12);
+    pruneFactionMembers(f,s); // 皇后、太后、帝与位份高于领袖的人，不算成员
     if(!f.power)f.power=factionPowerOf(f,s);
   }
   // 旧档兜底：仍无领袖的派系，从关系账里按位份高低认一位领头人（只改一次，之后以账上为准）
@@ -2378,7 +2401,8 @@ function factionMoveBrief(){ // 灌进剧情裁决：本旬各派各走哪一步
   const rows=live.map(f=>{
     const npc=factionNpc(f.leader);
     const tr=npc?normalizePersona((npc.profile||{}).traits||[]).join('、'):'';
-    const mem=(f.members||[]).filter(m=>{const n=factionNpc(m);return n&&n.known}).slice(0,6);
+    const ls=f.leader?factionMemberRank(f.leader):0;
+    const mem=(f.members||[]).filter(m=>{const n=factionNpc(m);if(!n||!n.known)return false;if(/皇帝|皇上|太后|皇后/.test(m))return false;const sc=rankScoreOf(n.rank);return !(sc>0&&ls>0&&sc>ls)}).slice(0,6);
     const pl=active.find(p=>p.factionId===f.name);
     const due=pl?(pl.latest!=null?serialTimeText(pl.latest):pl.dueText||'缓图'):'';
     return `${f.name}｜领袖 ${f.leader||'未明'}${npc&&npc.rank?`（${npc.rank}${tr?`，${tr}`:''}）`:''}｜${f.stance}·${f.goal||'目标未明'}｜实力 ${f.power}｜对你：${f.attitude}`
@@ -3379,7 +3403,8 @@ const FACTION_MODULE = [
 '5. 主控不入党派，除非玩家明确应下；不得替玩家表态、站队、收下人情或自作主张加入某系。玩家若明确应下，才可写她入系，并在 statePatch.factions 里改该系 members 与 attitude。',
 '6. 派系实力、成员、态度与近况只经 statePatch.factions 回写：{"派系名":{"power":数字,"attitude":"拉拢/观望/压制/敌对","members":["…"],"step":"一句话","note":"本旬近况","defunct":false}}。power 单旬变动不超过 ±10，members 只写本档已有的人物，note 进“最近动向”。',
 '7. 派系不得凭空出现或瓦解：领袖死亡或被降至从四品以下，前端才认瓦解；你只演事件，不自行宣布某系散了，也不得为凑戏新造派系。',
-'8. 与暗流账分工：暗流是个人手段针对主控，派系是立场与资源。同一件事只走一本账，不重复扣减；派系动作可作为暗流的由头，但不能替代暗流的发难与结账。'
+'8. 与暗流账分工：暗流是个人手段针对主控，派系是立场与资源。同一件事只走一本账，不重复扣减；派系动作可作为暗流的由头，但不能替代暗流的发难与结账。',
+'9. 尊卑不许倒置：领袖必须是本系位份最高的人，成员位份不得高于领袖；皇帝、太后不入派系，皇后只可自领中宫一系，不作他人羽翼。members 回写前先自查，写错的成员前端会剔掉。'
 ].join('\n');
 
 /* 三途·命途：主线由前端写死，模型只演不判 */
@@ -4570,8 +4595,8 @@ function avatarHtml(who,cls){ // 有头像用头像；没有则以名首字作�
   return `<span class="av av-fb ${cls||''}" aria-hidden="true">${esc(String(who||'客').trim().charAt(0)||'客')}</span>`;
 }
 /* ============================================================ 捏主控（本地随机生成） */
-const CR_SURNAMES='李 王 张 刘 陈 杨 赵 黄 周 吴 徐 孙 胡 朱 高 林 何 郭 马 罗 梁 宋 郑 谢 韩 唐 冯 董 萧 程 曹 袁 邓 许 傅 沈 曾 彭 吕 苏'.split(' ');
-const CR_GIVEN='明蘅 令仪 婉宁 昭华 静姝 柔嘉 清如 砚秋 佩兰 纫秋 惠然 采薇 文茵 琼华 疏影 惊鸿 望舒 兰因 素问 知夏 南絮 初晴 栖迟 静婉 含章 稚鱼 雪君 妙仪 徽音 攸宁 陶然 灵均 云韶 书瑶 芃芃 舜华'.split(' ');
+const CR_SURNAMES='李 王 张 刘 陈 杨 赵 黄 周 吴 徐 孙 胡 朱 高 林 何 郭 马 罗 梁 宋 郑 谢 韩 唐 冯 董 萧 程 曹 袁 邓 许 傅 沈 曾 彭 吕 苏 顾 陆 卫 秦 温 姜 戚 阮'.split(' ');
+const CR_GIVEN='明蘅 令仪 婉宁 昭华 静姝 柔嘉 清如 砚秋 佩兰 纫秋 惠然 采薇 文茵 琼华 疏影 惊鸿 望舒 兰因 素问 知夏 南絮 初晴 栖迟 静婉 含章 稚鱼 雪君 妙仪 徽音 攸宁 陶然 灵均 云韶 书瑶 芃芃 舜华 清欢 知微 见月 听雪 疏桐 揽星 衔月 望春 拾翠 纫蕙 语棠 枕书 酌月 漱玉 停云 拾萤 衔霜 照水 映棠 依梅 素心 素衣 锦书 玉簪 珠帘 翠微 令昭 令月 怡然 恬宁 婉柔 柔止 温言 温如 清和 清妍 清芷 清漪 清婉 雪晴 雪芝 云舒 云卿 云初 照影 灼华 夭夭 若兰 若薇 若初 含烟 湘君 湘灵 听澜 昭月 明溪 明妆 静言 婉兮 芷若'.split(' ');
 const CR_FAMILIES=[ // 家世六档：决定初始位份与体己银
   {k:'平民',d:'市井人家，父为匠户',rank:'官女子（从九品）',silver:20},
   {k:'商贾',d:'绸缎起家，资财殷实',rank:'采女（正九品）',silver:90},
@@ -5792,6 +5817,7 @@ function applyPatch(patch){
         if(Array.isArray(v.members)){
           const known=new Set([...Object.keys(state.npcs||{}).map(id=>((state.npcs[id]||{}).name||id)),...Object.keys(state.relationships||{})]);
           f.members=[...new Set(v.members.map(String).filter(m=>known.has(m)))].slice(0,12);
+          pruneFactionMembers(f,state); // 位份高于领袖的、帝后太后，一律不进成员
         }
         if(v.step!=null)f.step=String(v.step).slice(0,90);
         if(v.note)f.notes=[...(f.notes||[]),{xun:fmtTime(),text:String(v.note).slice(0,90)}].slice(-4);
@@ -7315,7 +7341,12 @@ const UI={
       const npc=factionNpc(f.leader);
       const rk=npc&&npc.rank?String(npc.rank):'';
       const tr=npc?normalizePersona((npc.profile||{}).traits||[]).join('、'):'';
-      const mem=(f.members||[]).filter(m=>{const n=factionNpc(m);return n&&n.known});
+      const ls=f.leader?factionMemberRank(f.leader):0;
+      const mem=(f.members||[]).filter(m=>{ // 显示前再挡一道：皇后、太后与位份高于领袖的人不列
+        const n=factionNpc(m);if(!n||!n.known)return false;
+        if(/皇帝|皇上|太后|皇后/.test(m))return false;
+        const sc=rankScoreOf(n.rank);return !(sc>0&&ls>0&&sc>ls);
+      });
       const notes=(f.notes||[]).slice(-2).map(n=>`${n.xun?esc(n.xun)+'　':''}${esc(n.text)}`).join('<br>');
       const pill=f.defunct?'p-mid':(f.attitude==='敌对'||f.attitude==='压制')?'p-bad':f.attitude==='拉拢'?'p-good':'p-mid';
       return `<div class="faccard${f.defunct?' off':''}">
