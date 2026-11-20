@@ -194,6 +194,10 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
 .meter-v{flex:none;width:34px;text-align:right;font-size:13px;color:var(--ink-soft)}
 .meter.m-cinnabar .meter-fill{background:var(--cinnabar)}.meter.m-indigo .meter-fill{background:var(--indigo)}
 .meter.m-gold .meter-fill{background:var(--gold)}.meter.m-ink .meter-fill{background:var(--ink-soft)}
+.sklink{display:flex;align-items:center;gap:6px;width:100%;background:transparent;border:0;padding:0;text-align:left;color:inherit;font:inherit;cursor:pointer}
+.sklink .meter{flex:1;min-width:0}
+.sklink .sk-go{flex:none;font-size:12px;color:var(--ink-soft);letter-spacing:.05em}
+.sklink:active .sk-go{color:var(--cinnabar)}
 .rel{display:flex;align-items:center;gap:10px;min-height:38px;font-size:14px}
 .rel-nm{flex:1}
 .relpill{flex:none;font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid currentColor;letter-spacing:.12em}
@@ -3542,6 +3546,11 @@ const SKILL_TEACH_MIN=50;   // 对方此艺须高于此数，方可为人师
 const SKILL_PRACTICE_BOND=30; // 陪练只需相熟：好感达到此数、此艺高于主控，便可请她/他带着练
 const SKILL_PRACTICE_MIN=30;  // 陪练者此艺的最低门槛
 function skillKeyIn(sk,k){return Object.keys(sk||{}).find(x=>x.indexOf(k)>-1)}
+function skillPoolKeyOf(name){ // 显示名（琴艺／歌艺…）折回才艺池的单字键
+  const s=String(name||'');
+  for(const k of SKILL_POOL)if(s.indexOf(k)>-1)return k;
+  return s;
+}
 function skillUnlocked(sk,k){return !!skillKeyIn(sk,k)}
 const SKILL_MAX=999; // 仅作数值护栏：才艺不设100上限，越过100后仍可增长
 const SKILL_LEVEL=v=>v>=160?'通神':v>=130?'入化':v>=100?'冠绝':v>=90?'卓绝':v>=70?'出众':v>=50?'娴熟':v>=30?'入门':'生疏';
@@ -6088,10 +6097,13 @@ const UI={
         <div class="itemrow"><span>${esc(wk.title)}（${esc(wk.kind)}）</span><span class="cnt">${wk.progress}／${wk.need}</span></div>
         <div class="sheet-note" style="margin:6px 0 0">再修习 ${Math.max(0,wk.need-wk.progress)} 次可成；临帖读谱、请人陪练会让成品更精。${PIECE_SKILLS[selSkill]?(selSkill==='医术'?'成件后列入下方医案，不入行囊，可温习、可在人前施治。':selSkill==='棋'?'成件后列入下方棋谱，不入行囊，可温习、可与人手谈。':'成件后列入下方'+PIECE_LABELS[selSkill]+'，不入行囊，可温习、可在席间或人前献艺。'):'成件后入行囊，可赠、可献、可陈设。'}</div></div>`:`<div class="sheet-note" style="margin:8px 0 0">这门眼下没有起头的功课；下一次修习会起一件，三次成篇。</div>`):'';
     const modeHtml=selSkill?`<div class="sec"><div class="sec-cap">怎么练「${esc(selSkill)}」</div>
-        <div class="sheet-note" style="margin:0 0 6px">眼下 ${esc(SKILL_LEVEL(Number((sk[skillKeyIn(sk,selSkill)]||0))))}。三种练法同耗 ${cost} 精力，进益与代价不同。${inScene?'<br>对话中只可查看，修习须回住处。':''}</div>
+        <div class="sheet-note" style="margin:0 0 6px">眼下 ${esc(SKILL_LEVEL(Number((sk[skillKeyIn(sk,selSkill)]||0))))}。四种练法同耗 ${cost} 精力，进益与代价不同。${inScene?'<br>对话中只可查看，修习须回住处。':''}</div>
         <button class="npcrow" ${(inScene||energy<cost)?'disabled style="opacity:.45"':''} onclick="Game.practiceSkill('solo')"><span class="nr-name">独自苦练</span><span class="nr-depth">稳进 1—2 点 · 无门槛</span></button>
         <button class="npcrow" ${(!bk||inScene||energy<cost)?'disabled style="opacity:.45"':''} onclick="Game.practiceSkill('book')"><span class="nr-name">临帖／读谱</span><span class="nr-depth">${bk?`${esc(bk.name)}在案 · 进益 3—4 点`:'手边没有此艺谱册'}</span></button>
         <button class="npcrow" ${(!teacher||inScene||energy<cost)?'disabled style="opacity:.45"':''} onclick="Game.practiceSkill('teacher')"><span class="nr-name">请教／陪练</span><span class="nr-depth">${teacher?`${esc(teacher.name)}（此艺 ${teacher.tv}）· 进益 3—4 点，也可能婉拒`:'没有可请教的人——须相熟、且此艺高过你'}</span></button>
+        ${PIECE_SKILLS[selSkill]
+          ? `<button class="npcrow" ${(inScene||energy<cost)?'disabled style="opacity:.45"':''} onclick="UI.goSheet('修习曲目')"><span class="nr-name">修习${PIECE_LABELS[selSkill]}</span><span class="nr-depth">${piecesOfSkill(selSkill).length?`已会 ${piecesOfSkill(selSkill).length} 件 · 择一件温习`:'还没有成品'}</span></button>`
+          : `<button class="npcrow" disabled style="opacity:.45"><span class="nr-name">修习曲目</span><span class="nr-depth">此艺不列曲目，成品在行囊</span></button>`}
       </div>`:`<button class="btn btn-primary" style="border-radius:22px;letter-spacing:.12em;font-size:14px" disabled>先在上头择一门技艺</button>`;
     const pieceHtml=(selSkill&&PIECE_SKILLS[selSkill])?this.pieceListHtml(selSkill,cost):'';
     return `<div class="skillgrid">${cells}</div>
@@ -6108,7 +6120,6 @@ const UI={
     const fest=festivalOf(state.time);
     const festOk=!!fest&&state.lastFestPerfSerial!==xunSerial(state.time)&&(ensurePlotMeta().graceTurn||0)<=(state.turn||0);
     const canPractice=phase==='FOCUS_SELECT'&&(Number(state.energy)||0)>=cost;
-    const mtext=v=>v>=100?'炉火纯青':v>=85?'烂熟':v>=60?'娴熟':v>=30?'渐熟':'生疏';
     const actOf=k==='医术'?'施治':k==='棋'?'对弈':'献艺';
     const rows=list.map(pc=>{
       const canPerf=(k==='医术'||k==='棋')?inScene:(inScene||festOk);
@@ -6121,7 +6132,7 @@ const UI={
       const traitText=Array.isArray(pc.traits)&&pc.traits.length?` · ${pc.traits.map(t=>esc(t)).join('、')}`:'';
       return `<div class="piececard">
         <div class="piece-top"><span class="pc-name">${esc(pc.name)}</span><span class="qbadge ${this.qualityClass(pc.quality)}">${esc(pc.quality||'寻常')}</span></div>
-        <div class="pc-meta">${esc(pc.kind)}${traitText}<br>熟练 ${mt}／100（${mtext(mt)}）${pc.perfCount?` · 已用 ${pc.perfCount} 回`:''}</div>
+        <div class="pc-meta">${esc(pc.kind)}${traitText}<br>熟练 ${mt}／100（${this.masteryText(mt)}）${pc.perfCount?` · 已用 ${pc.perfCount} 回`:''}</div>
         <div class="pc-btns">
           <button class="btn btn-line" ${canPractice?'':'disabled style="opacity:.45"'} onclick="Game.practicePiece('${pc.id}')">温习 · 精力 −${cost}</button>
           <button class="btn btn-line" ${canPerf?'':'disabled style="opacity:.45"'} onclick="Game.performPiece('${pc.id}')">${act}</button>
@@ -6132,6 +6143,68 @@ const UI={
     return `<div class="sec"><div class="sec-cap">手上的${label}（${list.length}）</div>
       ${rows||`<div class="sheet-note" style="margin:0">还没有成品。同一门修习三次成一${label==='曲目'?'支曲子':label==='舞段'?'折舞':label==='棋谱'?'局棋谱':'册医案'}；成后列在这里，不占行囊。</div>`}
       <div class="sheet-note">温习只精熟这一件，不会再起新功课；熟练越高，${k==='棋'?'对弈':k==='医术'?'施治':'献艺'}时越有把握。</div></div>`;
+  },
+  sheetPiecePick(){ // 才艺修习的第四个入口：择一件已会的成品温习
+    const k=selSkill;
+    const cost=focusEnergyCost('才艺修习');
+    const name=k?(CR_SKILLNAME[k]||k):'';
+    const can=phase==='FOCUS_SELECT'&&(Number(state.energy)||0)>=cost;
+    if(!k)return `<button class="backbtn" onclick="UI.sheetBack()">◀ 返回才艺</button>
+      <div class="sec"><div class="sheet-note">先在上头择一门技艺。</div></div>`;
+    if(!PIECE_SKILLS[k])return `<button class="backbtn" onclick="UI.sheetBack()">◀ 返回才艺</button>
+      <div class="sec"><div class="sec-cap">修习曲目 · ${esc(name)}</div>
+        <div class="sheet-note">此艺不列曲目：成品收在行囊里，可赠、可陈设。</div></div>`;
+    const list=piecesOfSkill(k);
+    const rows=list.map(pc=>{
+      const mt=Math.max(0,Math.min(100,Number(pc.mastery)||0));
+      return `<button class="npcrow" ${can?'':'disabled style="opacity:.45"'} onclick="Game.practicePiece('${pc.id}')">
+        <span class="nr-main"><span class="nr-name">${esc(pc.name)}</span><span class="nr-role">${esc(pc.quality||'寻常')} · ${esc(pc.kind||'')} · 熟练 ${mt}（${this.masteryText(mt)}）</span></span>
+        <span class="nr-rel num">温习 −${cost}</span></button>`;
+    }).join('');
+    return `<button class="backbtn" onclick="UI.sheetBack()">◀ 返回才艺</button>
+      <div class="sec"><div class="sec-cap">修习${PIECE_LABELS[k]} · ${esc(name)}</div>
+        <div class="sheet-note" style="margin:0 0 6px">选一件已会的${PIECE_LABELS[k]}温习，耗精力 ${cost}。温习只精熟这一件，不会起新的功课。${can?'':(phase!=='FOCUS_SELECT'?'<br>对话中只可查看，修习须回住处。':'<br>精力不足，先歇一歇。')}</div>
+        ${rows||'<div class="sheet-note">还没有成品。先用前三种练法修习三次，起一件。</div>'}
+      </div>`;
+  },
+  sheetSkillDetail(k){ // 状态页点才艺进来：只读，看已会的成品与熟练
+    const name=CR_SKILLNAME[k]||k;
+    const sk=(state.protagonist&&state.protagonist.skills)||{};
+    const key=skillKeyIn(sk,k);
+    const v=key?Number(sk[key])||0:0;
+    if(!key)return `<button class="backbtn" onclick="UI.sheetBack()">◀ 返回状态</button>
+      <div class="sec"><div class="sec-cap">${esc(name)}</div><div class="sheet-note">此艺尚未入门。</div></div>`;
+    const work=skillWorks()[name];
+    const workHtml=work?`<div class="sec"><div class="sec-cap">手上的功课</div>
+        <div class="itemrow"><span>${esc(work.title)}（${esc(work.kind)}）</span><span class="cnt">${work.progress}／${work.need}</span></div>
+        <div class="sheet-note">再修习 ${Math.max(0,work.need-work.progress)} 次可成。</div></div>`:'';
+    let body='';
+    if(PIECE_SKILLS[k]){
+      const list=piecesOfSkill(k);
+      body=list.length?`<div class="sec"><div class="sec-cap">已会的${PIECE_LABELS[k]}（${list.length}）</div>${list.map(pc=>{
+        const mt=Math.max(0,Math.min(100,Number(pc.mastery)||0));
+        const traitText=Array.isArray(pc.traits)&&pc.traits.length?`<div class="pc-meta">${pc.traits.map(t=>esc(t)).join('、')}</div>`:'';
+        return `<div class="piececard">
+          <div class="piece-top"><span class="pc-name">${esc(pc.name)}</span><span class="qbadge ${this.qualityClass(pc.quality)}">${esc(pc.quality||'寻常')}</span></div>
+          <div class="pc-meta">${esc(pc.kind||'')}${pc.perfCount?` · 已用 ${pc.perfCount} 回`:''}</div>${traitText}
+          <div class="pc-meta">熟练 ${mt}／100（${this.masteryText(mt)}）</div>
+          <div style="height:4px;background:var(--paper-deep);border-radius:2px;overflow:hidden;margin-top:6px"><span style="display:block;height:100%;width:${mt}%;background:var(--gold)"></span></div>
+        </div>`;
+      }).join('')}</div>`:'<div class="sec"><div class="sheet-note">此艺还没有成品：连修三次可成一'+(PIECE_LABELS[k]==='曲目'?'支曲子':PIECE_LABELS[k]==='舞段'?'折舞':PIECE_LABELS[k]==='棋谱'?'局棋谱':'册医案')+'。</div></div>';
+    }else{
+      const items=(state.inventory||[]).filter(it=>it&&it.src==='功课'&&String(it.note||'').indexOf(name)>-1);
+      body=items.length?`<div class="sec"><div class="sec-cap">已成的功课（${items.length}）</div>${items.map(it=>`<div class="piececard">
+          <div class="piece-top"><span class="pc-name">${esc(it.name)}</span><span class="qbadge ${this.qualityClass(it.quality)}">${esc(it.quality||'—')}</span></div>
+          <div class="pc-meta">${esc(it.category||'功课')}${it.displayed?' · 已陈设在住处':''}${Array.isArray(it.traits)&&it.traits.length?' · '+it.traits.map(t=>esc(t)).join('、'):''}</div>
+        </div>`).join('')}<div class="sheet-note">此艺的成品收在行囊里，可赠、可陈设。</div></div>`
+        :'<div class="sec"><div class="sheet-note">此艺不列曲目；成件后收进行囊，可赠、可陈设。</div></div>';
+    }
+    return `<button class="backbtn" onclick="UI.sheetBack()">◀ 返回状态</button>
+      <div class="sec"><div class="sec-cap">${esc(name)}</div>
+        ${this.meter('修为',v,(v>100?'m-gold':'m-indigo'))}
+        <div class="sheet-note">${esc(SKILL_LEVEL(v))}；才艺越高，修习进益越慢。${PIECE_SKILLS[k]?'此艺的成品列在下方，可温习熟练。':''}</div>
+      </div>
+      ${workHtml}${body}`;
   },
   pickSkill(k){selSkill=(selSkill===k)?null:k;UI.renderSheet('才艺修习')},
   /* 求艺：未习之艺——先打听“谁会”，再登门求师 */
@@ -6385,6 +6458,7 @@ const UI={
       <div class="sheet-note">材料至多 ${CRAFT_MAX_KINDS} 种、${CRAFT_MAX_TOTAL} 份，且须为同一类。成品会带名称、品质、特质、一句描述与使用效果，入行囊后可自用、赠人、献物或典卖。</div>`;
   },
   qualityClass(q){return {'粗陋':'q-rough','寻常':'q-normal','精巧':'q-fine','珍品':'q-rare','绝品':'q-epic'}[q]||'q-normal'},
+  masteryText(v){v=Math.max(0,Math.min(100,Number(v)||0));return v>=100?'炉火纯青':v>=85?'烂熟':v>=60?'娴熟':v>=30?'渐熟':'生疏'},
   sheetCraftResult(){
     const it=craftResult;
     if(!it)return '<div class="sheet-note">暂无成品。</div>';
@@ -6473,6 +6547,8 @@ const UI={
     else if(name==='吩咐')B.innerHTML=this.sheetFocus();
     else if(name==='行囊')B.innerHTML=this.sheetItems();
     else if(name==='才艺修习')B.innerHTML=this.sheetSkills();
+    else if(name==='才艺详情')B.innerHTML=this.sheetSkillDetail(param);
+    else if(name==='修习曲目')B.innerHTML=this.sheetPiecePick();
     else if(name==='节宴献艺')B.innerHTML=this.sheetFestPerf();
     else if(name==='求艺')B.innerHTML=this.sheetUnlock(param);
     else if(name==='赠礼')B.innerHTML=this.sheetGift();
@@ -6512,15 +6588,17 @@ const UI={
     const tiNow=Number(at['体质'])||0;
     const baseNote=(base>0&&tiNow>base)?`<div class="sheet-note">气血高出根基 ${tiNow-base} 点，每旬自然回落 1 点：散步、药膳只作维持；欲拔高根基，须长期锻炼或药物调理。</div>`
       :(base>0&&tiNow===base)?'<div class="sheet-note">气血已达根基：散步、药膳只作维持；欲拔高根基，须长期锻炼或药物调理。</div>':'';
-    const skills=Object.entries(sk).map(([k,v])=>this.meter(k,v,(Number(v)||0)>100?'m-gold':'m-indigo')).join('');
+    const skills=Object.entries(sk).map(([name,v])=>{
+      const kk=skillPoolKeyOf(name);
+      return `<div class="sklink" role="button" tabindex="0" onclick="UI.goSheet('才艺详情','${esc(kk)}')">${this.meter(name,v,(Number(v)||0)>100?'m-gold':'m-indigo')}<span class="sk-go">详情›</span></div>`;
+    }).join('');
     const talent=`<div class="itemrow"><span>才华</span><span class="cnt num">${esc(at.才华??'—')}</span></div>`;
     const displayed=(state.inventory||[]).filter(it=>it&&it.displayed);
     const displaySec=displayed.length?`<div class="sec"><div class="sec-cap">住处陈设</div>${displayed.map(it=>`<div class="itemrow"><span>${esc(it.name)}</span><span class="cnt">${esc(it.quality||'')}${it.category?' · '+esc(it.category):''}</span></div>`).join('')}</div>`:'';
     return `<div class="sec"><div class="sec-cap">属性</div>${this.meter('精力',Math.round(state.energy??ENERGY_MAX),'m-cinnabar')}${tiMeter}${attrs||'<div class="sheet-note">—</div>'}${stance?`<div class="sheet-note">言行：${esc(stance)}</div>`:''}${baseNote}
         <div class="itemrow"><span>月俸</span><span class="cnt num">每月 ${esc(salary)} 两</span></div>
         <div class="sheet-note">按位份发放，每月下旬末自动入账；位份升降后随新月俸结算。</div></div>
-      <div class="sec"><div class="sec-cap">才艺</div>${skills||'<div class="sheet-note">—</div>'}${talent}
-        <div class="setbtns"><button class="btn btn-line" onclick="UI.goSheet('才艺修习')">${phase==='EVENT_CHOICE'?'查看曲目／献艺':'才艺修习 · 温习与献艺'}</button></div></div>
+      <div class="sec"><div class="sec-cap">才艺</div>${skills||'<div class="sheet-note">—</div>'}${talent}</div>
       ${displaySec}
       ${this.nightLedgerHtml()}
       <div class="sheet-note">剧情账、待续事项与帝的侍寝记档在顶栏「时间」打开的局面页里。</div>`;
