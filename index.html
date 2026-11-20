@@ -694,7 +694,7 @@ button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:cente
         <div id="shiftPresets"></div>
         <textarea id="shiftEmpPersona" maxlength="1000" placeholder="为他重写一段人设：性情、好恶、隐秘，以及他待你的方式。他将自此照此行事。" oninput="Game.shiftEmpInput(this)"></textarea>
         <div class="cr-empbar"><button class="cr-varbtn" onclick="Game.crInsertPlayerVar('shiftEmpPersona','shiftEmpCount')">插入 &lt;player&gt;</button><span class="cr-count num" id="shiftEmpCount">0/1000</span></div>
-        <div class="sheet-note" style="margin-top:6px">一千字以内 · 自本旬起，他的举止与待你的态度向新设靠拢 · 「插入 &lt;player&gt;」代入你的名讳 · 写毕符纸自焚</div>
+        <div class="sheet-note" style="margin-top:6px">一千字以内 · &lt;player&gt; 代入名讳</div>
       </div>
     </div>
     <div class="rm-ops"><button class="btn btn-line" onclick="Game.closeShiftCharm()">收符</button><button class="btn btn-primary" onclick="Game.confirmShiftCharm()">落笔，改写帝设</button></div>
@@ -3327,7 +3327,7 @@ function dawnReportHtml(r){
   return `<div style="font-size:14px;line-height:1.9;color:var(--ink)">${esc(head)}</div>`
     +(rows.length?`<div style="font-size:13px;line-height:1.85;color:var(--ink-soft);margin-top:8px">${rows.map(x=>`<div>${x}</div>`).join('')}</div>`:'')
     +recentHtml
-    +`<div class="sheet-note" style="margin-top:12px">本旬末只记敬事房的明面记档与宫人议论；${r.kind==='me'?'要入帐，点下面「入帐相见」；不想去，也可略过。':'想争一争，可在【宫务·行事】里递牌子；想避，也可称病。'}</div>`;
+    +`<div class="sheet-note" style="margin-top:12px">${r.kind==='me'?'要入帐，点下面「入帐相见」。':'帝召幸他人，记入承宠录。'}</div>`;
 }
 
 /* 帝设：玩家亲撰的皇帝人设（开局捏主控时自定义，商城「移性符」可改一次）。覆盖世界书与随机性情中对帝的默认描写。 */
@@ -6142,7 +6142,7 @@ const UI={
   sheetFocus(){ // 吩咐：自拟本旬要做的事（新开局时改为首旬选项）
     if(Game._openingOptions&&Game._openingOptions.length){
       phase='FOCUS_PICK';
-      return `<div class="sheet-note" style="margin:0 0 6px">初入宫闱，这一旬先定个章法：</div>`+
+      return `<div class="sheet-note" style="margin:0 0 6px">这一旬先定个章法：</div>`+
         Game._openingOptions.map((t,i)=>`<button class="npcrow" onclick="Game.pickOpening(${i})"><span class="nr-name">${esc(t)}</span><span class="nr-depth">耗精力${focusEnergyCost(t)}</span></button>`).join('');
     }
     const adj=(state.plots&&state.plots.length)?adjudicatePlots():{due:[],overdue:[],stale:[],pendStale:[]};
@@ -6154,7 +6154,7 @@ const UI={
       `<div class="sec"><div class="sec-cap">自己安排一件</div>
         <textarea class="craftinsp" id="focusText" maxlength="120" placeholder="查一查份例的账 / 写封家书 / 差人去内务府领料 / 去给柳妃递句话…"></textarea>
         <div class="setbtns"><button class="btn btn-primary" onclick="Game.customFocus()">安排下去</button></div>
-        <div class="sheet-note">界面上没有专门入口的事都在这里安排。要人当面说话的事（请托、对质、问话、赏罚）会进对话窗细演，由你一句句接；派人去办的差事则当场给结果。无论哪一种，都照常扣精力，并留下实打实的后果。</div>
+        <div class="sheet-note">没有专门入口的事在这里安排，照常扣精力。</div>
       </div>`+this.inviteHtml();
   },
   festPerfHtml(){ // 宫务·行事：本旬节宴的献艺入口
@@ -6163,7 +6163,7 @@ const UI={
     const done=state.lastFestPerfSerial===xunSerial(state.time);
     const cost=focusEnergyCost('节宴献艺');
     return `<div class="sec"><div class="sec-cap">节宴献艺 · ${esc(fest.name)}</div>
-      <div class="sheet-note" style="margin:0 0 6px">${done?'本旬已在席间献过艺，余下的工夫留给自己。':'趁宴未散，可当席献一门才艺。成算看才艺高低与当场精神；精力低于二十五时容易失手。一宴只可献一回。'}</div>
+      <div class="sheet-note" style="margin:0 0 6px">${done?'本旬已献过。':'一宴一回；精力低于 25 易失手。'}</div>
       ${done?'':`<div class="setbtns" style="margin:0"><button class="btn btn-primary" onclick="UI.openSheet('节宴献艺')">择一门才艺或曲目献上 · 精力 −${cost}</button></div>`}</div>`;
   },
   sheetFestPerf(){ // 节宴献艺：选一门已入门的才艺；歌舞若已成曲目，可直接择曲
@@ -6183,7 +6183,7 @@ const UI={
       return `<button class="npcrow" ${done?'disabled style="opacity:.45"':''} onclick="Game.festPerform('${k}')"><span class="nr-name">${k}</span><span class="nr-depth">${SKILL_LEVEL(v)} ${v} · ${note}</span></button>`;
     }).join('');
     return `<div class="sec"><div class="sec-cap">${esc(fest.name)} · 席间献艺</div>
-      <div class="sheet-note">成算全看这门才艺、曲目成色与当场精神；大宴人多，压得住场便更露脸。献艺耗精力 ${focusEnergyCost('节宴献艺')}，一宴只可一回。${done?'<br>本旬已经献过了。':''}</div>
+      <div class="sheet-note">耗精力 ${focusEnergyCost('节宴献艺')} · 一宴一回。${done?'<br>本旬已献过。':''}</div>
       ${rows||'<div class="sheet-note">你还没有可献的才艺——先去「才艺修习」入门一门。</div>'}
       <div class="setbtns"><button class="btn btn-line" onclick="UI.openSheet('宫务')">返回宫务</button></div></div>`;
   },
@@ -6196,17 +6196,17 @@ const UI={
       return `<button class="npcrow"${off?' disabled style="opacity:.45"':''} onclick="Game.inviteNpc('${esc(c.id)}')"><span class="nr-name">${esc(dispName(c.id))}</span><span class="nr-depth">成算 ${pct}% · 精力 ${INVITE_ENERGY}</span></button>`;
     }).join('');
     return `<div class="sec"><div class="sec-cap">递帖相邀</div>
-      <div class="sheet-note" style="margin:0 0 6px">请人来住处一叙：成算只看交情，帝看恩宠；成与不成都耗 ${INVITE_ENERGY} 精力，一旬只递一回。${used?'<br>本旬的帖子已经递过了。':(low?'<br>精力不足，先歇一歇。':'')}</div>
+      <div class="sheet-note" style="margin:0 0 6px">耗 ${INVITE_ENERGY} 精力 · 一旬一回。${used?'<br>本旬已递过。':(low?'<br>精力不足。':'')}</div>
       ${rows||'<div class="sheet-note">眼下没有可递帖的人。</div>'}</div>`;
   },
   gongMaidHtml(){ // 宫务·吩咐：召配属宫女问话
     const maids=(state.protagonist&&state.protagonist.maids)||[];
     const rows=maids.map(m=>`<button class="npcrow" onclick="Game.maidTalk('${esc(m)}')"><span class="nr-name">${esc(m)}</span><span class="nr-depth">配属宫女</span></button>`).join('');
-    return rows?`<div class="sec"><div class="sec-cap">召宫人问话</div>${rows}<div class="sheet-note" style="margin-top:6px">进对话、开口问话都不耗精力：交代差事、打听消息、问办差进度皆可，吩咐下去的事日后兑现。</div></div>`:'<div class="sheet-note">暂无配属宫人。</div>';
+    return rows?`<div class="sec"><div class="sec-cap">召宫人问话</div>${rows}<div class="sheet-note" style="margin-top:6px">问话不耗精力。</div></div>`:'<div class="sheet-note">暂无配属宫人。</div>';
   },
   gongDecorHtml(){ // 宫务·装潢：住处背景
     const d=ensureDecor(state),silver=Number(state.protagonist.silver)||0;
-    return `<div class="sheet-note" style="margin:0 0 10px">每幅装潢 ${DECOR_COST} 两；解锁后可随时更换，不再花银。</div>`+
+    return `<div class="sheet-note" style="margin:0 0 10px">每幅 ${DECOR_COST} 两。</div>`+
       `<div class="decorgrid">`+DECOR_ROOMS.map(r=>{
         const on=d.current===r.id,owned=d.unlocked.includes(r.id);
         return `<button class="decorcard${on?' on':''}${owned?'':' lock'}" onclick="Game.pickDecor('${r.id}')">
@@ -6240,7 +6240,7 @@ const UI={
       ${opt('strive','争取','耗精力10 · 打点10两（银两不足则只递牌子）',!canStrive)}
       ${opt('wait','静候','不耗精力 · 听凭敬事房安排',preg||pp)}
       ${opt('avoid','避宠','不耗精力 · 免去争宠风险，但恩宠会缓跌',preg||pp)}
-      <div class="sheet-note" style="margin-top:6px">结果在点「结束本旬」后结算并弹出夜账。帝召幸他人属公开记档，会记入承宠录。</div>
+      <div class="sheet-note" style="margin-top:6px">「结束本旬」后结算。</div>
     </div>`;
   },
   nightLedgerHtml(){ // 状态页：只放主控自己的孕事与皇嗣；帝的侍寝记档在局面页
@@ -6295,7 +6295,7 @@ const UI={
         ${p.earliest!=null?`<div class="itemrow"><span>起于</span><span class="cnt">${esc(serialTimeText(p.earliest))}</span></div>`:''}
         ${p.latest!=null?`<div class="itemrow"><span>限期</span><span class="cnt">${esc(serialTimeText(p.latest))}</span></div>`:''}
       </div>
-      <div class="sec"><div class="sec-cap">任务说明</div>${goal||'<div class="sheet-note" style="margin:0">尚未写明说明；此后推进时补记。</div>'}</div>
+      <div class="sec"><div class="sec-cap">任务说明</div>${goal||'<div class="sheet-note" style="margin:0">尚无说明。</div>'}</div>
       ${note}${logSec}
       ${hint?`<div class="sheet-note">${esc(hint)}</div>`:''}
       ${p.id===DESTINY_PLOT_ID?`<div class="setbtns"><button class="btn btn-primary" onclick="UI.goSheet('命途')">命途总览</button></div>`:''}
@@ -6331,7 +6331,7 @@ const UI={
     const reqRows=c?c.reqs.map(r=>`<div class="itemrow"><span>${esc(r.text)}</span><span class="cnt">${r.ok?'已足':'未足'}</span></div>`).join(''):'';
     const beatRow=c?`<div class="itemrow"><span>关目：${esc(c.st.beat.text)}</span><span class="cnt">${c.beatDone?'已演':'待演'}</span></div>`:'';
     const stateNote=ml.finished?`<div class="sheet-note" style="margin-top:0">此路已走到头：${esc(def.finale)}。要不要就此收束，由你决定。</div>`
-      :(ml.blocked?`<div class="sheet-note" style="margin-top:0;color:var(--cinnabar)">此路已堵：两次发难皆败。${ml.hard?'你在硬撑——此后每次到期直接扣减，不再给考场。':'可以改道（还有机会），也可以硬撑。'}</div>`
+      :(ml.blocked?`<div class="sheet-note" style="margin-top:0;color:var(--cinnabar)">此路已堵：两次发难皆败。${ml.hard?'此后到期直接扣减。':'可改道，也可硬撑。'}</div>`
       :(ml.fails?`<div class="sheet-note" style="margin-top:0">已记债 ${ml.fails}/2：再败一次，此路不通。</div>`:''));
     const switchSec=ml.finished?'':(ml.switched
       ?`<div class="sheet-note">已改道一次，不能再改。</div>`
@@ -6350,8 +6350,7 @@ const UI={
       <div class="sec"><div class="sec-cap">本阶接口</div>
         <div class="itemrow"><span>阻力</span><span class="cnt">${esc(st.slots.block)}</span></div>
         <div class="itemrow"><span>助力</span><span class="cnt">${esc(st.slots.help)}</span></div>
-        <div class="itemrow"><span>意外</span><span class="cnt">${esc(st.slots.twist)}</span></div>
-        <div class="sheet-note">在途引线只要对得上这其中一项，就会并进同一场戏推进。</div></div>
+        <div class="itemrow"><span>意外</span><span class="cnt">${esc(st.slots.twist)}</span></div></div>
       <div class="sec"><div class="sec-cap">五阶</div>${stageRows}</div>
       ${hardBtn}${switchSec}`;
   },
@@ -6424,9 +6423,9 @@ const UI={
     const wk=workKey?skillWorks()[workKey]:null;
     const workHtml=selSkill?(wk?`<div class="sec"><div class="sec-cap">手上的功课</div>
         <div class="itemrow"><span>${esc(wk.title)}（${esc(wk.kind)}）</span><span class="cnt">${wk.progress}／${wk.need}</span></div>
-        <div class="sheet-note" style="margin:6px 0 0">再修习 ${Math.max(0,wk.need-wk.progress)} 次可成；临帖读谱、请人陪练会让成品更精。${PIECE_SKILLS[selSkill]?(selSkill==='医术'?'成件后列入下方医案，不入行囊，可温习、可在人前施治。':selSkill==='棋'?'成件后列入下方棋谱，不入行囊，可温习、可与人手谈。':'成件后列入下方'+PIECE_LABELS[selSkill]+'，不入行囊，可温习、可在席间或人前献艺。'):'成件后入行囊，可赠、可献、可陈设。'}</div></div>`:`<div class="sheet-note" style="margin:8px 0 0">这门眼下没有起头的功课；下一次修习会起一件，三次成篇。</div>`):'';
+        <div class="sheet-note" style="margin:6px 0 0">再修习 ${Math.max(0,wk.need-wk.progress)} 次可成。</div></div>`:`<div class="sheet-note" style="margin:8px 0 0">修习三次成一件。</div>`):'';
     const modeHtml=selSkill?`<div class="sec"><div class="sec-cap">怎么练「${esc(selSkill)}」</div>
-        <div class="sheet-note" style="margin:0 0 6px">眼下 ${esc(SKILL_LEVEL(Number((sk[skillKeyIn(sk,selSkill)]||0))))}。四种练法同耗 ${cost} 精力，进益与代价不同。${inScene?'<br>对话中只可查看，修习须回住处。':''}</div>
+        <div class="sheet-note" style="margin:0 0 6px">四种练法同耗 ${cost} 精力。${inScene?'<br>对话中只可查看，修习须回住处。':''}</div>
         <button class="npcrow" ${(inScene||energy<cost)?'disabled style="opacity:.45"':''} onclick="Game.practiceSkill('solo')"><span class="nr-name">独自苦练</span><span class="nr-depth">稳进 1—2 点 · 无门槛</span></button>
         <button class="npcrow" ${(!bk||inScene||energy<cost)?'disabled style="opacity:.45"':''} onclick="Game.practiceSkill('book')"><span class="nr-name">临帖／读谱</span><span class="nr-depth">${bk?`${esc(bk.name)}在案 · 进益 3—4 点`:'手边没有此艺谱册'}</span></button>
         <button class="npcrow" ${(!teacher||inScene||energy<cost)?'disabled style="opacity:.45"':''} onclick="Game.practiceSkill('teacher')"><span class="nr-name">请教／陪练</span><span class="nr-depth">${teacher?`${esc(teacher.name)}（此艺 ${teacher.tv}）· 进益 3—4 点，也可能婉拒`:'没有可请教的人——须相熟、且此艺高过你'}</span></button>
@@ -6439,7 +6438,7 @@ const UI={
       ${workHtml}
       ${pieceHtml}
       ${modeHtml}
-      <div class="sheet-note">开局所习才艺共四十点。未解锁的技艺，先得打听谁会——与相识之人交好，或问身边侍女；知道后，再登门当面求师。</div>
+      <div class="sheet-note">未解锁的技艺，先打听谁会，再当面求师。</div>
       <div class="setbtns"><button class="btn btn-line" ${inScene?'disabled style="opacity:.45"':''} onclick="Game.openCraft()">手作 · 用材料做一件东西</button></div>`;
   },
   pieceListHtml(k,cost){ // 曲目／舞段／棋谱／医案：温习与对人施用
@@ -6470,8 +6469,8 @@ const UI={
       </div>`;
     }).join('');
     return `<div class="sec"><div class="sec-cap">手上的${label}（${list.length}）</div>
-      ${rows||`<div class="sheet-note" style="margin:0">还没有成品。同一门修习三次成一${label==='曲目'?'支曲子':label==='舞段'?'折舞':label==='棋谱'?'局棋谱':'册医案'}；成后列在这里，不占行囊。</div>`}
-      <div class="sheet-note">温习只精熟这一件，不会再起新功课；熟练越高，${k==='棋'?'对弈':k==='医术'?'施治':'献艺'}时越有把握。</div></div>`;
+      ${rows||`<div class="sheet-note" style="margin:0">修习三次成一件。</div>`}
+      <div class="sheet-note">温习只精熟这一件。</div></div>`;
   },
   sheetPiecePick(){ // 才艺修习的第四个入口：择一件已会的成品温习
     const k=selSkill;
@@ -6482,7 +6481,7 @@ const UI={
       <div class="sec"><div class="sheet-note">先在上头择一门技艺。</div></div>`;
     if(!PIECE_SKILLS[k])return `<button class="backbtn" onclick="UI.sheetBack()">◀ 返回才艺</button>
       <div class="sec"><div class="sec-cap">修习曲目 · ${esc(name)}</div>
-        <div class="sheet-note">此艺不列曲目：成品收在行囊里，可赠、可陈设。</div></div>`;
+        <div class="sheet-note">成品入行囊。</div></div>`;
     const list=piecesOfSkill(k);
     const rows=list.map(pc=>{
       const mt=Math.max(0,Math.min(100,Number(pc.mastery)||0));
@@ -6492,8 +6491,8 @@ const UI={
     }).join('');
     return `<button class="backbtn" onclick="UI.sheetBack()">◀ 返回才艺</button>
       <div class="sec"><div class="sec-cap">修习${PIECE_LABELS[k]} · ${esc(name)}</div>
-        <div class="sheet-note" style="margin:0 0 6px">选一件已会的${PIECE_LABELS[k]}温习，耗精力 ${cost}。温习只精熟这一件，不会起新的功课。${can?'':(phase!=='FOCUS_SELECT'?'<br>对话中只可查看，修习须回住处。':'<br>精力不足，先歇一歇。')}</div>
-        ${rows||'<div class="sheet-note">还没有成品。先用前三种练法修习三次，起一件。</div>'}
+        <div class="sheet-note" style="margin:0 0 6px">温习耗精力 ${cost}。${can?'':(phase!=='FOCUS_SELECT'?'<br>对话中只可查看，修习须回住处。':'<br>精力不足，先歇一歇。')}</div>
+        ${rows||'<div class="sheet-note">修习三次成一件。</div>'}
       </div>`;
   },
   sheetSkillDetail(k){ // 状态页点才艺进来：只读，看已会的成品与熟练
@@ -6519,19 +6518,19 @@ const UI={
           <div class="pc-meta">熟练 ${mt}／100（${this.masteryText(mt)}）</div>
           <div style="height:4px;background:var(--paper-deep);border-radius:2px;overflow:hidden;margin-top:6px"><span style="display:block;height:100%;width:${mt}%;background:var(--gold)"></span></div>
         </div>`;
-      }).join('')}</div>`:'<div class="sec"><div class="sheet-note">此艺还没有成品：连修三次可成一'+(PIECE_LABELS[k]==='曲目'?'支曲子':PIECE_LABELS[k]==='舞段'?'折舞':PIECE_LABELS[k]==='棋谱'?'局棋谱':'册医案')+'。</div></div>';
+      }).join('')}</div>`:'<div class="sec"><div class="sheet-note">修习三次成一件。</div></div>';
     }else{
       const items=(state.inventory||[]).filter(it=>it&&it.src==='功课'&&String(it.note||'').indexOf(name)>-1);
       body=items.length?`<div class="sec"><div class="sec-cap">已成的功课（${items.length}）</div>${items.map(it=>`<div class="piececard">
           <div class="piece-top"><span class="pc-name">${esc(it.name)}</span><span class="qbadge ${this.qualityClass(it.quality)}">${esc(it.quality||'—')}</span></div>
           <div class="pc-meta">${esc(it.category||'功课')}${it.displayed?' · 已陈设在住处':''}${Array.isArray(it.traits)&&it.traits.length?' · '+it.traits.map(t=>esc(t)).join('、'):''}</div>
-        </div>`).join('')}<div class="sheet-note">此艺的成品收在行囊里，可赠、可陈设。</div></div>`
-        :'<div class="sec"><div class="sheet-note">此艺不列曲目；成件后收进行囊，可赠、可陈设。</div></div>';
+        </div>`).join('')}<div class="sheet-note">成品入行囊。</div></div>`
+        :'<div class="sec"><div class="sheet-note">成品入行囊。</div></div>';
     }
     return `<button class="backbtn" onclick="UI.sheetBack()">◀ 返回状态</button>
       <div class="sec"><div class="sec-cap">${esc(name)}</div>
         ${this.meter('修为',v,(v>100?'m-gold':'m-indigo'))}
-        <div class="sheet-note">${esc(SKILL_LEVEL(v))}；才艺越高，修习进益越慢。${PIECE_SKILLS[k]?'此艺的成品列在下方，可温习熟练。':''}</div>
+        <div class="sheet-note">${esc(SKILL_LEVEL(v))}；才艺越高，修习进益越慢。</div>
       </div>
       ${workHtml}${body}`;
   },
@@ -6544,7 +6543,7 @@ const UI={
       const key=skillKeyIn(sk,k),v=Number(sk[key])||0;
       return `<button class="backbtn" onclick="UI.sheetBack()">◀ 返回才艺</button>
         <div class="sec"><div class="sec-cap">${esc(skillName)}</div>
-          <div class="sheet-note">此艺已入门：${esc(skillName)} ${v}（${SKILL_LEVEL(v)}）。回才艺面板即可择它修习。</div></div>`;
+          <div class="sheet-note">已入门：${esc(skillName)} ${v}（${SKILL_LEVEL(v)}）。</div></div>`;
     }
     const knownCount=Object.keys(state.npcs||{}).reduce((a,id)=>{
       const n=state.npcs[id];
@@ -6553,18 +6552,18 @@ const UI={
     },0);
     return `<button class="backbtn" onclick="UI.sheetBack()">◀ 返回才艺</button>
       <div class="sec"><div class="sec-cap">未习之艺 · ${esc(k)}</div>
-        <div class="sheet-note">此艺尚未入门。要学，得先知道宫里谁懂它——这不能凭空得知。</div></div>
+        <div class="sheet-note">尚未入门：先打听谁会。</div></div>
       <div class="sec"><div class="sec-cap">一、与宫中人来往</div>
-        <div class="sheet-note">与相识之人交好到好感 ${SKILL_INTEL_BOND}，自然会知道她擅长什么。知道之后，去人物谱看她的才艺，再登门当面请教。</div>
+        <div class="sheet-note">好感达 ${SKILL_INTEL_BOND} 可知其艺，再去当面求师。</div>
         <div class="setbtns"><button class="btn btn-line" onclick="UI.renderSheet('六宫')">往六宫走动</button></div></div>
       <div class="sec"><div class="sec-cap">二、问身边侍女</div>
-        <div class="sheet-note">侍女知道些宫里的旧话。问一问，或能问出谁精于此道。</div>
+        <div class="sheet-note">侍女知些旧话。</div>
         <div class="setbtns"><button class="btn btn-line" onclick="Game.askMaidSkill('${k}')">唤侍女打听「${esc(k)}」 · 精力 −5</button></div>
-        ${knownCount?`<div class="sheet-note">你已听说 ${knownCount} 人精于此道——去人物谱看是谁。</div>`:''}</div>
+        ${knownCount?`<div class="sheet-note">已知 ${knownCount} 人精于此道。</div>`:''}</div>
       <div class="sec"><div class="sec-cap">求师之礼</div>
-        <div class="sheet-note">当面提起想学此艺，且双方好感达 ${SKILL_TEACH_BOND}、对方此艺高于 ${SKILL_TEACH_MIN}，她才肯教。条件不足，多半婉拒。</div></div>
+        <div class="sheet-note">须好感 ${SKILL_TEACH_BOND}、此艺高于 ${SKILL_TEACH_MIN}。</div></div>
       <div class="sec"><div class="sec-cap">三、藏书阁寻书</div>
-        <div class="sheet-note">往藏书阁翻阅书目，寻得谱册可借、可抄：持谱修习此艺，进益取高档；未习之艺，研读书册也能依书入门，不必求人。</div>
+        <div class="sheet-note">借谱修习取高档；未习之艺可依书入门。</div>
         <div class="setbtns"><button class="btn btn-line" onclick="UI.goSheet('藏书阁')">往藏书阁寻书</button></div></div>`;
   },
   sheetLibrary(){
@@ -6610,12 +6609,12 @@ const UI={
         <div class="sheet-note" style="margin:0 0 8px">${esc(b.desc)}</div>
         <div class="setbtns" style="margin:0">${btns||'<span class="sheet-note" style="margin:0">借阅中，旬末归还</span>'}</div></div>`;
     }).join('');
-    return `<div class="sheet-note" style="margin-top:2px">藏书阁分架陈列谱册。寻书每旬一次；蒙学、进阶之书可借阅（一册，旬末归还）或花银抄录永为已有，抄得者可择一册置案头——手头有谱，修习该艺进益取高档；孤本不可外借、不可抄录，只可在阁内研读。</div>
+    return `<div class="sheet-note" style="margin-top:2px">寻书每旬一次；可借一册（旬末还）或抄录；孤本只可在阁内研读。</div>
       <div class="sec"><div class="sec-cap">寻书</div>
         <div class="setbtns"><button class="btn btn-line" ${searched||energy<5?'disabled style="opacity:.45"':''} onclick="Game.libSearch()">${searched?'本旬已寻过':'翻阅书目 · 精力 −5'}</button></div>
-        <div class="sheet-note" style="margin:0">${unseen>0?`尚有 ${unseen} 部未曾翻见，慢慢寻来。`:'阁中书目你已尽数翻见。'}　研读每旬一次 · 精力 −10</div></div>
+        <div class="sheet-note" style="margin:0">${unseen>0?`尚有 ${unseen} 部未翻见。`:'书目已翻遍。'}　研读每旬一次 · 精力 −10</div></div>
       ${heldHtml?`<div class="sec"><div class="sec-cap">手头谱册</div>${heldHtml}</div>`:''}
-      ${rows||'<div class="sheet-note">翻一翻书目，看看阁里有什么。</div>'}`;
+      ${rows||'<div class="sheet-note">尚未翻见谱册。</div>'}`;
   },
   /* 墨妙斋：写字作画（前端自结，不走模型） */
   sheetStudio(){
@@ -6660,13 +6659,12 @@ const UI={
     else if(lackSilver)why=`银两不足：${paper.name}需 ${paper.cost} 两。`;
     else if(lackEnergy)why=`精力不足：本幅须耗 ${sel.energy} 点。`;
     const title=String(sel.title||'');
-    return `<div class="sheet-note" style="margin-top:2px">墨妙斋在宫城东侧的一处静院，窗下设长案，纸墨俱全。写字作画不按次收钱——宫中所领纸墨每旬两幅，够日常练笔；用完了仍要动笔，才须自备佳纸好墨。</div>
+    return `<div class="sheet-note" style="margin-top:2px">纸墨每旬两幅；用尽后自备。</div>
       <div class="sec"><div class="sec-cap">一、写什么</div>
         <div class="craftchips">${typeRow('字','写字')}${typeRow('画','作画')}</div>
-        <div class="craftchips">${forms}</div>
-        <div class="sheet-note" style="margin:0">${locked?'':'书体与画科只定路数；真正成色，看你的造诣、用心与纸墨。'}</div></div>
+        <div class="craftchips">${forms}</div></div>
       <div class="sec"><div class="sec-cap">二、用什么纸</div>
-        <div class="sheet-note" style="margin:0 0 8px">份例纸墨由宫中按旬供给，不费银两；佳纸、澄心堂纸自费，笔墨更见精神。</div>
+        <div class="sheet-note" style="margin:0 0 8px">份例两幅免费；佳纸自费。</div>
         <div class="craftgrid">${papers}</div></div>
       <div class="sec"><div class="sec-cap">三、用几分心</div>
         <div class="craftchips">${energyChips}</div>
@@ -6677,7 +6675,7 @@ const UI={
       <div class="sec"><div class="sec-cap">这一幅</div>
         <div class="craftsum"><b>${esc(paper.name)}${paper.cost?` · ${paper.cost} 两`:''}</b>　耗精力 ${sel.energy}<br>${esc(paper.desc)}${why?`<br><span style="color:var(--cinnabar)">${esc(why)}</span>`:''}</div></div>
       <button class="btn btn-primary" style="border-radius:22px;letter-spacing:.14em;text-indent:.14em;font-size:15px;margin-top:14px" ${canGo?'':'disabled'} onclick="Game.studioSubmit()">落笔 · 精力 −${sel.energy}${paper.cost?` · 银 ${paper.cost} 两`:''}</button>
-      <div class="sheet-note">品质由「${skillName}」造诣、用心、纸墨与临场发挥共同决定，且以造诣封顶：技艺未至，好纸也难出绝品。作品入行囊，可赠人、陈设或典卖。</div>`;
+      <div class="sheet-note">品质以「${skillName}」封顶；作品入行囊。</div>`;
   },
   sheetStudioResult(){
     const r=studioResult;
@@ -6702,7 +6700,7 @@ const UI={
         <button class="btn btn-line" ${canAgain?'':'disabled style="opacity:.45"'} onclick="Game.studioAgain()">再写一幅</button>
         <button class="btn btn-primary" onclick="Game.studioDone()">收好</button>
       </div>
-      <div class="sheet-note">已入行囊，可在「行囊」看详情；赠人、献物按正常社交规则结算，品质只提供更好的起点。</div>`;
+      <div class="sheet-note">已入行囊。</div>`;
   },
   /* 传膳菜单：本旬膳单 + 剩余次数（前端自结，不调 API） */
   sheetMeal(){
@@ -6724,7 +6722,7 @@ const UI={
     const hint=full?'精力已满，先用过早膳了。':(left<=0?'本旬三次传膳已用尽，待下旬再传。':'点一味传上来，即刻用毕。');
     return `<div class="mealhead"><span>本旬膳单 · ${esc(menu.theme)}</span><span>本旬余 ${left}／${MEAL_LIMIT_PER_XUN} 次</span></div>
       ${rows}
-      <div class="sheet-note">${hint}　精力 ${energy}／${ENERGY_MAX}　银两 ${silver} 两。菜色每三旬一换；最贵一味另有属性增益，余者只回精力。</div>`;
+      <div class="sheet-note">${hint}　精力 ${energy}／${ENERGY_MAX}　银两 ${silver} 两。</div>`;
   },
   /* 手作：选做什么、选料、投精力、写灵感 → 调 API 生成成品 */
   sheetCraft(){
@@ -6754,8 +6752,8 @@ const UI={
         </div></div>`;
     }).join('');
     const matHtml=cells?`<div class="craftgrid">${cells}</div>`
-      :(kindsAvail.length?'<div class="sheet-note">这一类暂无存货：换一类看看，或先去领料、求赠、采买。</div>'
-      :'<div class="sheet-note">囊中暂无手作材料。内务府按月会发些，也可让宫人去采买；御赐、赏赐与园中花木也可能得料。</div>');
+      :(kindsAvail.length?'<div class="sheet-note">此类暂无材料。</div>'
+      :'<div class="sheet-note">暂无材料；可领料或采买。</div>');
     const selList=Object.keys(craftSel.mats).map(name=>({name,count:craftSel.mats[name]}));
     const selText=selList.length?selList.map(x=>`${x.name}×${x.count}`).join('、'):'尚未放料';
     const total=selList.reduce((a,b)=>a+b.count,0);
@@ -6766,25 +6764,25 @@ const UI={
     const canGo=selList.length>0&&!!insp.trim()&&energy>=CRAFT_ENERGY_MIN&&craftSel.energy<=energy;
     const skills=(state.protagonist&&state.protagonist.skills)||{};
     const skillLine=['女红','香道','医术','莳花'].map(k=>{const key=skillKeyIn(skills,k);return `${k} ${key?skills[key]:'未习'}`}).join(' · ');
-    return `<div class="sheet-note" style="margin-top:2px">以材料、精力与灵感做一件东西。材料与精力在开做时扣除；生成失败不扣。品质由材料品级、份数、精力、灵感与相关才艺共同决定。</div>
+    return `<div class="sheet-note" style="margin-top:2px">开做即扣材料与精力，失败不扣。</div>
       <div class="sec"><div class="sec-cap">相关才艺</div><div class="itemrow"><span>${esc(skillLine)}</span></div></div>
       <div class="sec"><div class="sec-cap">一、做什么</div>
-        <div class="sheet-note" style="margin:0 0 8px">选定一类，便只用这一类材料：绣、香、药、花不能混用。</div>
+        <div class="sheet-note" style="margin:0 0 8px">一类材料不可混用。</div>
         <div class="craftchips">${kindChips}</div></div>
       <div class="sec"><div class="sec-cap">二、放料</div>
-        <div class="sheet-note" style="margin:0 0 8px">内务府每旬可领一份常用料；稀有料仍须赏赐、采买或人情。别人送的净材料也会收在这里。</div>
+        <div class="sheet-note" style="margin:0 0 8px">每旬可领一份常用料。</div>
         <div class="setbtns" style="margin:0 0 10px"><button class="btn btn-line" ${restocked?'disabled style="opacity:.45"':''} onclick="Game.craftRestock()">${restocked?'本旬材料已领':'领本旬材料'}</button></div>
         ${matHtml}</div>
       <div class="sec"><div class="sec-cap">三、投入精力</div>
         <div class="craftchips">${chips}</div>
-        <div class="sheet-note" style="margin-top:0">本旬余 ${energy}／${ENERGY_MAX}；开做后按所选数额扣除。</div></div>
+        <div class="sheet-note" style="margin-top:0">本旬余 ${energy}／${ENERGY_MAX}。</div></div>
       <div class="sec"><div class="sec-cap">四、写一句灵感</div>
         <textarea class="craftinsp" id="craftInsp" maxlength="${CRAFT_INSPIRATION_MAX}" placeholder="想做什么、给谁、要什么味道或样子？写得越具体，成品越容易合心意。" oninput="Game.craftInsp(this.value)">${esc(insp)}</textarea>
         <div class="craftcount" id="craftInspCount">${insp.length}／${CRAFT_INSPIRATION_MAX}</div></div>
       <div class="sec"><div class="sec-cap">本件用料</div>
         <div class="craftsum"><b>${esc(selText)}</b>${total?`（${selList.length} 种 / ${total} 份）`:''}<br>投入精力 ${craftSel.energy}${errs.length?`<br><span style="color:var(--cinnabar)">${esc(errs[0])}</span>`:''}</div></div>
       <button class="btn btn-primary" id="craftGo" style="border-radius:22px;letter-spacing:.14em;text-indent:.14em;font-size:15px;margin-top:14px" ${canGo?'':'disabled'} onclick="Game.craftSubmit()">开做 · 精力 −${craftSel.energy}</button>
-      <div class="sheet-note">材料至多 ${CRAFT_MAX_KINDS} 种、${CRAFT_MAX_TOTAL} 份，且须为同一类。成品会带名称、品质、特质、一句描述与使用效果，入行囊后可自用、赠人、献物或典卖。</div>`;
+      <div class="sheet-note">至多 ${CRAFT_MAX_KINDS} 种、${CRAFT_MAX_TOTAL} 份，同类。</div>`;
   },
   qualityClass(q){return {'粗陋':'q-rough','寻常':'q-normal','精巧':'q-fine','珍品':'q-rare','绝品':'q-epic'}[q]||'q-normal'},
   masteryText(v){v=Math.max(0,Math.min(100,Number(v)||0));return v>=100?'炉火纯青':v>=85?'烂熟':v>=60?'娴熟':v>=30?'渐熟':'生疏'},
@@ -6808,7 +6806,7 @@ const UI={
         <button class="btn btn-line" ${canAgain?'':'disabled style="opacity:.45"'} onclick="Game.craftAgain()">再做一个</button>
         <button class="btn btn-primary" onclick="Game.closeCraftResult()">收好</button>
       </div>
-      <div class="sheet-note">成品已入行囊，可在「行囊」查看详情、使用或典卖。赠人、献物按正常社交与剧情规则结算；品质与心意只提供更好的起点。</div>`;
+      <div class="sheet-note">已入行囊。</div>`;
   },
   /* 歇下一旬：本旬小结弹窗 */
   showRestTip(){
@@ -6839,7 +6837,7 @@ const UI={
     $('#questBody').innerHTML=`<div class="sec"><div class="sec-cap">${isNew?'新主线任务':'主线了结'}</div>
       <div class="nd-head"><div><div class="nd-nm">${esc(q.title)}</div></div></div>
       ${status}${goal}${progress}${due}
-      <div class="sheet-note">${isNew?'已记入剧情账与大事记，可随时在「大事记」查看。':'已记入大事记。'}</div></div>`;
+      <div class="sheet-note">已记入大事记。</div></div>`;
     $('#questBtn').textContent=isNew?'领命':'知道了';
     $('#questModal').classList.add('on');
   },
@@ -6915,8 +6913,8 @@ const UI={
     const attrs=Object.entries(at).filter(([k])=>k!=='才华'&&!(k==='体质'&&base>0)).map(([k,v])=>this.meter(k,v,(['威望','交际'].includes(k)?'m-gold':(['忌惮','外貌'].includes(k)?'m-cinnabar':'m-indigo')))).join('');
     const stance=presenceNote(p);
     const tiNow=Number(at['体质'])||0;
-    const baseNote=(base>0&&tiNow>base)?`<div class="sheet-note">气血高出根基 ${tiNow-base} 点，每旬自然回落 1 点：散步、药膳只作维持；欲拔高根基，须长期锻炼或药物调理。</div>`
-      :(base>0&&tiNow===base)?'<div class="sheet-note">气血已达根基：散步、药膳只作维持；欲拔高根基，须长期锻炼或药物调理。</div>':'';
+    const baseNote=(base>0&&tiNow>base)?`<div class="sheet-note">气血高出根基 ${tiNow-base} 点，每旬回落 1。</div>`
+      :(base>0&&tiNow===base)?'<div class="sheet-note">气血已达根基。</div>':'';
     const skills=Object.entries(sk).map(([name,v])=>{
       const kk=skillPoolKeyOf(name);
       return `<div class="sklink" role="button" tabindex="0" onclick="UI.goSheet('才艺详情','${esc(kk)}')">${this.meter(name,v,(Number(v)||0)>100?'m-gold':'m-indigo')}<span class="sk-go">详情›</span></div>`;
@@ -6925,12 +6923,11 @@ const UI={
     const displayed=(state.inventory||[]).filter(it=>it&&it.displayed);
     const displaySec=displayed.length?`<div class="sec"><div class="sec-cap">住处陈设</div>${displayed.map(it=>`<div class="itemrow"><span>${esc(it.name)}</span><span class="cnt">${esc(it.quality||'')}${it.category?' · '+esc(it.category):''}</span></div>`).join('')}</div>`:'';
     return `<div class="sec"><div class="sec-cap">属性</div>${this.meter('精力',Math.round(state.energy??ENERGY_MAX),'m-cinnabar')}${tiMeter}${attrs||'<div class="sheet-note">—</div>'}${stance?`<div class="sheet-note">言行：${esc(stance)}</div>`:''}${baseNote}
-        <div class="itemrow"><span>月俸</span><span class="cnt num">每月 ${esc(salary)} 两</span></div>
-        <div class="sheet-note">按位份发放，每月下旬末自动入账；位份升降后随新月俸结算。</div></div>
+        <div class="itemrow"><span>月俸</span><span class="cnt num">每月 ${esc(salary)} 两</span></div></div>
       <div class="sec"><div class="sec-cap">才艺</div>${skills||'<div class="sheet-note">—</div>'}${talent}</div>
       ${displaySec}
       ${this.nightLedgerHtml()}
-      <div class="sheet-note">剧情账、待续事项与帝的侍寝记档在顶栏「时间」打开的局面页里。</div>`;
+      <div class="sheet-note">剧情账与待续在「时间」打开的页面里。</div>`;
   },
   sheetChronicle(){
     const entries=state&&Array.isArray(state.chronicle)?state.chronicle:null;
@@ -6977,8 +6974,8 @@ const UI={
     const list=mems.slice(0,10).map(m=>`<div class="tl-item"><div class="tl-time">${esc(m.xun||'')} <span class="tag">${esc(m.type||'共历')}</span>${m.open?' <span class="tag t-rumor">未了</span>':''}</div>${esc(m.text)}</div>`).join('');
     const more=mems.length>10?`<div class="sheet-note">更早还有 ${mems.length-10} 条，往后正文里自会提起。</div>`:'';
     return `<div class="sec"><div class="sec-cap">知心</div>${rows}
-      ${list?`<div class="tl" style="margin-top:8px">${list}</div>${more}`:'<div class="sheet-note">尚无共同经历。相处得多了，这里会记下他记得的事、欠下的约定与未解的误会。</div>'}</div>
-      ${persona?`<div class="sec"><div class="sec-cap">帝设（你所撰）</div><div class="sheet-note" style="white-space:pre-wrap;line-height:1.8">${esc(persona)}</div><div class="sheet-note">他自此照此行事。若想改写，商城的「移性符」每件可改一次。</div></div>`:''}`;
+      ${list?`<div class="tl" style="margin-top:8px">${list}</div>${more}`:'<div class="sheet-note">尚无共同经历。</div>'}</div>
+      ${persona?`<div class="sec"><div class="sec-cap">帝设（你所撰）</div><div class="sheet-note" style="white-space:pre-wrap;line-height:1.8">${esc(persona)}</div><div class="sheet-note">「移性符」每件可改一次。</div></div>`:''}`;
   },
   npcRowHtml(who,onclick){
     const c=this.npcCard(who);
@@ -7013,11 +7010,11 @@ const UI={
             return `<div class="itemrow"><span>${esc(b.name)}</span><span class="cnt">${esc(tag)} · ${esc(hint)}</span></div>`;
           }).join('')+
           (shelf>0?`<div class="itemrow"><span>自抄藏书 ${shelf} 册</span><span class="cnt">留在藏书阁 · 任一部可置案头</span></div>`:'')+
-          `<div class="sheet-note" style="margin:0">借阅、研读、置案头，出门往藏书阁办理。</div></div>`;
+          `<div class="sheet-note" style="margin:0">须往藏书阁办理。</div></div>`;
       }else if(L.revealed.length){
         h+=`<div class="sec"><div class="sec-cap">藏书阁</div>
           <div class="itemrow"><span>阁中已翻见 ${L.revealed.length} 部书</span><span class="cnt">书留在阁中</span></div>
-          <div class="sheet-note" style="margin:0">翻见的书不入行囊；借阅、研读、抄录，须外出往藏书阁。</div></div>`;
+          <div class="sheet-note" style="margin:0">借阅须往藏书阁。</div></div>`;
       }
     }
     const inv=state.inventory||[];
@@ -7046,7 +7043,7 @@ const UI={
         <span class="nr-rel num">×${esc(it.count)}</span></button>`;
     }).join('');
     return `<button class="backbtn" onclick="UI.closeSheet()">◀ 返回对话</button>
-      <div class="sheet-note" style="margin-top:0">从囊中取一件递给${esc(dispName(who)||'对方')}。收不收、回什么话，由${ta}的性情、与你的交情和眼前场合定，不保证得脸。御赐、禁物与信物不可转赠，故不列在此。</div>
+      <div class="sheet-note" style="margin-top:0">御赐、禁物、信物不可转赠。</div>
       ${list?`<div class="sec"><div class="sec-cap">可赠之物（${rows.length}）</div>${list}</div>`:'<div class="sec"><div class="sheet-note">囊中没有可赠之物。</div></div>'}`;
   },
   sheetInterPerform(){ // 互动·献艺：歌舞曲目，或即席一段
@@ -7063,7 +7060,7 @@ const UI={
       return `<div class="sec"><div class="sec-cap">${k} · ${PIECE_LABELS[k]}</div>${unlocked?(rows+improv):`<div class="sheet-note">${k}尚未入门。</div>`}</div>`;
     };
     return `<button class="backbtn" onclick="UI.closeSheet()">◀ 返回对话</button>
-      <div class="sheet-note" style="margin-top:0">当着${esc(dispName(who)||'对方')}的面献上一段，耗精力 ${focusEnergyCost('献艺')}。成色看作品品质、熟练、场合与对方性情，不保证得脸。</div>
+      <div class="sheet-note" style="margin-top:0">耗精力 ${focusEnergyCost('献艺')}。</div>
       ${sec('歌')}${sec('舞')}`;
   },
   sheetInterChess(){ // 互动·对弈：胜负前端掷定，棋谱与熟练加成
@@ -7082,7 +7079,7 @@ const UI={
     }).join('');
     const basePct=Math.round(chessEstimate(my,opp,0)*100);
     return `<button class="backbtn" onclick="UI.closeSheet()">◀ 返回对话</button>
-      <div class="sheet-note" style="margin-top:0">你棋艺 ${esc(my)}（${esc(SKILL_LEVEL(my))}），${esc(dispName(who)||'对方')}约 ${esc(opp)}，空手胜算约 ${basePct}%。胜负由前端按双方棋力加临场乘区掷定，不是定数；耗精力 ${focusEnergyCost('对弈')}。</div>
+      <div class="sheet-note" style="margin-top:0">你 ${esc(my)}，对方约 ${esc(opp)}，空手胜算约 ${basePct}%。耗精力 ${focusEnergyCost('对弈')}。</div>
       ${rows?`<div class="sec"><div class="sec-cap">以棋谱应局</div>${rows}</div>`:''}
       <div class="sec"><div class="sec-cap">空手</div>
         <button class="npcrow" onclick="Game.interChess('')"><span class="nr-name">空手对弈</span><span class="nr-depth">胜算约 ${basePct}% · 全看临场</span></button></div>`;
@@ -7098,7 +7095,7 @@ const UI={
       return `<button class="npcrow" onclick="Game.interConsult('${pc.id}')"><span class="nr-name">以${esc(pc.name)}诊看</span><span class="nr-depth">${esc(pc.quality||'寻常')} · 熟练 ${mt}</span></button>`;
     }).join('');
     return `<button class="backbtn" onclick="UI.closeSheet()">◀ 返回对话</button>
-      <div class="sheet-note" style="margin-top:0">为${esc(dispName(who)||'对方')}搭脉问诊，耗精力 ${focusEnergyCost('问诊')}。对方肯不肯说、病证对不对得上、场合合不合适，都影响结果，不保证诊出什么。</div>
+      <div class="sheet-note" style="margin-top:0">耗精力 ${focusEnergyCost('问诊')}。</div>
       ${rows?`<div class="sec"><div class="sec-cap">持医案</div>${rows}</div>`:''}
       <div class="sec"><div class="sec-cap">空手</div>
         <button class="npcrow" onclick="Game.interConsult('')"><span class="nr-name">凭所学搭脉</span><span class="nr-depth">无医案可参 · 全看手上功夫</span></button></div>`;
@@ -7141,7 +7138,7 @@ const UI={
       ${cat.fx?wide('效用',cat.fx):''}
       <div class="itemrow"><span>可否使用</span><span class="cnt">${it.durable?'无需使用 · 启用即生效':(it.usable?'可':'不可')}</span></div>
       <div class="itemrow"><span>可否典卖</span><span class="cnt">${it.pawnable?'可':'不可'}</span></div></div>
-      ${it.src==='功课'?'<div class="sheet-note">可带入对话赠人——对帝便是献物；陈设在住处只作赏玩，不占回合。</div>':''}
+      ${it.src==='功课'?'<div class="sheet-note">可赠人，也可陈设在住处。</div>':''}
       <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px">${act}${displayBtn}${pawn}</div>
       <button class="backbtn" onclick="UI.sheetBack()">◀ 返回行囊</button>`;
   },
@@ -7205,7 +7202,7 @@ const UI={
       return `<button class="npcrow" onclick="Game.pickMeetTarget('${esc(id)}')"><span class="nr-main"><span class="nr-name">${esc(c.name)}</span>${role?`<span class="nr-role">${esc(role)}</span>`:''}</span><span class="nr-rel">${this.relBadge(id)}</span></button>`;
     }).join('');
     const pending=state.gardenMeetWhom;
-    return `<div class="sheet-note" style="margin-top:0">择定一人：下一次往御花园散步，必与此人相遇；正文会演成自然巧合，不提道具。${pending?`<br>当前已记：<b>${esc(dispName(pending))}</b>——重择会作废前一次。`:''}</div>
+    return `<div class="sheet-note" style="margin-top:0">下一次往御花园，必遇此人。${pending?`<br>当前已记：<b>${esc(dispName(pending))}</b>，重择即作废。`:''}</div>
       <div class="sec"><div class="sec-cap">可选之人</div>${rows||'<div class="sheet-note">宫中尚无相识之人，暂无可遇。</div>'}</div>
       <button class="backbtn" onclick="UI.sheetBack()">◀ 返回行囊</button>`;
   },
@@ -7224,7 +7221,7 @@ const UI={
     return `<div class="sec"><div class="sec-cap">宫市 · 采买</div>
       <div class="sheet-note" style="margin:0">囊中银两 <b class="num">${esc(p.silver??0)}</b> 两 · 货色每月初入新，本月这单采买回来便不再变动</div></div>
       <div class="sec">${list||'<div class="sheet-note">本月货色未至，稍后再来。</div>'}</div>
-      <div class="sheet-note">布料、香料、药材是净材料，买入即入手作材料，裁绣、调香、合药皆可用；食物与玩意儿入行囊，用时由剧情承接效用。</div>`;
+      <div class="sheet-note">布料、香料、药材入手作料，其余入行囊。</div>`;
   },
   sheetMarketDetail(i){
     const m=state.market;
@@ -7250,7 +7247,7 @@ const UI={
       ${it.effect?wide('效用',it.effect):''}
       <div class="itemrow"><span>可否典卖</span><span class="cnt">可</span></div></div>
       <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px">${buy}</div>
-      <div class="sheet-note" style="margin-top:10px">${it.mat?'净材料入库即作手作之料，不占地儿、不入膳。':'入手即入行囊；点物品可查看效用，使用时由剧情承接。'}</div>`;
+      <div class="sheet-note" style="margin-top:10px">${it.mat?'入手作料。':'入行囊。'}</div>`;
   },
   relBadge(who){
     const r=(state.relationships||{})[who];
@@ -7307,7 +7304,7 @@ const UI={
       </div>`;
     }).join('');
     return seg+`<div class="sec"><div class="sec-cap">宫中派系（${fs.filter(f=>!f.defunct).length} 系在世）</div>${cards}</div>
-      <div class="sheet-note">只列你听说过的成员；没打过照面的人，名字不会凭空出现。派系的下一步与期限见「局面」的剧情账。</div>`;
+      <div class="sheet-note">只列听说过的成员。</div>`;
   },
   mindSection(id){ // 对方对你：默认不可知；印象位即按钮，点击即耗读心笺一张即时生成，不落档
     const ta=npcSexOf(state,id)==='m'?'他':'她';
@@ -7315,8 +7312,8 @@ const UI={
     if(v&&typeof v==='object')return `<div class="rel"><span class="rel-v" style="width:auto">${esc(v.text)}</span></div><div class="sheet-note">——读心所见，止于第 ${xunNoOf(v.turn)} 旬；要知如今，再点一次。</div>`;
     if(v==='…')return `<div class="sheet-note">笺上火光一闪，${ta}的影子正在笺上聚拢……</div>`;
     const own=(state.inventory||[]).filter(x=>x.name==='读心笺').reduce((a,x)=>a+(Number(x.count)||0),0);
-    if(own)return `<button class="npcrow" style="width:100%" onclick="Game.readMind('${esc(id)}')"><span class="nr-name">${ta}心底如何看待你——不可知</span><span class="nr-depth">读心笺 ×1 · 点击窥心</span></button><div class="sheet-note">囊中尚有 ${own} 张；点击即消耗一张，即时窥见此刻心意。</div>`;
-    return `<div class="sheet-note">${ta}待你如何，只在言行举止间露出三分；真实心意，无从揣度。读心笺可在商城以积分购得。</div>`;
+    if(own)return `<button class="npcrow" style="width:100%" onclick="Game.readMind('${esc(id)}')"><span class="nr-name">${ta}心底如何看待你——不可知</span><span class="nr-depth">读心笺 ×1 · 点击窥心</span></button><div class="sheet-note">尚有 ${own} 张。</div>`;
+    return `<div class="sheet-note">读心笺可在商城换购。</div>`;
   },
   sheetNpcDetail(id){
     const n=(state.npcs||{})[id];
@@ -7349,7 +7346,7 @@ const UI={
         :(!(v>SKILL_TEACH_MIN)
           ?`<div class="sheet-note">${ta}于此道未至精熟，教不了人。</div>`
           :(bondOk?`<div class="setbtns"><button class="btn btn-line" onclick="Game.askTeach('${esc(id)}','${esc(name)}')">当面求教「${esc(name)}」 · 精力 ${focusEnergyCost('求师')}</button></div>`
-            :`<div class="sheet-note">交情尚浅（好感 ${bond??'—'}／${SKILL_TEACH_BOND}），${ta}未必肯教。再往来些时日。</div>`));
+            :`<div class="sheet-note">好感 ${bond??'—'}／${SKILL_TEACH_BOND}，尚不够。</div>`));
       return `<div class="rowline"><span class="rk">${esc(name)}</span><span class="rv num">${esc(v)} · ${SKILL_LEVEL(v)}</span></div>${act}`;
     }).join('');
     return `<button class="backbtn" onclick="UI.sheetBack()">◀ 返回人物谱</button>
@@ -7369,7 +7366,7 @@ const UI={
         ${n.emperorStory?`<div class="sheet-note" style="margin-top:6px">${esc(n.emperorStory)}</div>`:''}
         ${n.arc?`<div class="itemrow" style="margin-top:6px"><span>她眼下的事</span><span class="cnt">${esc(n.arc)}</span></div>`:''}</div>`:''}
       <div class="sec"><div class="sec-cap">已感知的性情</div>${normalizePersona(prof.traits).map(t=>`<span class="tag">${esc(t)}</span>`).join('')||'<div class="sheet-note">所知尚浅。</div>'}</div>
-      <div class="sec"><div class="sec-cap">才艺见闻</div>${intelSection||`<div class="sheet-note">尚未听说${ta}精于何艺。多来往，或问身边侍女打听。</div>`}</div>
+      <div class="sec"><div class="sec-cap">才艺见闻</div>${intelSection||`<div class="sheet-note">尚未听说${ta}精于何艺。</div>`}</div>
       <div class="sec"><div class="sec-cap">${ta}对你</div>${this.mindSection(id)}</div>
       <div class="sec"><div class="sec-cap">${ta}对他人（据你所知）</div>${impOther}</div>
       <div class="sec"><div class="sec-cap">生平所知</div>${bio?`<div class="tl">${bio}</div>`:'<div class="sheet-note">还没有可记的往来。</div>'}</div>
@@ -7404,16 +7401,16 @@ const UI={
   paneEscape(){
     const hasState=!!state;
     return `<div class="sec"><div class="sec-cap">脱离卡死</div>
-      <div class="sheet-note" style="margin-top:0">生成卡住、对话界面点不动、或流程走不下去时，按下方按钮立即中止当前生成并回到住处。本次操作尚未落定的精力、银两、积分、属性、才艺、行囊与关系变化会一并退还；已经结算的旬不会回退。</div>
+      <div class="sheet-note" style="margin-top:0">中止当前生成并回到住处；本次未落定的变化一并退还，已结算的旬不回退。</div>
       <div class="setbtns"><button class="btn btn-primary" onclick="Game.escapeStuck()" ${hasState?'':'disabled'}>脱离卡死</button></div>
-      <div class="sheet-note">${hasState?(safePoint?'已有可回的落定点：本次操作开始前的进度。':'进入对局后会记录落定点。'):'尚未开局，暂无可回的进度。'}</div></div>`;
+      <div class="sheet-note">${hasState?(safePoint?'可退回本次操作前。':'进入对局后会记录落定点。'):'尚未开局。'}</div></div>`;
   },
   paneBgm(){
     const s=loadSettings();
     return `<div class="sec"><div class="sec-cap">背景音乐</div>
       <div class="setrow"><span class="sk">曲目</span><select onchange="Game.chooseBgm(this.value)"><option value="0" ${s.bgm===false?'selected':''}>关闭</option>${BGM_TRACKS.map(t=>`<option value="${t.id}" ${s.bgm!==false&&(Number(s.bgmTrack)||1)===t.id?'selected':''}>${t.name}</option>`).join('')}</select></div>
       <div class="setrow"><span class="sk">速率</span><input type="range" id="setBgmRate" min="0.5" max="1.5" step="0.05" value="${s.bgmRate||1}" oninput="Game.setBgmRate(parseFloat(this.value))"><span class="sk num" id="bgmRateVal">${Math.round((s.bgmRate||1)*100)}%</span></div>
-      <div class="sheet-note" style="margin-top:6px">曲目按加入顺序命名为「一」「二」……；选中即切换播放。关闭后仍记得上次的曲目与速率。</div></div>`;
+      <div class="sheet-note" style="margin-top:6px">选中即切换。</div></div>`;
   },
   paneApi(){
     const s=loadSettings();
@@ -7423,7 +7420,7 @@ const UI={
       <div class="setrow"><span class="sk">模型</span><input id="setModel" placeholder="deepseek-chat" value="${esc(s.model)}"></div>
       <div class="setrow"><span class="sk">流式输出</span><select id="setStream"><option value="1" ${s.stream!==false?'selected':''}>开启（边写边看，推荐）</option><option value="0" ${s.stream===false?'selected':''}>关闭（接口不支持流式时）</option></select></div>
       <div class="setrow"><span class="sk">外观</span><select id="setTheme"><option value="auto" ${s.theme==='auto'?'selected':''}>跟随系统</option><option value="light" ${s.theme==='light'?'selected':''}>宣纸（浅色）</option><option value="dark" ${s.theme==='dark'?'selected':''}>墨底（深色）</option></select></div>
-      <div class="sheet-note" style="margin-top:6px">${lastApiStat?`上次请求：${lastApiStat.sec.toFixed(1)} 秒 · 输入 ${lastApiStat.in??'?'}${lastApiStat.cache!=null?`（缓存命中 ${lastApiStat.cache}）`:''} / 输出 ${lastApiStat.out??'?'} tokens`:'尚无请求记录'}<br>输入大、缓存命中为 0 → 提示词过长或前缀失效；输出大而耗时长 → 是生成慢，可换更快的模型。</div>
+      <div class="sheet-note" style="margin-top:6px">${lastApiStat?`上次请求：${lastApiStat.sec.toFixed(1)} 秒 · 输入 ${lastApiStat.in??'?'}${lastApiStat.cache!=null?`（缓存命中 ${lastApiStat.cache}）`:''} / 输出 ${lastApiStat.out??'?'} tokens`:'尚无请求记录'}</div>
       <div class="setbtns"><button class="btn btn-primary" onclick="Game.saveSettingsFromUI()">保存设置</button><button class="btn btn-line" id="btnTestApi" onclick="Game.testApi()">测试连通</button></div>
       <div id="apiTestRes" style="display:none;margin-top:10px;font-size:13px;line-height:1.7;border-radius:8px;padding:8px 10px"></div></div>
       <div class="sec"><div class="sec-cap">数据</div>
@@ -7548,7 +7545,7 @@ const SHOP_CYCLE=3, SHOP_SLOTS=10;
 const SHOP_CATALOG = {
   '读心笺': {kind:'consumable', cost:15, usable:false,
     desc:'素白小笺一张，无字无墨，入手微温。系统之物，只你可见可触。',
-    usage:'购入即刻入囊。在「人物」中点开其人详情，点「其心底如何看待你」即燃笺窥心：每张限用一次，不占回合、不耗精力；所见只此一瞬，不落档。',
+    usage:'人物详情里点「其心底如何看待你」即用；所知只此一瞬，不落档。',
     fx:'即时窥见一人此刻对你的真实心意。'},
   '明目露': {kind:'consumable', cost:30,
     desc:'以清晨荷叶露调的眼露，清亮微凉。',
@@ -7584,7 +7581,7 @@ const SHOP_CATALOG = {
     fx:'隔空传一句话：不经人手、不落字迹，隔墙有耳时最稳。'},
   '邂逅笺': {kind:'consumable', cost:60,
     desc:'当你有话想说，又不愿显得刻意。',
-    usage:'行囊详情页点「使用」，择定一人。下一次往御花园散步，必与此人相遇——不占回合、不耗精力，用毕即无。',
+    usage:'行囊里使用，择定一人；下一次往御花园必遇。',
     fx:'下一次御花园散步必遇所选之人：帝、太后、妃嫔、皇嗣、宫人皆可（重择会作废前一次）。'},
   '驻颜膏': {kind:'consumable', cost:60,
     desc:'琥珀色小盒膏子，膏体细滑，带一缕冷香，据说是前朝方士所传。',
@@ -7628,7 +7625,7 @@ const SHOP_CATALOG = {
     fx:'长期之效：入口之前先验酒食——饮用之物有毒即显形。'},
   '避毒珠': {kind:'durable', cost:70,
     desc:'乌沉珠子一颗，贴身戴着冬暖夏凉；百毒近身，则微微发烫示警。',
-    usage:'购入后随身佩戴（入手即启用），无需也不可「使用」。行囊详情页可「收存」摘下——效用即停，再「启用」戴回。',
+    usage:'佩着即生效；行囊里可「收存」摘下。',
     fx:'长期之效：佩戴中可避寻常毒物与慢药暗算——凡针对你的下毒皆不能得手，毒近身时珠身发烫，你会有所察觉。'},
   '敛息佩': {kind:'durable', cost:75,
     desc:'墨玉小佩，佩之气息内收，人往人堆里一站便不起眼。',
@@ -7652,7 +7649,7 @@ const SHOP_CATALOG = {
     fx:'长期之效：佩戴中增益子嗣缘，帷帐之事后更易有信；收存则无效。'},
   '移性符': {kind:'consumable', cost:100,
     desc:'朱砂符纸一道，纹如蟠龙，入手微温，不焚不化。系统之物，只你可见可触。',
-    usage:'行囊详情页点「使用」：屏息凝神，重撰帝设——为皇帝重写一段人设（一千字以内，可插入 <player> 代你的名讳）。不占回合、不耗精力；写毕符纸自焚。',
+    usage:'行囊里使用，为帝重写一段人设（一千字以内，可插入 <player> 代名讳）。',
     fx:'改写皇帝人设：帝自此依新设性情行事、待你。每件限改一次，用毕即焚。'}
 };
 function shopCycleOf(turn){return Math.floor(((Number(turn)||1)-1)/SHOP_CYCLE)} // 第几轮货色（每 3 旬一轮）
@@ -8474,7 +8471,7 @@ const STUDIO_QUOTA=2;              // 每旬份例纸墨：两幅
 const STUDIO_ENERGIES=[10,20,30];  // 用心程度
 const STUDIO_TITLE_MAX=40;
 const STUDIO_PAPERS=[
-  {id:'li',name:'份例纸墨',cost:0,bonus:0,desc:'宫中所领的寻常纸墨，本旬两幅之内不费银两。'},
+  {id:'li',name:'份例纸墨',cost:0,bonus:0,desc:'寻常纸墨。'},
   {id:'jia',name:'佳纸良墨',cost:8,bonus:7,desc:'宣纸徽墨，浓淡易分，笔锋立得住。'},
   {id:'chengxin',name:'澄心堂纸',cost:25,bonus:15,desc:'南唐旧制，滑如春冰；好纸配好墨，最见工夫。'}
 ];
