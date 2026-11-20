@@ -3407,7 +3407,7 @@ const FESTIVAL_MODULE = [
 const SCENE_PARTS_RULES = [
 '【scene.parts 分段协议】按语义拆 2—5 段，每段只做一件事：',
 'narr＝完全旁白：只写其他人物的举止、客观场面、环境与事件环节，不写当前说话人（scene.who）的动作神态；',
-'act＝当前说话人的动作神态：只写她/他此刻做了什么、神色如何，不写台词、不加引号；前端会把它并入同一只对方对话气泡，以（）显示。',
+'act＝当前说话人的动作神态：只写她/他此刻做了什么、神色如何，只写这一个动作或神态（一两句），不写台词、不加引号，也不得写主控或其他人物的举动；前端会把它并入同一只对方对话气泡，以（）显示。主控的动作、多人往来、时间推移与场面变化一律写 narr（开场的这一整段写顶层 narrative）。',
 'say＝当前说话人此刻亲口说的原话：直接写说了什么，不带引号，也不带“他说”“她说”之类的提示语。',
 'quote＝转述/引用第三方的原话：某人复述别人（贵嫔、帝、太后、宫女等）说过的话，或信里、传闻里、圣旨里的原话；who 写原话者的称谓（确无出处可省），text 仍不带引号。',
 '分辨：当前说话人的动作神态→act；当前说话人亲口说→say；他转述第三个人说的话→quote；其他人物与客观场面→narr。不要把当前说话人的动作神态写成 narr 旁白。',
@@ -3433,7 +3433,7 @@ const SCENE_MODULE = [
 '```',
 '- scene.who 必填，写清对方是谁：用存档中的人物称谓或姓名（如"太后""韦昭仪""春韶"），顶层 eventSource 写同一人；界面据此显示姓名与头像。',
 SCENE_PARTS_RULES,
-'- 触发剧情的当旬，narrative 必须先交代主控正在何处做什么、此人如何出现（迎面、传唤、偶遇、遣人请去），只写完全旁白，到"只让人回了句"这类引出语为止；第一句台词放进 scene.parts 的 say 段。界面会先显示 narrative，再按 parts 顺序渲染。',
+'- 触发剧情的当旬，narrative 必须先交代主控正在何处做什么、此人如何出现（迎面、传唤、偶遇、遣人请去），只写完全旁白，到"只让人回了句"这类引出语为止；第一句台词放进 scene.parts 的 say 段。界面会先显示 narrative，再按 parts 顺序渲染。开场这一轮 narrative 不得留空，也不得把这段旁白塞进 parts 的 act（act 只放对方当场的动作神态）。',
 '- narrative 只写完全旁白（主控所见、其他人物、场面与客观环节），人物台词一律放进 scene.parts；当前说话人的动作神态放进 act，不要写进 narrative，也不要在 narrative 里写引号对白。scene.line 可省略，仅作旧界面兜底。',
 '- 每轮只演绎场上人物的当即反应与场面变化（以 scene.who 为主，位份更高者在其位主事时，由其开口并换手）：scene.state 一律写 "ongoing"（继续对谈），scene.parts 总长不超过 120 字（act 写动作神态，say 写话；不写主控的动作心理、不铺环境）、2—3 个接话选项（放顶层 options）；此阶段 narrative 必须为空字符串，changes 与 statePatch 为空，不结算数值。',
 '- 对话对象可当场换手（通传后被召入阁面圣、正主闻声出来等）：后续轮把 scene.who 改写为新对象（档案在册的称谓）；过渡与场面写进 parts 的 narr 段，新对象的言行照常写 act/say；scene.where 写新所在。换手用 "ongoing" 继续对谈，不得借换手 resolve 收场。引见场景尤其注意：太监或宫人把人引到后，正主开口的那一轮必须把 scene.who 改为正主（帝写「皇帝」，不要写太监/宫女的名字），本轮只写正主的言行，引见者的话放上一轮或 parts 的 narr 段；不得让引见者一直占着对话人。',
@@ -9116,7 +9116,7 @@ const Game={
       const meetHit=!!meetWho&&(forcedMeet||Math.random()<GARDEN_MEET_CHANCE); // 偶遇由前端代码掷骰硬约束，不交给提示词"随缘"
       const forcedNote=forcedMeet?'此行是一次有意的“巧合”：正文不得提及道具、系统或“安排”，照常写成自然相遇；若对方本有避嫌、病中或久不召见，只作一次短暂照面，不必长谈。':'';
       const meetNote=meetHit
-        ?`本轮偶遇骰已命中（概率 ${Math.round(GARDEN_MEET_CHANCE*100)}%）：玩家须在园中偶遇「${meetWho}」，用剧情对话 scene 结构呈现（scene.who 填「${meetWho}」，地点写园中所在）；偶遇内容须与在途引线、双方关系或主控当前处境自然相关，给 2—4 个接话选项后停止，不结算应对后果；本轮 hasEvent 必须为 true。若主控与此人尚未照面（如帝、太后），按初见演绎：问安避让、自报家门、留下第一印象，事后经 dossier 建档。${forcedNote}`
+        ?`本轮偶遇骰已命中（概率 ${Math.round(GARDEN_MEET_CHANCE*100)}%）：玩家须在园中偶遇「${meetWho}」，用剧情对话 scene 结构呈现（scene.who 填「${meetWho}」，地点写园中所在）；顶层 narrative 先交代园中何处、如何照面、在场还有什么人（这段是开场旁白，不得留空，也不得塞进 parts 的 act），随后 parts 才进对方的第一句动作与台词；偶遇内容须与在途引线、双方关系或主控当前处境自然相关，给 2—4 个接话选项后停止，不结算应对后果；本轮 hasEvent 必须为 true。若主控与此人尚未照面（如帝、太后），按初见演绎：问安避让、自报家门、留下第一印象，事后经 dossier 建档。${forcedNote}`
         :`本轮偶遇骰未命中（概率 ${Math.round(GARDEN_MEET_CHANCE*100)}%）：只演物候风景、宫人闲话等轻量见闻，不安排与具体人物的撞见剧情。`;
       const msg=`第${xunNo()}旬第一轮：玩家往御花园散步闲逛（本旬第 ${walkNo} 次，耗精力 ${focusEnergyCost('散步')}）。演绎一路物候风景与园中见闻。${meetNote}${gainNote}（同一旬高强度活动与康健收益不兼得。）${leadHint}${pendHint}散步只是本旬中的一段外出：scene.where 可写园中所在，但 statePatch.location 仍写本宫住处，不要把 location 改成御花园。`;
       this.round1(msg,'外出·御花园散步',focusEnergyCost('散步'),{skipDice:meetHit,meetWho:meetHit?meetWho:null,leadIds:hits.map(p=>p.id),pendTexts:phits.map(pendText),whoHint:meetHit?meetWho:undefined}); // 偶遇命中即本轮剧情额度；宫城图不关：加载与结果都叠在图上，避免背景弹回房间
@@ -9542,7 +9542,15 @@ const Game={
       const isSay=['say','dialog','dialogue','npc','speech','character','char','台词','对白'].includes(raw);
       const isAct=['act','action','gesture','manner','动作','神态','举止'].includes(raw);
       if(isSay||isQuote)text=fixEmperorMention(text); // 台词里提天子称“陛下”，不写“帝”
-      out.push({type:isQuote?'quote':isAct?'act':isSay?'say':'narr',text,who:p.who?String(p.who).trim():''});
+      let type=isQuote?'quote':isAct?'act':isSay?'say':'narr';
+      if(type==='act'){ // 模型常把主控/旁人的整段叙事塞进 act：以「你」起句、或长篇里反复提到你的，其实是旁白
+        const bare=text.replace(/^[（(]\s*|\s*[）)]$/g,'').trim();
+        const proto=String((state&&state.protagonist&&state.protagonist.name)||'');
+        const fromHer=/^你/.test(bare)||(proto&&bare.indexOf(proto)===0);
+        const muchYou=bare.length>=50&&(bare.match(/你/g)||[]).length>=2;
+        if(fromHer||muchYou){type='narr';text=bare}
+      }
+      out.push({type,text,who:p.who?String(p.who).trim():''});
     }
     if(!out.length)return null;
     if(!out.some(x=>x.type==='say'||x.type==='quote')){ // parts 只给了动作/旁白、台词却落在 scene.line 上：补一句，别让这轮只剩个动作
