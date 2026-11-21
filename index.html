@@ -2327,13 +2327,34 @@ function ensureFactions(s){ // 旧档/新档归一：world.factionLeaders → �
   s.factions=out;
   return out;
 }
-function recalcFactionAttitude(f){ // 态度跟着领袖与主控的亲疏走；敌对不自动降，只有剧情能解
+function factionHostileEvidence(f){ // 近期真对你下过几次手：以剧情账为准，不认口头态度
+  const id=String((f&&f.name)||'');
+  const now=xunSerial(state&&state.time)||0;
+  let near=0,mid=0,hasPlot=false;
+  for(const p of ((state&&state.plots)||[])){
+    if(!p||p.factionId!==id||p.line!=='敌对'||p.stage==='已作废')continue;
+    if(p.stage==='进行中')hasPlot=true;
+    const t=Number(p.touch||p.earliest||0);
+    if(!t)continue;
+    if(now-t<=6)near++;
+    if(now-t<=12)mid++;
+  }
+  if(!hasPlot&&f&&f.step&&f.stepLine==='敌对')near++; // 旧档只留了这一步、没立账的，也算一次
+  return {near,mid};
+}
+function recalcFactionAttitude(f){ // 态度看领袖亲疏，也看这一系最近真做过什么；敌对不自动降，只有关系转厚才松
   if(!f||f.defunct)return f?f.attitude:'观望';
   const t=relTier(f.leader);
-  if(t.key==='feud'){f.attitude='敌对';return f.attitude}
-  if(t.key==='close'||t.key==='ally'){if(f.attitude!=='敌对')f.attitude='拉拢';return f.attitude}
-  if(f.stance==='强硬'&&(t.key==='new'||t.key==='cold')){if(f.attitude!=='拉拢')f.attitude='压制';return f.attitude}
-  if(f.attitude==='压制')f.attitude='观望';
+  const ev=factionHostileEvidence(f);
+  if(t.key==='feud'||ev.near>=2||ev.mid>=3){f.attitude='敌对';return f.attitude}
+  if(ev.near>=1){if(f.attitude!=='敌对')f.attitude='压制';return f.attitude} // 六旬内动过手：不是观望
+  if(f.attitude==='敌对'){
+    if(t.key==='close'||t.key==='ally')f.attitude='压制'; // 亲厚起来才能松一档
+    return f.attitude;
+  }
+  if(f.stance==='强硬'&&(t.key==='new'||t.key==='cold')){f.attitude='压制';return f.attitude}
+  if(t.key==='close'||t.key==='ally'){f.attitude='拉拢';return f.attitude}
+  if(f.attitude==='压制')f.attitude='观望'; // 安静过六旬、也没别的由头，才回落
   return f.attitude;
 }
 function factionMovePick(f){
@@ -9985,17 +10006,28 @@ const Game={
   sayParts(parts,who){ // 按 API 给的语义段渲染：act 与 say 并入同一只对方气泡，quote 走转述，narr 走完全旁白
     const fallback=who||(sceneCtx?sceneCtx.who:'');
     const proto=String((state&&state.protagonist&&state.protagonist.name)||'');
+    parts=(Array.isArray(parts)?parts:[]).map(p=>Object.assign({},p));
+    // 没标 who 的动作，多半是下一位的过场（「（赵贵妃从廊那头过来）」后面跟着她的台词）：
+    // 先认后面最近一个标了人的段，再认前面；否则这条动作会被塞进上一位的气泡，看着像没换人
+    for(let i=0;i<parts.length;i++){
+      const p=parts[i];
+      if(!p||p.who||(p.type!=='act'&&p.type!=='say'))continue;
+      let pick='';
+      for(let j=i+1;j<parts.length;j++){const q=parts[j];if(!q||q.type==='narr'||q.type==='quote')break;if(q.who){pick=q.who;break}}
+      if(!pick)for(let j=i-1;j>=0;j--){const q=parts[j];if(!q||q.type==='narr'||q.type==='quote')break;if(q.who){pick=q.who;break}}
+      if(pick)p.who=pick;
+    }
     let group=[],groupWho='';
     const speakerOf=p=>{ // parts 上标了 who 就以它为准：一轮里换人，不能全挂在上一位名下
       const raw=String((p&&p.who)||'').trim();
       if(isPlaceholderWho(raw)||raw==='你'||raw==='主控'||(proto&&raw===proto))return ''; // 「…」这类占位不算标了人，仍归当前说话人
       return canonicalSceneWho(raw)||raw;
     };
-    const applySpeaker=sp=>{ // 真正开口的人变了：标题与头像一起换
+    const applySpeaker=(sp,hasSay)=>{ // 真正开口的人变了：标题与头像一起换
       if(!sp||!sceneCtx)return;
       const can=canonicalSceneWho(sp)||sp;
       if(can===sceneCtx.who)return;
-      if(sceneCtx.pinned&&can!==sceneCtx.pinned)return; // 本轮刚把话交回正主：旁人的陪衬动作不得再把对话人抢回去
+      if(sceneCtx.pinned&&can!==sceneCtx.pinned&&!hasSay)return; // 交人后旁人的陪衬动作不得抢标题；但真有人开口，标题照换
       sceneCtx.who=can;
       const t=document.getElementById('chatTitle');if(t)t.textContent='剧情对话 · '+dispName(can);
       const a=document.getElementById('chatAva');if(a)a.innerHTML=avatarHtml(can);
@@ -10005,7 +10037,7 @@ const Game={
       const segs=group.map(p=>p.type==='act'?{act:p.text}:{text:p.text});
       const plain=group.map(p=>p.type==='act'?'（'+p.text+'）':p.text).join('');
       const speaker=groupWho||fallback;
-      applySpeaker(speaker);
+      applySpeaker(speaker,group.some(p=>p.type==='say'||p.type==='quote'));
       this.bubble('npc',speaker,'',segs);
       if(sceneCtx)sceneCtx.lines.push({who:'npc',name:speaker,text:plain});
       group=[];groupWho='';
