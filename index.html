@@ -2824,6 +2824,13 @@ function applyOpeningBuff(id){ // 入梦定线时的一次性开局赏赐；改�
   if(text&&ml)ml.openingBuff=text; // 记在命途上：命途页可查，也不会再发第二次
   return text;
 }
+function grantMissedOpeningBuff(){ // 刚开局却漏领（入梦被打断、从命途页补选）：读档时补发一次，旧档不追溯
+  if(!state||!state.mainLine||state.mainLine.openingBuff)return '';
+  if((state.turn||0)>6)return '';
+  const b=applyOpeningBuff(state.mainLine.id);
+  if(b){chronicleAdd(b);toast(b,4200)}
+  return b;
+}
 function openingWooActive(){
   const w=state&&state.openingWoo;
   return !!(w&&!w.done&&xunSerial(state.time)<=Number(w.until));
@@ -9309,6 +9316,7 @@ const Game={
     const cur=loadCurrent();
     if(cur){state=normalizeState(cur.state);history=cur.history||[];toast('已恢复本机进度（第'+xunNo()+'旬）')}
     else{state=normalizeState(JSON.parse(JSON.stringify(DEFAULT_SAVE)));history=[];toast('已载入 v36 存档：'+fmtTime())}
+    grantMissedOpeningBuff(); // 刚开局漏领的开局之赐，读档时补上
     persistCurrent(); // 旧档迁移（补精力、行囊、台账等）立即落盘，避免每次读档重复迁移
     this.enterMain();
   },
