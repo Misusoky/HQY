@@ -2556,7 +2556,7 @@ function mlFanRivals(s){ // 六宫里仍在走动、且不在主控这一系的�
 }
 
 const MAIN_LINES={
-  tong:{name:'白首同心',sub:'一心之途',call:'痴心人',finale:'愿得一心人，白首不相离',cost:'他先是皇帝，才是你的；每一分偏宠，都要有人来讨。',
+  tong:{name:'白首同心',sub:'一心之途',call:'痴心人',finale:'愿得一心人，白首不相离',cost:'他先是皇帝，才是你的；每一分偏宠，都要有人来讨。',buff:'帝心先偏你三分：初始宠爱 +20，知心 +10',longBuff:'长赐：帝宠每涨一次，额外 +1（每旬至多 +5）',
     stages:[
       {title:'入眼',days:10,
        goal:'他先得看见你，且看见的不是你的位份。',
@@ -2599,7 +2599,7 @@ const MAIN_LINES={
               help:'这些年你们一起攒下的每一件小事；他自己心里那点不肯认的软',
               twist:'一个只有你们两个人在场的夜晚；一件旧物；一次几乎失去'}}
     ]},
-  an:{name:'长乐岁安',sub:'岁岁之途',call:'惜命人',finale:'朔风如解意，容易莫摧残',cost:'你求的是不出事；可宫里的事，从来不问你求不求。',
+  an:{name:'长乐岁安',sub:'岁岁之途',call:'惜命人',finale:'朔风如解意，容易莫摧残',cost:'你求的是不出事；可宫里的事，从来不问你求不求。',buff:'入宫头一个月内，必有人登门拉拢',longBuff:'长赐：任何人好感每涨一次，额外 +1（每旬至多 +3）',
     stages:[
       {title:'立身',days:10,
        goal:'先把自己安顿好：住处、人手、身子，一样都不能塌。',
@@ -2649,7 +2649,7 @@ const MAIN_LINES={
               help:'这些年你留过的每一条退路、每一个人情',
               twist:'一场大病、一次宫变风声、一件旧案翻出来'}}
     ]},
-  fan:{name:'翻手为云',sub:'执柄之途',call:'执柄人',finale:'六宫之内，再无人敢与你并肩',cost:'你走的是一条用名字铺成的路；每少一个人，夜里就多一个声音。',
+  fan:{name:'翻手为云',sub:'执柄之途',call:'执柄人',finale:'六宫之内，再无人敢与你并肩',cost:'你走的是一条用名字铺成的路；每少一个人，夜里就多一个声音。',buff:'积分 +100，忌惮 +5',longBuff:'长赐：每完成一件任务，额外 +10 积分',
     stages:[
       {title:'立威',days:10,
        goal:'先让人怕你。敬可以装，怕装不出来。',
@@ -2791,6 +2791,105 @@ function startMainLine(id,silent){
   chronicleAdd('入梦定途：愿作'+def.call+'，走「'+def.name+'」——'+def.sub+'。');
   if(!silent)queueQuest({kind:'new',id:'p-destiny-1',title:def.name+'·'+st.title,goal:st.goal,note:'第一阶关目：'+st.beat.text,dueText:serialTimeText(state.mainLine.dueAt)+'前'});
   return true;
+}
+function applyOpeningBuff(id){ // 入梦定线时的一次性开局赏赐；改道与旧档补记不发
+  if(!state||!id)return '';
+  const p=state.protagonist||{};
+  if(id==='tong'){
+    const rels=state.relationships=state.relationships||{};
+    const rel=rels['皇帝'];
+    const cur=rel&&typeof rel==='object'?(Number(rel.value)||0):(Number(rel)||0);
+    if(rel&&typeof rel==='object')rel.value=cur+20;
+    else rels['皇帝']={type:'宠爱',value:cur+20};
+    state.emperor=state.emperor||{};
+    state.emperor.intimacy=Math.min(100,(Number(state.emperor.intimacy)||0)+10);
+    return '开局之赐：帝心先偏你三分——宠爱 +20，知心 +10';
+  }
+  if(id==='an'){
+    state.openingWoo={until:xunSerial(state.time)+1,done:false}; // 本旬与下一旬之内，必有一人登门拉拢
+    return '开局之赐：入宫头一个月内，必有人登门拉拢';
+  }
+  if(id==='fan'){
+    const p=state.protagonist||{};
+    p.points=(Number(p.points)||0)+100;
+    state.system=state.system||{};
+    state.system.points=(Number(state.system.points)||0)+100;
+    const at=p.attributes=p.attributes||{};
+    at['忌惮']=clamp01_100((Number(at['忌惮'])||0)+5);
+    return '开局之赐：积分 +100，忌惮 +5';
+  }
+  return '';
+}
+function openingWooActive(){
+  const w=state&&state.openingWoo;
+  return !!(w&&!w.done&&xunSerial(state.time)<=Number(w.until));
+}
+function pickWooVisitor(){ // 拉拢者：先挑仍立着的派系领袖，其次位份高的妃嫔；不挑结怨与中宫
+  const pool=consortVisitIds().filter(id=>relTier(id).key!=='feud');
+  if(!pool.length)return null;
+  const leads=new Set((state.factions||[]).filter(f=>f&&!f.defunct&&f.leader).map(f=>String(f.leader)));
+  const rankOf=id=>{const n=(state.npcs||{})[id]||{};return rankScoreOf(n.rank||rankTitleOf(id))};
+  pool.sort((a,b)=>(leads.has(String(b))-leads.has(String(a)))||(rankOf(b)-rankOf(a)));
+  return {id:pool[0],kind:'consort',reason:'你新入宫，她来看你，话里带着拉拢之意'};
+}
+/* 命途长赐：入梦定线后一直生效，按旬封顶 */
+function relNumOf(who){
+  const r=((state&&state.relationships)||{})[who];
+  if(r==null)return null;
+  if(typeof r==='object'){const v=Number(r.value);return Number.isFinite(v)?v:null}
+  const v=Number(r);return Number.isFinite(v)?v:null;
+}
+function relIsHatred(who){
+  const r=((state&&state.relationships)||{})[who];
+  return !!(r&&typeof r==='object'&&r.type==='仇恨');
+}
+function relSetNum(who,val){
+  const rs=state.relationships=state.relationships||{};
+  const r=rs[who];
+  if(r&&typeof r==='object')r.value=val;
+  else rs[who]={type:'好感',value:val};
+}
+function relSnapshotNum(){
+  const m={},rels=(state&&state.relationships)||{};
+  for(const who in rels){const v=relNumOf(who);if(v!=null)m[who]=v}
+  return m;
+}
+function longBuffState(){
+  const now=xunSerial(state.time);
+  if(!state.longBuff||Number(state.longBuff.xun)!==now)state.longBuff={xun:now,tong:0,an:0};
+  return state.longBuff;
+}
+function longBuffOneGain(who){ // 刚涨过一次好感：按命途补 1 点，返回实加数
+  const ml=state&&state.mainLine;if(!ml||relIsHatred(who))return 0;
+  const b=longBuffState();
+  if(ml.id==='tong'){
+    if(!UI.isEmperorId(who)||b.tong>=5)return 0;
+    relSetNum(who,(relNumOf(who)||0)+1);b.tong++;return 1;
+  }
+  if(ml.id==='an'){
+    if(b.an>=3)return 0;
+    relSetNum(who,(relNumOf(who)||0)+1);b.an++;return 1;
+  }
+  return 0;
+}
+function longBuffAfterGains(before){ // before＝涨之前的数值快照；给每一处上涨补 1 点
+  const ml=state&&state.mainLine;if(!ml||!before)return [];
+  const out=[];
+  for(const who in before){
+    const now=relNumOf(who);
+    if(now==null||!(now>before[who]))continue;
+    if(longBuffOneGain(who))out.push(who+' 好感 +1');
+  }
+  if(out.length)toast('命途长赐：'+out.join('、'),2600);
+  return out;
+}
+function longBuffQuestPoints(n){ // 翻手为云：每兑现一件任务，额外 10 积分
+  const ml=state&&state.mainLine;if(!ml||ml.id!=='fan'||!n)return 0;
+  const p=state.protagonist||{};
+  const add=10*n;
+  p.points=(Number(p.points)||0)+add;
+  toast('命途长赐：任务积分 +'+add,2600);
+  return add;
 }
 function mainLineAdvance(){
   const ml=state&&state.mainLine;if(!ml||ml.finished)return false;
@@ -3375,6 +3474,7 @@ function birthChild(report){
 }
 function resolveNight(prevTurn){
   const report={turn:state.turn,time:fmtTime(),kind:'alone',who:'',rank:'',intent:'wait'};
+  const buffBefore=relSnapshotNum(); // 承宠与召幸带来的好感上涨，同样吃命途长赐
   state.bedchamber=state.bedchamber&&typeof state.bedchamber==='object'?state.bedchamber:{log:[],last:null,seq:0};
   if(!Array.isArray(state.bedchamber.log))state.bedchamber.log=[];
   revivePregnancy(); // 旧档/读档后孕月对齐
@@ -3425,6 +3525,7 @@ function resolveNight(prevTurn){
     }
   }
   state.xunIntent=null;
+  longBuffAfterGains(buffBefore);
   return report;
 }
 function revivePregnancy(s){ // 读档/旧档：补孕月与产期；字段残缺则按月份推算
@@ -3558,7 +3659,8 @@ const MAIN_LINE_MODULE = [
 '5. 命途的剧情账条目（id="p-destiny"）由前端维护：不要改它的 title／goal／note／dueText／stage，回写一律不认。支线、引线、敌对条目的回写照旧。',
 '6. 期限到了，前端会让暗流账以“命途考”发难：那是本阶的考场。赢或化解＝以战代关目直接过阶；勉强挡下＝期限顺延；败＝记一债，同阶第二次败则此路不通（玩家改道或硬撑）。发难胜败仍由你按整场应对与局势裁定，收尾写 schemeOutcome，不得写成虚惊一场。',
 '7. 翻手为云（fan）另有一份【翻手为云·清册】：只数“仍在走动、且不在主控这一系”的妃嫔与中宫。自己这一系＝态度为「盟友」或「拉拢」的派系（含其领袖与成员）；已死、已废、幽禁、冷宫、禁足、逐出、出家的人不算。清掉一人后必须把痕迹写进 statePatch（relationships.<称谓>.note 或 npcs.<称谓>.status 带「已故／幽禁／冷宫／禁足／逐出／出家」），否则前端不计。此路不接受“考场代过”：终阶须六宫清空才算完。能废、能幽、能逐就先走这些路；写死须有证据、时机与代价，每阶至多一次，点到为止。',
-'8. 不许讨主控欢心：没演成的事不写兑现，命途不因身份、祈愿或系统好意自动推进；也不得把日常琐事包装成命途推进。'
+'8. 不许讨主控欢心：没演成的事不写兑现，命途不因身份、祈愿或系统好意自动推进；也不得把日常琐事包装成命途推进。',
+'9. 三途各有一份开局之赐与长赐，均由前端结算：白首同心开头宠爱 +20、知心 +10，此后帝宠每涨一次额外 +1（每旬至多 +5）；长乐岁安开头一个月内必有人登门拉拢，此后任何人好感每涨一次额外 +1（每旬至多 +3）；翻手为云开头积分 +100、忌惮 +5，此后每兑现一件任务额外 +10 积分。你照常写因果与关系变化，不要替前端再算这笔加成，也不要写“数值未变”。'
 ].join('\n');
 
 /* 固定节宴：岁岁此旬必至，前端写死触发；模型只演，不得改期或略过 */
@@ -5471,7 +5573,7 @@ function compactState(s,focusMsg){ // 只压缩送入模型的那一份，localS
   const out=Object.assign({},s);
   out.turn=xunNoOf(s.turn); // 对外统一 1 起旬号，与指令里的「第N旬」一致
   // 前端内部标记与展示字段不送模型
-  for(const k of ['avatarMap','plotMeta','schemeMeta','xunBook','saveVersion','plotLedgerV1','pawnFix1','itemFlagV1','readMindV1','energyWarned','mealCount','lastSalaryMonth','lastFestSerial','lastFestPerfSerial','items','skillWorks','pieceSeq','craftV1','chamberV1','xunIntent','inviteTurn','postpartumUntil','decor','factionFix1','lastConsortYear'])delete out[k];
+  for(const k of ['avatarMap','plotMeta','schemeMeta','xunBook','saveVersion','plotLedgerV1','pawnFix1','itemFlagV1','readMindV1','energyWarned','mealCount','lastSalaryMonth','lastFestSerial','lastFestPerfSerial','items','skillWorks','pieceSeq','craftV1','chamberV1','xunIntent','inviteTurn','postpartumUntil','decor','factionFix1','lastConsortYear','openingWoo','longBuff'])delete out[k];
   // 派系账：只送模型够写的部分；排期时刻与期限由前端管，不送出去免得照抄出错位的旬号
   if(Array.isArray(s.factions)){
     out.factions=s.factions.map(f=>({
@@ -6039,6 +6141,7 @@ function advanceTime(t){ // 两旬制日历推进：上旬→同月下旬；下�
 function applyPatch(patch){
   if(!patch)return[];
   const majors=[];
+  const buffBefore=relSnapshotNum(); // 命途长赐：本轮结束后统一给上涨的关系补点
   let baseCap=Number(state&&state.protagonist&&state.protagonist.constitutionBase)||0; // 体质根基：气血上限
   const pb=patch['protagonist.constitutionBase'];
   if(typeof pb==='number')baseCap=Math.max(baseCap,Math.round(pb)); // 同补丁先抬根基，再按新根基钳气血
@@ -6081,7 +6184,12 @@ function applyPatch(patch){
     if(k==='time')continue;  // 日历前端自管（两旬制固定规则，避免与模型重复推进）
     if(k==='inventory.add'){addToInventory(Array.isArray(patch[k])?patch[k]:[patch[k]]);continue} // 行囊入库（前端合并件数）
     if(k==='plots'){ // 剧情台账按 id 增量合并；回写即记 touch=本旬（统一用 xunSerial 旬号，与发酵裁决同一单位）
+      const wasDone={};
+      for(const p of (state.plots||[]))if(p&&p.id)wasDone[p.id]=p.stage==='已兑现';
       state.plots=mergePlots(state.plots,patch[k],xunSerial(state.time));
+      let newlyDone=0;
+      for(const p of (state.plots||[]))if(p&&p.id&&!wasDone[p.id]&&p.stage==='已兑现')newlyDone++;
+      if(newlyDone)longBuffQuestPoints(newlyDone); // 翻手为云：任务兑现即补积分
       for(const f of (state.factions||[])){ // 派系那一步已结：清掉当前一步，免得模型照着旧棋继续演
         if(!f.stepPlotId)continue;
         const p=(state.plots||[]).find(x=>x.id===f.stepPlotId);
@@ -6134,6 +6242,7 @@ function applyPatch(patch){
     if(k==='protagonist.rank'){majors.push('位份变动');if(state.protagonist)state.protagonist.salary=`每月${monthlySalaryFor(v)}两，下旬末统一结算`;}
     if(/死亡|薨|病逝|暴毙/.test(k))majors.push('死亡');
   }
+  longBuffAfterGains(buffBefore);
   return majors;
 }
 function applyDossier(list){
@@ -6646,6 +6755,7 @@ const UI={
         <div class="itemrow"><span>本阶</span><span class="cnt">第${ml.stage}阶 · ${esc(st.title)}</span></div>
         <div class="itemrow"><span>期限</span><span class="cnt">${esc(serialTimeText(ml.dueAt))}${ml.finished?'':'（'+(left>=0?'还剩 '+left+' 旬':'已到期')+'）'}</span></div>
         <div class="sheet-note" style="margin-top:10px">${esc(st.goal)}</div>
+        ${def.longBuff?`<div class="sheet-note" style="margin-top:6px">${esc(def.longBuff)}</div>`:''}
         ${stateNote}
       </div>
       ${fanSec}
@@ -9283,7 +9393,7 @@ const Game={
       const d=MAIN_LINES[id];
       return `<button class="destinycard${id===rec?' sel':''}" onclick="Game._dreamChoose('${id}')">`+
         `<span class="dc-name">${esc(d.name)} · ${esc(d.sub)}${id===rec?'<span class="dc-tag">它说，你像这个</span>':''}</span>`+
-        `<span class="dc-note">${esc(d.stages[0].goal)}</span><span class="dc-note">代价：${esc(d.cost)}</span></button>`;
+        `<span class="dc-note">${esc(d.stages[0].goal)}</span><span class="dc-note">代价：${esc(d.cost)}</span>${d.buff?`<span class="dc-note">开局：${esc(d.buff)}</span>`:''}${d.longBuff?`<span class="dc-note">${esc(d.longBuff)}</span>`:''}</button>`;
     }).join('');
     body.innerHTML=`<div style="line-height:1.95">“我看你是这么个人。”</div>
       <div style="line-height:1.95;margin-top:8px">它把三条路摆在你面前，每一条都写着代价。</div>
@@ -9328,8 +9438,10 @@ const Game={
     if(!MAIN_LINES[id])return;
     $('#dreamModal').classList.remove('on');
     startMainLine(id,true); // 命途卡已当面交付，不再另弹「新主线」打断引导
+    const buff=applyOpeningBuff(id);
+    if(buff)chronicleAdd(buff);
     persistCurrent();saveToSlot(0,true);
-    toast('命途已定：'+MAIN_LINES[id].name+'·'+MAIN_LINES[id].sub,3600);
+    toast('命途已定：'+MAIN_LINES[id].name+'·'+MAIN_LINES[id].sub+(buff?'；'+buff.replace(/^开局之赐：/,''):''),4200);
     this._afterOpening();
   },
   _afterOpening(){ // 入梦之后：先看档案，再走五步引导
@@ -9699,6 +9811,7 @@ const Game={
   _xunStartPop(){ // 旬首强制处置：固定节宴/发酵引线/琐事/暗流发难一旬之首直接弹出（hasEvent=true）；主线断档同在此补新主线
     if(!state||phase!=='FOCUS_SELECT')return;
     if(Game._questOpen){Game._pendingXunPop=true;return;} // 主线弹窗未关：旬首处置等它关完再走
+    if(state.openingWoo&&!state.openingWoo.done&&xunSerial(state.time)>Number(state.openingWoo.until))delete state.openingWoo; // 头一个月过去，没人来便不再补
     const schemeNotes=schemeTick(); // 暗流账：结上旬未应对的旧账、起新图谋
     for(const n of schemeNotes){
       UI.pushCard(`<article class="turncard"><div class="card-head"><div><div class="card-focus">【宫斗系统】<b>暗流得手</b></div></div>${UI.seal()}</div><div class="card-body">上一旬你没有接住${esc(n.sc.who)}的手：${esc((SCHEME_TARGET_TEXT[n.sc.target]||n.sc.target))}受损。${esc((n.changes||[]).join('；'))}</div></article>`);
@@ -9723,11 +9836,14 @@ const Game={
     if(clearOk&&(meta.visitHit||meta.visitPending)){visitHit=true;meta.visitHit=false;meta.visitPending=false}
     else if(!clearOk&&meta.visitHit){meta.visitPending=true;meta.visitHit=false}
     // 妃嫔来访：与帝至共用旬首这一回来客名额；不熟的人须有共同的事或共同的敌人才会登门
+    const woo=openingWooActive()?pickWooVisitor():null; // 长乐岁安的开局之赐：头一个月必有人来拉拢
     let npcVisit=null;
-    if(!visitHit&&!mainMiss&&graceOk&&noOther){
+    if(woo)npcVisit=woo;
+    else if(!visitHit&&!mainMiss&&graceOk&&noOther){
       if(meta.npcVisitRollTurn!==state.turn){meta.npcVisitRollTurn=state.turn;meta.npcVisitHit=Math.random()<0.16?pickConsortVisitor():null} // 一旬一骰；与新主线发布不抢场
       npcVisit=meta.npcVisitHit||null;
     }
+    if(woo&&state.openingWoo)state.openingWoo.done=true;
     if(visitHit||npcVisit)meta.visitThisTurn=state.turn; // 本旬来访额度用掉，旬中不再来客
     if(!schemeHit&&!adj.stale.length&&!adj.pendStale.length&&!mainMiss&&!visitHit&&!npcVisit&&!fest)return;
     const items=[...adj.stale.map(p=>`「${p.title}」`),...adj.pendStale.map(x=>pendText(x))].join('；');
@@ -9737,7 +9853,7 @@ const Game={
     if(schemeHit)msg+=`暗流发难，就在本旬：${adj.schemeFire.map(s=>`${s.who}（${s.aim}，冲你的${SCHEME_TARGET_TEXT[s.target]||s.target}）`).join('；')}。这是当旬主戏，hasEvent=true，用 scene 开场；写清她怎么动的手、你被逼到哪一步；给 2—4 个应对选项，结果由你根据玩家选择、局势与她的人设推断，收尾写 schemeOutcome。${fest?'发难就摆在宴上，宴席同时是本场舞台。':''}`;
     if(mainMiss)msg+=`${items?'同场处置（了结旧事时引出新线头）——':''}剧情账中已无进行中的主线：这不等于必须发一条。若确有从当前处境与既有伏笔自然长出的线头（位份、子嗣、旧案、母族、新敌），可顺势开立；没有就空着，不要为了补槽位硬编名字与期限。若发布，标题须与 goal 说同一件事，dueText 只写真实期限或不写，earliest/latest 不要写数字。`;
     if(visitHit)msg+=`${items||mainMiss?'——同场带出帝线：':''}本旬旬首，帝主动与主控相见（恩宠所致，不必另寻由头）——${favor>=60?'夜访住处、遣高德全接入阁、游园时遣开随从说话皆可；宠爱 '+favor+'，他肯花心思，"主动记得、提前安排、破例"至少体现其一':'经高德全传召往养心殿、晨起问安遇驾、园中偶逢皆可；宠爱 '+favor+'，按"每 '+win+' 旬至少一次有内容相处"的账，这旬轮到他主动'}。`;
-    if(npcVisit)msg+=`${items||mainMiss||visitHit?'——同场再添一层：':''}本旬旬首，${dispName(npcVisit.id)}主动登门（由头：${npcVisit.reason}）。她是自己来的，不是恰好路过：须写清她为何此刻来、带了什么话或要求什么，一开口就有实际来意，且态度按其性情、位份与交情写，不得有求必应。`;
+    if(npcVisit)msg+=`${items||mainMiss||visitHit?'——同场再添一层：':''}本旬旬首，${dispName(npcVisit.id)}主动登门（由头：${npcVisit.reason}）。她是自己来的，不是恰好路过：须写清她为何此刻来、带了什么话或要求什么，一开口就有实际来意，且态度按其性情、位份与交情写，不得有求必应。${woo?'这一趟是来拉拢你的：须把结盟或入她一系的价码说到明处，也给你留出回旋与拒绝的余地。':''}`;
     if(fest)msg+=`这场宴就是本旬的剧情额度：${items||mainMiss?'上面列的事一并拿到宴上处置——':'不必另找由头，'}以宴席开场（来客通传、引至席上、席间有人搭话皆可），hasEvent=true；宴的场面、主宴者、席上机缘与分寸见下方【定例·本旬节宴】。`;
     msg+='请用剧情对话 scene 结构开场（state="ongoing"，对方的话或动作开场，嵌入主控当前处境自然发生：来人传话、事发、旧事被翻上门等皆可），给 2—4 个接话选项后停止，不结算应对后果；';
     if(visitHit)msg+='帝相处的正戏在这场：给足一来一往的实际内容（谈旧事、记挂着什么、破什么例），并经 statePatch["emperor.contact"] 记一句相处注记；';
@@ -11055,12 +11171,14 @@ const Game={
     const dW=tier==='great'?2:tier==='good'?1:tier==='fail'?-1:0;
     if(dW){at['威望']=clamp01_100((Number(at['威望'])||0)+dW);deltas.push(`威望 ${dW>0?'+':''}${dW}`)}
     const fk=emperorKey();state.relationships=state.relationships||{};
+    const buffBefore=relSnapshotNum();
     const rel=state.relationships[fk];
     const curFavor=typeof rel==='object'?Number(rel.value)||0:Number(rel)||0;
     const dF=tier==='great'?3:tier==='good'?1:tier==='fail'?-1:0;
     if(dF){
       state.relationships[fk]=Object.assign({},rel&&typeof rel==='object'?rel:{},{type:'宠爱',value:Math.max(0,curFavor+dF)});
       deltas.push(`宠爱 ${dF>0?'+':''}${dF}`);
+      longBuffAfterGains(buffBefore);
     }
     const silver=tier==='great'?(fest.scale==='大宴'?20:12):tier==='good'?(fest.scale==='大宴'?10:6):0;
     if(silver){p.silver=(Number(p.silver)||0)+silver;deltas.push(`银两 +${silver}`)}
