@@ -4677,8 +4677,8 @@ function avatarHtml(who,cls){ // 有头像用头像；没有则以名首字作�
   return `<span class="av av-fb ${cls||''}" aria-hidden="true">${esc(String(who||'客').trim().charAt(0)||'客')}</span>`;
 }
 /* ============================================================ 捏主控（本地随机生成） */
-const CR_SURNAMES='李 王 张 刘 陈 杨 赵 黄 周 吴 徐 孙 胡 朱 高 林 何 郭 马 罗 梁 宋 郑 谢 韩 唐 冯 董 萧 程 曹 袁 邓 许 傅 沈 曾 彭 吕 苏 顾 陆 卫 秦 温 姜 戚 阮'.split(' ');
-const CR_GIVEN='明蘅 令仪 婉宁 昭华 静姝 柔嘉 清如 砚秋 佩兰 纫秋 惠然 采薇 文茵 琼华 疏影 惊鸿 望舒 兰因 素问 知夏 南絮 初晴 栖迟 静婉 含章 稚鱼 雪君 妙仪 徽音 攸宁 陶然 灵均 云韶 书瑶 芃芃 舜华 清欢 知微 见月 听雪 疏桐 揽星 衔月 望春 拾翠 纫蕙 语棠 枕书 酌月 漱玉 停云 拾萤 衔霜 照水 映棠 依梅 素心 素衣 锦书 玉簪 珠帘 翠微 令昭 令月 怡然 恬宁 婉柔 柔止 温言 温如 清和 清妍 清芷 清漪 清婉 雪晴 雪芝 云舒 云卿 云初 照影 灼华 夭夭 若兰 若薇 若初 含烟 湘君 湘灵 听澜 昭月 明溪 明妆 静言 婉兮 芷若'.split(' ');
+const CR_SURNAMES='李 王 张 刘 陈 杨 赵 黄 周 吴 徐 孙 胡 朱 高 林 何 郭 马 罗 梁 宋 郑 谢 韩 唐 冯 董 萧 程 曹 袁 邓 许 傅 沈 曾 彭 吕 苏 顾 陆 卫 秦 温 姜 戚 阮 叶 江 梅 乔 段 钟 邢 岑 翟 严 华 金'.split(' ');
+const CR_GIVEN='明蘅 令仪 婉宁 昭华 静姝 柔嘉 清如 砚秋 佩兰 纫秋 惠然 采薇 文茵 琼华 疏影 惊鸿 望舒 兰因 素问 知夏 南絮 初晴 栖迟 静婉 含章 稚鱼 雪君 妙仪 徽音 攸宁 陶然 灵均 云韶 书瑶 芃芃 舜华 清欢 知微 见月 听雪 疏桐 揽星 衔月 望春 拾翠 纫蕙 语棠 枕书 酌月 漱玉 停云 拾萤 衔霜 照水 映棠 依梅 素心 素衣 锦书 玉簪 珠帘 翠微 令昭 令月 怡然 恬宁 婉柔 柔止 温言 温如 清和 清妍 清芷 清漪 清婉 雪晴 雪芝 云舒 云卿 云初 照影 灼华 夭夭 若兰 若薇 若初 含烟 湘君 湘灵 听澜 昭月 明溪 明妆 静言 婉兮 芷若 凝霜 凝之 映月 弄月 邀月 揽月 步月 待月 问月 栖月 枕月 听风 听雨 听松 听琴 疏雨 疏星 采葛 采莲 采菱 小满 玉京 玉茗 素娥 素秋 素月 清商 清徽 清弦 清霜 清露 清晓 云岫 云萝 云屏 云和 雪衣 梅英 梅影 梅妆 荷衣 荷珠 桂魄 菊英 月娥 盈盈 脉脉 纤纤 燕绥 静好 嘉禾 嘉树 令姿 令淑 令婉 柔则 徽月 照夜 横波 解语'.split(' ');
 const CR_FAMILIES=[ // 家世六档：决定初始位份与体己银
   {k:'平民',d:'市井人家，父为匠户',rank:'官女子（从九品）',silver:20},
   {k:'商贾',d:'绸缎起家，资财殷实',rank:'采女（正九品）',silver:90},
@@ -4729,7 +4729,16 @@ const CR_SKILLNAME={'琴':'琴艺','棋':'棋艺','书':'书法','画':'画艺',
 const pick=a=>a[Math.floor(Math.random()*a.length)];
 const pickN=(a,n)=>{const c=a.slice(),o=[];while(o.length<n&&c.length)o.push(c.splice(Math.floor(Math.random()*c.length),1)[0]);return o};
 const cr={}; // 当前捏人数据
-function crRollName(){cr.name=pick(CR_SURNAMES)+pick(CR_GIVEN)}
+let _crNameDeck=[];
+function crDrawName(){ // 全名牌堆：连续掷不会撞名，掷完一轮才重洗
+  if(!_crNameDeck.length){
+    const deck=[];
+    for(const s of CR_SURNAMES)for(const g of CR_GIVEN)if(s&&g)deck.push(s+g);
+    _crNameDeck=wlShuffle(deck);
+  }
+  return _crNameDeck.pop();
+}
+function crRollName(){cr.name=crDrawName()}
 function crRollAge(){cr.age=15+Math.floor(Math.random()*4)} // 15—18
 function crRollFamily(i){cr.family=(i==null)?Math.floor(Math.random()*CR_FAMILIES.length):i}
 function crRollOrigin(){cr.origin=pick(CR_ORIGINS)}
