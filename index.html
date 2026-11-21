@@ -2792,33 +2792,37 @@ function startMainLine(id,silent){
   if(!silent)queueQuest({kind:'new',id:'p-destiny-1',title:def.name+'·'+st.title,goal:st.goal,note:'第一阶关目：'+st.beat.text,dueText:serialTimeText(state.mainLine.dueAt)+'前'});
   return true;
 }
-function applyOpeningBuff(id){ // 入梦定线时的一次性开局赏赐；改道与旧档补记不发
+function applyOpeningBuff(id){ // 入梦定线时的一次性开局赏赐；改道与旧档补记不发；同一档只发一次
   if(!state||!id)return '';
   const p=state.protagonist||{};
+  const ml=state.mainLine;
+  if(ml&&ml.openingBuff)return ''; // 已经领过：入梦重进、手滑连点都不再叠加
+  let text='';
   if(id==='tong'){
     const rels=state.relationships=state.relationships||{};
-    const rel=rels['皇帝'];
+    const key=(typeof chamberFavorKey==='function'?chamberFavorKey():'')||'皇帝'; // 帝的存档键可能是本名，别往「皇帝」这个空位上发
+    const rel=rels[key];
     const cur=rel&&typeof rel==='object'?(Number(rel.value)||0):(Number(rel)||0);
     if(rel&&typeof rel==='object')rel.value=cur+20;
-    else rels['皇帝']={type:'宠爱',value:cur+20};
+    else rels[key]={type:'宠爱',value:cur+20};
     state.emperor=state.emperor||{};
     state.emperor.intimacy=Math.min(100,(Number(state.emperor.intimacy)||0)+10);
-    return '开局之赐：帝心先偏你三分——宠爱 +20，知心 +10';
+    text='开局之赐：帝心先偏你三分——宠爱 +20，知心 +10';
   }
   if(id==='an'){
-    state.openingWoo={until:xunSerial(state.time)+1,done:false}; // 本旬与下一旬之内，必有一人登门拉拢
-    return '开局之赐：入宫头一个月内，必有人登门拉拢';
+    state.openingWoo={until:xunSerial(state.time)+2,done:false}; // 头一个月（本旬起三旬）之内，必有一人登门拉拢
+    text='开局之赐：入宫头一个月内，必有人登门拉拢';
   }
   if(id==='fan'){
-    const p=state.protagonist||{};
     p.points=(Number(p.points)||0)+100;
     state.system=state.system||{};
     state.system.points=(Number(state.system.points)||0)+100;
     const at=p.attributes=p.attributes||{};
     at['忌惮']=clamp01_100((Number(at['忌惮'])||0)+5);
-    return '开局之赐：积分 +100，忌惮 +5';
+    text='开局之赐：积分 +100，忌惮 +5';
   }
-  return '';
+  if(text&&ml)ml.openingBuff=text; // 记在命途上：命途页可查，也不会再发第二次
+  return text;
 }
 function openingWooActive(){
   const w=state&&state.openingWoo;
@@ -6755,6 +6759,7 @@ const UI={
         <div class="itemrow"><span>本阶</span><span class="cnt">第${ml.stage}阶 · ${esc(st.title)}</span></div>
         <div class="itemrow"><span>期限</span><span class="cnt">${esc(serialTimeText(ml.dueAt))}${ml.finished?'':'（'+(left>=0?'还剩 '+left+' 旬':'已到期')+'）'}</span></div>
         <div class="sheet-note" style="margin-top:10px">${esc(st.goal)}</div>
+        ${ml.openingBuff?`<div class="sheet-note">${esc(ml.openingBuff)}</div>`:''}
         ${def.longBuff?`<div class="sheet-note" style="margin-top:6px">${esc(def.longBuff)}</div>`:''}
         ${stateNote}
       </div>
@@ -6789,6 +6794,8 @@ const UI={
     if(!confirm(msg))return;
     if(!ml){
       startMainLine(id,true);
+      const buff=applyOpeningBuff(id); // 入梦被打断、从命途页补选：开局之赐照发
+      if(buff){chronicleAdd(buff);toast(buff,4200)}
     }else if(!mainLineSwitch(id))return;
     UI.renderSheet('命途');
     toast('已定命途：'+d.name,3200);
