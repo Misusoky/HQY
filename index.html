@@ -2181,10 +2181,16 @@ function applySchemeOutcome(sc,result,opt){ // result: win 挫败 / draw 勉强�
    前端管“谁在何时走哪一步”：每 2—4 旬由一派走一步，落成剧情账的一条；
    模型只负责演这一步的痕迹与到期清算，态度、实力、成员变动只经 statePatch.factions 回写。
    派系不是独立剧情通道：它的每一步都必须落到具体的人、物、差事上。 */
-const FACTION_ATTITUDES=['拉拢','观望','压制','敌对'];
+const FACTION_ATTITUDES=['盟友','拉拢','观望','压制','敌对'];
 const FACTION_STANCES=['主和','主宠','观望','强硬','清流'];
 const FACTION_MOVE_GAP=2; // 同一派两次出手至少隔 2 旬（含出手那一旬共 3 旬）
 const FACTION_MOVES={
+  盟友:[
+    {kind:'speak',title:'替你说话',line:'支线',goal:'把你从一桩是非里摘出来',step:'在皇后或帝前替你递一句话，说得不重，刚好把话头引开，事后并不居功'},
+    {kind:'share',title:'递个消息',line:'支线',goal:'让你早一步知道',step:'遣心腹把一桩还没传开的消息先递到你手里，叮嘱你别说是从她这边听去的'},
+    {kind:'cover',title:'替你兜一件事',line:'支线',goal:'免你一处短处',step:'把你宫里一桩对不上的账先揽过去，说是她那头经手时记错了数'},
+    {kind:'hand',title:'借你人手',line:'支线',goal:'替你补一处缺',step:'把自家一个得用的嬷嬷借到你宫里使几日，说用完了再还，不必客气'}
+  ],
   拉拢:[
     {kind:'invite',title:'递帖相邀',line:'支线',goal:'把你拉到她这一边',step:'遣一位心腹宫女来递话，说她家主子想请你过宫坐坐，有件体己事想当面说'},
     {kind:'gift',title:'节礼探意',line:'支线',goal:'先卖你一份人情',step:'借着节礼的名目送来一份不轻不重的东西，单子上写的却是“日常往来”'},
@@ -2277,7 +2283,7 @@ function sanitizeFaction(raw,s){
   if(!out.power)out.power=factionPowerOf(out,s);
   if(!raw.attitude){
     const v=factionRelValue(out.leader,s);
-    out.attitude=v==null?'观望':v<=-20?'敌对':v>=50?'拉拢':(out.stance==='强硬'?'压制':'观望');
+    out.attitude=factionAttitudeFrom(v,out.stance);
   }
   return out;
 }
@@ -2336,7 +2342,7 @@ function ensureFactions(s){ // 旧档/新档归一：world.factionLeaders → �
       const v=factionRelValue(who,s);
       if(!f.goal)f.goal='争宠固位';
       if(f.stance==='观望')f.stance=v<=10?'强硬':(v>=50?'主和':'观望');
-      f.attitude=v==null?'观望':v<=-20?'敌对':v>=50?'拉拢':(f.stance==='强硬'?'压制':'观望');
+      f.attitude=factionAttitudeFrom(v,f.stance);
       f.power=factionPowerOf(f,s);
     }
   }
@@ -2345,12 +2351,19 @@ function ensureFactions(s){ // 旧档/新档归一：world.factionLeaders → �
       f.power=factionPowerOf(f,s);
       const v=factionRelValue(f.leader,s);
       if(f.stance==='观望'&&v!=null)f.stance=v<=10?'强硬':(v>=50?'主和':'观望');
-      if(v!=null&&f.attitude!=='敌对')f.attitude=v<=-20?'敌对':v>=50?'拉拢':(f.stance==='强硬'?'压制':'观望');
+      if(v!=null&&f.attitude!=='敌对')f.attitude=factionAttitudeFrom(v,f.stance);
     }
     s.factionFix1=true;
   }
   s.factions=out;
   return out;
+}
+function factionAttitudeFrom(v,stance){ // 只按交情与立场排座次；真动作另由 factionHostileEvidence 校正
+  if(v==null)return '观望';
+  if(v<=-20)return '敌对';
+  if(v>=70)return '盟友';
+  if(v>=50)return '拉拢';
+  return stance==='强硬'?'压制':'观望';
 }
 function factionHostileEvidence(f){ // 近期真对你下过几次手：以剧情账为准，不认口头态度
   const id=String((f&&f.name)||'');
@@ -2377,8 +2390,9 @@ function recalcFactionAttitude(f){ // 态度看领袖亲疏，也看这一系最
     if(t.key==='close'||t.key==='ally')f.attitude='压制'; // 亲厚起来才能松一档
     return f.attitude;
   }
+  if(t.key==='ally'){f.attitude='盟友';return f.attitude} // 知己交情：这一系会主动替你办事
   if(f.stance==='强硬'&&(t.key==='new'||t.key==='cold')){f.attitude='压制';return f.attitude}
-  if(t.key==='close'||t.key==='ally'){f.attitude='拉拢';return f.attitude}
+  if(t.key==='close'){f.attitude='拉拢';return f.attitude}
   if(f.attitude==='压制')f.attitude='观望'; // 安静过六旬、也没别的由头，才回落
   return f.attitude;
 }
@@ -2463,7 +2477,7 @@ ${rows}${off}
 1. 派系不是独立剧情通道：每一步都要落到具体的人、物、差事、座次、份例、传话上。禁止只写“宫里暗流涌动”“众人心思各异”这类空转；一场派系戏必须有人当场得失（位份、差事、份例、眼线、人情、把柄，至少一项）。
 2. ${anyStep?'本旬有“当前一步”的派系，先在正文或后宫动态里演出它的可见痕迹（谁来了、动了什么、传了什么话），让主控看见、听见、起疑；不要当旬就逼她当场表态——清算留给该账到期那一旬。玩家若主动查问、当面应对，照常接戏并可达标兑现（statePatch.plots，stage 改“已兑现”）。':'本旬各派按兵不动：只允许在 haremNews 留一条可见痕迹（谁得了差事、谁被赏、谁宫里换了人），不得平地起派系冲突。'}
 3. 主控不入党派，除非玩家明确应下；不得替玩家表态、站队或收下人情。
-4. 派系实力、成员、态度与近况只经 statePatch.factions 回写：{"派系名":{"power":数字,"attitude":"拉拢/观望/压制/敌对","members":["…"],"step":"一句话","note":"本旬近况","defunct":false}}。power 单旬变动不超过 ±10；members 只写本档已有的人物；note 会进“最近动向”。
+4. 派系实力、成员、态度与近况只经 statePatch.factions 回写：{"派系名":{"power":数字,"attitude":"盟友/拉拢/观望/压制/敌对","members":["…"],"step":"一句话","note":"本旬近况","defunct":false}}。power 单旬变动不超过 ±10；members 只写本档已有的人物；note 会进“最近动向”。
 5. 派系不得凭空出现或瓦解：领袖死亡或被降至从四品以下，前端才认瓦解；你只演事件，不自行宣布某系散了。
 6. 与暗流账分工：暗流是个人手段针对主控，派系是立场与资源。同一件事只走一本账，不要重复扣减。`;
 }
@@ -2492,7 +2506,7 @@ function mlFanOwnFactions(s){
   const me=String((((s||{}).protagonist||{}).name)||'').trim();
   return (((s||{}).factions)||[]).filter(f=>{
     if(!f||f.defunct)return false;
-    return f.attitude==='拉拢'||(!!me&&String(f.leader||'')===me);
+    return f.attitude==='盟友'||f.attitude==='拉拢'||(!!me&&String(f.leader||'')===me);
   });
 }
 function mlFanOwnSet(s){
@@ -2941,7 +2955,7 @@ function mainLineBrief(){
     const rivals=mlFanRivals(state);
     const camps=mlFanOwnFactions(state).map(f=>f.name+'（'+(f.leader||'领袖未明')+'）').join('、')||'尚无';
     lines.push('【翻手为云·清册】你这一系：'+camps+'；六宫仍在走动、且不在你这一系的妃嫔与中宫共 '+rivals.length+' 人'+(rivals.length?'：'+rivals.slice(0,6).join('、')+(rivals.length>6?' 等':''):'')+'。');
-    lines.push('此路的门槛只认“还在走动的人”：已死、已废、幽禁、冷宫、禁足、逐出、出家的人不算；倒向你这一系（派系态度为「拉拢」）的人也不算。清人须先有布置、有代价、有知情边界；清掉之后必须回写痕迹——relationships.<称谓>.note 写清「已故／幽禁／冷宫／禁足／逐出／出家」之一，或 npcs.<称谓>.status 写同义字样，前端才会计数，口头宣称不算。');
+    lines.push('此路的门槛只认“还在走动的人”：已死、已废、幽禁、冷宫、禁足、逐出、出家的人不算；倒向你这一系（派系态度为「盟友」或「拉拢」）的人也不算。清人须先有布置、有代价、有知情边界；清掉之后必须回写痕迹——relationships.<称谓>.note 写清「已故／幽禁／冷宫／禁足／逐出／出家」之一，或 npcs.<称谓>.status 写同义字样，前端才会计数，口头宣称不算。');
     lines.push('不要为凑数把活人写成死人：能废、能幽、能逐、能令其自请出宫，就先走这些路；真要写到死，须有证据、时机与代价，且一阶之内至多一次，过程点到为止。她若还有用处，也可先留着，把账挂到后头。');
   }
   lines.push('命途的剧情账条目（p-destiny）由前端维护：不要改它的 title/goal/note/dueText/stage。关目演完时，在 statePatch 里写 "mainBeat":"'+st.beat.id+'"；没有真演就不要写。');
@@ -3523,12 +3537,12 @@ const SCHEME_MODULE = [
 /* 宫中派系：前端排期，模型只演；派系账的每一步都要落到具体的人与物 */
 const FACTION_MODULE = [
 '## 二十二、宫中派系（factions；前端排期，模型只演）',
-'1. 存档 state.factions 是派系账：每系含 name（系名）、leader（领袖称谓）、stance（主和/主宠/观望/强硬/清流）、goal（近来图什么）、power（实力 0—100）、attitude（对你：拉拢/观望/压制/敌对）、members（成员）、step（当前一步）、notes（最近动向）。它由前端按领袖亲疏与位份排期，不靠你临时起意。',
+'1. 存档 state.factions 是派系账：每系含 name（系名）、leader（领袖称谓）、stance（主和/主宠/观望/强硬/清流）、goal（近来图什么）、power（实力 0—100）、attitude（对你：盟友/拉拢/观望/压制/敌对）、members（成员）、step（当前一步）、notes（最近动向）。它由前端按领袖亲疏与位份排期，不靠你临时起意。',
 '2. 每旬裁决块附【派系动向·本旬】：列出各系的领袖性情、实力、对你的态度与当前一步。有“当前一步”的系，本旬必须在正文或 haremNews 里演出它的可见痕迹——谁来了、动了什么、传了什么话；让主控看见、听见、起疑，但不要当旬就逼她当场表态。清算留给该账到期那一旬。',
 '3. 派系不是独立剧情通道：它的每一步都要落到具体的人、物、差事、座次、份例、传话上，并接上主控已有的处境与人物关系。禁止只写“宫里暗流涌动”“众人心思各异”这类空转；一场派系戏必须有人当场得失（位份、差事、份例、眼线、人情、把柄，至少一项）。',
 '4. 派系的账目在剧情账里，id 形如 “p-faction-…”，标题用“系名·动作”。到期那一旬由前端裁决强制兑现：写成一场当面逼迫（压份例、挪座次、当面递话、查账、截机会等），给 2—4 个应对选项，停下等玩家抉择；不能写成虚惊一场，也不能让出手的派系无代价退走。玩家应对后，照常经 statePatch.plots 把该条 stage 改“已兑现”，后果写进 narrative/changes/statePatch。',
 '5. 主控不入党派，除非玩家明确应下；不得替玩家表态、站队、收下人情或自作主张加入某系。玩家若明确应下，才可写她入系，并在 statePatch.factions 里改该系 members 与 attitude。',
-'6. 派系实力、成员、态度与近况只经 statePatch.factions 回写：{"派系名":{"power":数字,"attitude":"拉拢/观望/压制/敌对","members":["…"],"step":"一句话","note":"本旬近况","defunct":false}}。power 单旬变动不超过 ±10，members 只写本档已有的人物，note 进“最近动向”。',
+'6. 派系实力、成员、态度与近况只经 statePatch.factions 回写：{"派系名":{"power":数字,"attitude":"盟友/拉拢/观望/压制/敌对","members":["…"],"step":"一句话","note":"本旬近况","defunct":false}}。power 单旬变动不超过 ±10，members 只写本档已有的人物，note 进“最近动向”。',
 '7. 派系不得凭空出现或瓦解：领袖死亡或被降至从四品以下，前端才认瓦解；你只演事件，不自行宣布某系散了，也不得为凑戏新造派系。',
 '8. 与暗流账分工：暗流是个人手段针对主控，派系是立场与资源。同一件事只走一本账，不重复扣减；派系动作可作为暗流的由头，但不能替代暗流的发难与结账。',
 '9. 尊卑不许倒置：领袖必须是本系位份最高的人，成员位份不得高于领袖；皇帝、太后不入派系，皇后只可自领中宫一系，不作他人羽翼。members 回写前先自查，写错的成员前端会剔掉。'
@@ -3543,7 +3557,7 @@ const MAIN_LINE_MODULE = [
 '4. 关目必须真演：数值达标不算过阶，须在戏里把本阶关目演出来（当众被记住、替人解围、过一桩宫务、扳倒对手、破一次例……）。演完在本轮 statePatch 写 "mainBeat":"本阶关目 id"（id 以【命途】块所写为准）；没演就不要写，写了前端也会核对。',
 '5. 命途的剧情账条目（id="p-destiny"）由前端维护：不要改它的 title／goal／note／dueText／stage，回写一律不认。支线、引线、敌对条目的回写照旧。',
 '6. 期限到了，前端会让暗流账以“命途考”发难：那是本阶的考场。赢或化解＝以战代关目直接过阶；勉强挡下＝期限顺延；败＝记一债，同阶第二次败则此路不通（玩家改道或硬撑）。发难胜败仍由你按整场应对与局势裁定，收尾写 schemeOutcome，不得写成虚惊一场。',
-'7. 翻手为云（fan）另有一份【翻手为云·清册】：只数“仍在走动、且不在主控这一系”的妃嫔与中宫。自己这一系＝态度为「拉拢」的派系（含其领袖与成员）；已死、已废、幽禁、冷宫、禁足、逐出、出家的人不算。清掉一人后必须把痕迹写进 statePatch（relationships.<称谓>.note 或 npcs.<称谓>.status 带「已故／幽禁／冷宫／禁足／逐出／出家」），否则前端不计。此路不接受“考场代过”：终阶须六宫清空才算完。能废、能幽、能逐就先走这些路；写死须有证据、时机与代价，每阶至多一次，点到为止。',
+'7. 翻手为云（fan）另有一份【翻手为云·清册】：只数“仍在走动、且不在主控这一系”的妃嫔与中宫。自己这一系＝态度为「盟友」或「拉拢」的派系（含其领袖与成员）；已死、已废、幽禁、冷宫、禁足、逐出、出家的人不算。清掉一人后必须把痕迹写进 statePatch（relationships.<称谓>.note 或 npcs.<称谓>.status 带「已故／幽禁／冷宫／禁足／逐出／出家」），否则前端不计。此路不接受“考场代过”：终阶须六宫清空才算完。能废、能幽、能逐就先走这些路；写死须有证据、时机与代价，每阶至多一次，点到为止。',
 '8. 不许讨主控欢心：没演成的事不写兑现，命途不因身份、祈愿或系统好意自动推进；也不得把日常琐事包装成命途推进。'
 ].join('\n');
 
@@ -6650,7 +6664,7 @@ const UI={
     const rows=rivals.length?rivals.map((w,i)=>`<div class="itemrow"><span>${i+1}. ${esc(w)}</span><span class="cnt">${esc(rankOf(w))}</span></div>`).join('')
       :'<div class="sheet-note">除你这一系的人，六宫里已无人还在走动。</div>';
     const campRows=camps.length?camps.map(f=>`<div class="itemrow"><span>${esc(f.name)}</span><span class="cnt">${esc(f.leader||'领袖未明')} · ${esc(f.attitude)}</span></div>`).join('')
-      :'<div class="sheet-note">眼下还没有一系公开站在你这边。门槛只把“态度为拉拢的派系”算作你的人。</div>';
+      :'<div class="sheet-note">眼下还没有一系公开站在你这边。门槛只把“态度为盟友或拉拢的派系”算作你的人。</div>';
     return `<div class="sec"><div class="sec-cap">清册</div>
       <div class="itemrow"><span>仍在走动的非你系妃嫔与中宫</span><span class="cnt">${rivals.length} 人</span></div>
       ${rows}
@@ -7619,7 +7633,7 @@ const UI={
     const fs=(state.factions||[]).slice();
     const seg=this.gongpuSeg();
     if(!fs.length)return seg+'<div class="sec"><div class="sheet-note">宫中尚无成形的派系。</div></div>';
-    const order={敌对:0,压制:1,观望:2,拉拢:3};
+    const order={敌对:0,压制:1,观望:2,拉拢:3,盟友:4};
     fs.sort((a,b)=>(a.defunct?9:(order[a.attitude]??8))-(b.defunct?9:(order[b.attitude]??8)));
     const cards=fs.map(f=>{
       const npc=factionNpc(f.leader);
@@ -7632,7 +7646,7 @@ const UI={
         const sc=rankScoreOf(n.rank);return !(sc>0&&ls>0&&sc>ls);
       });
       const notes=(f.notes||[]).slice(-2).map(n=>`${n.xun?esc(n.xun)+'　':''}${esc(n.text)}`).join('<br>');
-      const pill=f.defunct?'p-mid':(f.attitude==='敌对'||f.attitude==='压制')?'p-bad':f.attitude==='拉拢'?'p-good':'p-mid';
+      const pill=f.defunct?'p-mid':(f.attitude==='敌对'||f.attitude==='压制')?'p-bad':(f.attitude==='盟友'||f.attitude==='拉拢')?'p-good':'p-mid';
       return `<div class="faccard${f.defunct?' off':''}">
         <div class="fac-head"><span class="fac-nm">${esc(f.name)}</span><span class="relpill ${pill}">${f.defunct?'名存实亡':esc(f.attitude)}</span></div>
         <div class="fac-meta">领袖 ${esc(f.leader||'未明')}${rk?`（${esc(rk)}${tr?`，${esc(tr)}`:''}）`:''}　·　${esc(f.stance)}${f.goal?`　·　${esc(f.goal)}`:''}</div>
