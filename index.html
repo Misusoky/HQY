@@ -206,6 +206,31 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
 .segline{display:flex;gap:8px;margin:0 0 14px}
 .segline .seg{flex:1;min-height:38px;border:1px solid var(--line);border-radius:999px;background:var(--card);font-size:14px;letter-spacing:.14em;text-indent:.14em;color:var(--ink-soft)}
 .segline .seg.on{border-color:var(--cinnabar);color:var(--cinnabar);background:rgba(166,58,46,.06)}
+/* 行囊分类页签 */
+.bagseg{margin-bottom:10px}
+.bagseg .seg{min-height:40px;font-size:13px;letter-spacing:.06em;display:flex;align-items:center;justify-content:center;gap:5px}
+.bagseg .seg-n{font-size:11px;opacity:.6;font-family:var(--sans)}
+.bagseg .seg.on .seg-n{opacity:.9}
+/* 藏书阁：按才艺折叠，一本书一行 */
+.libgroup{border-bottom:1px solid var(--line)}
+.libgroup>summary{display:flex;align-items:center;gap:8px;min-height:44px;list-style:none;cursor:pointer;font-size:15px;letter-spacing:.04em}
+.libgroup>summary::-webkit-details-marker{display:none}
+.libgroup>summary::before{content:'▸';flex:none;width:14px;color:var(--ink-soft);font-size:12px}
+.libgroup[open]>summary::before{content:'▾'}
+.lg-name{flex:none}
+.lg-count{flex:none;font-size:12px;color:var(--ink-soft);font-family:var(--sans)}
+.lg-meta{margin-left:auto;font-size:11px;color:var(--gold);letter-spacing:.04em}
+.librow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:7px 0 8px;border-bottom:1px dashed var(--line);font-size:13px}
+.librow:last-child{border-bottom:0}
+.lr-name{flex:1 1 150px;min-width:0;font-size:14px}
+.lr-state{flex:none;font-size:11px;color:var(--ink-soft)}
+.lr-act{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto}
+.lr-desc{flex:1 1 100%;font-size:11px;color:var(--ink-soft);line-height:1.55;margin-top:-2px}
+.minibtn{min-height:34px;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:var(--card);font-size:12px;color:var(--ink-soft);letter-spacing:.03em;white-space:nowrap}
+.minibtn.on{border-color:var(--cinnabar);color:var(--cinnabar)}
+.minibtn:disabled{opacity:.4}
+.minibtn:active{opacity:.65}
+.libstrip{margin-bottom:8px}
 /* 派系一系一卡 */
 .faccard{border:1px solid var(--line);border-radius:14px;background:var(--card);box-shadow:var(--shadow);padding:12px 14px;margin-bottom:10px}
 .faccard.off{opacity:.62}
@@ -5236,6 +5261,22 @@ function itemFlags(it){ // 补齐物品词条：可使用 / 可典当；认出�
   if(typeof it.pawnable!=='boolean')it.pawnable=guessPawnable(it.name,it.note);
   return applyShopCatalog(it);
 }
+const ITEM_TABS=[['work','作品'],['story','剧情'],['food','食品'],['tool','道具']]; // 行囊分类：作品|任务剧情|食品|道具
+const ITEM_FOOD_RE=/糕|饼|酥|糖|藕|粥|羹|点心|蜜饯|果脯|葡萄干|月饼|元宵|腊八|食盒|攒盒|茶|酒|酪|粽|汤圆|馄饨|饺|包子|馒头|面食|枣泥|莲蓉|豆沙/;
+function itemKindOf(it){ // 行囊归类：只按词条与用途判断，模型新给的物品也能落进对的一栏
+  if(!it)return 'tool';
+  if(it.crafted)return 'work'; // 修习功课、手作、书画：都有自己的品质与描述
+  if(it.mat)return 'tool';
+  if(SHOP_CATALOG[it.name])return 'tool'; // 商城之物：丹药、香露、长期之宝
+  if(/食物|吃食/.test(String(it.kind||it.category||'')))return 'food';
+  const nm=String(it.name||'');
+  if(!/茶具|茶盏|茶壶|茶盘|茶炉|酒器|酒盏|酒壶/.test(nm)&&ITEM_FOOD_RE.test(nm))return 'food';
+  if(/御赐|御前|太后|先皇后|家传/.test(String(it.src||'')))return 'story'; // 御赐、太后与家中旧物：先归剧情，取用照旧
+  if(it.usable===true)return 'tool'; // 可吃用之外的可使用之物，仍归道具（药、香、笺）
+  if(it.pawnable===false)return 'story'; // 不可卖又不可用：信物、文书、御赐珍藏
+  if(/信物|密信|书信|旧函|手迹|脉案|抄本|证据|当票|遗物|御赐|御前|太后所赐|家传|封存|禁物|令牌|钥匙|密旨|口谕|玉牒/.test(`${nm} ${it.note||''} ${it.src||''} ${it.description||''}`))return 'story';
+  return 'tool';
+}
 let acquiredThisTurn=[]; // 新得之物：入库即提示"可使用/可典当"，不攒到下一旬
 let _acqTimer=null;
 function flushAcquired(){ // 本地得到的画、手作、买的东西当场报，别等下一次模型结算才冒出来
@@ -5310,6 +5351,8 @@ let soldNotes=[];            // 典卖通报队列（并入下一次主持人请
 let setPane='存档';          // 设置面板当前栏：存档|API|音乐|脱困
 let gongPane='行事';         // 宫务面板当前栏：行事|装潢|吩咐
 let gongpuPane='人物';       // 宫谱面板当前栏：人物|派系
+let bagPane='work',bagPaneTouched=false; // 行囊分类：work|story|food|tool
+let libOpen={};              // 藏书阁各才艺分类的展开状态
 let selSkill=null;          // 才艺修习面板当前选中项
 let craftSel={mats:{},energy:20,inspiration:'',kind:null}; // 手作面板当前选料/精力/灵感/所做类别
 function craftQuestHint(){ // 手作/书画成品可能对应任务：相赠收场时提醒主持人把 plots 条目兑现落账
@@ -6826,6 +6869,7 @@ const UI={
         <div class="sheet-note">借谱修习取高档；未习之艺可依书入门。</div>
         <div class="setbtns"><button class="btn btn-line" onclick="UI.goSheet('藏书阁')">往藏书阁寻书</button></div></div>`;
   },
+  libToggle(skill,open){libOpen[skill]=!!open},
   sheetLibrary(){
     const L=libState();
     const energy=Math.round(state.energy??0);
@@ -6835,46 +6879,61 @@ const UI={
     const readDone=L.lastReadTurn===state.turn;
     const unseen=L.present.length-L.revealed.length;
     const tierQ=t=>['','q-rough','q-fine','q-rare'][t]||'q-normal';
-    const heldHtml=[['borrowed','借阅中 · 旬末归还'],['desk','案头']].map(([slot,tag])=>{
-      const b=L[slot]&&libBook(L[slot]);if(!b)return'';
-      const act=slot==='borrowed'
-        ?`<button class="btn btn-line" onclick="Game.libReturn()">提前归还</button>`
-        :`<button class="btn btn-line" onclick="Game.libDesk('${b.id}')">撤下案头</button>`;
-      return `<div class="sec"><div class="sec-cap">${esc(b.name)} <span class="qbadge ${tierQ(b.tier)}">${esc(LIB_TIERS[b.tier])}</span></div>
-        <div class="itemrow"><span>${esc(b.cat)} · 涉「${esc(b.skill)}」 · ${esc(tag)}</span></div>
-        <div class="sheet-note" style="margin:0 0 8px">修习「${esc(b.skill)}」进益取高档。</div>
-        <div class="setbtns" style="margin:0">${act}</div></div>`;
-    }).join('');
-    const rows=L.revealed.map(id=>{
-      const b=libBook(id);if(!b)return'';
-      const owned=L.owned.includes(id);
-      const learned=skillKeyIn(skills,b.skill),lv=learned?Number(skills[learned])||0:0;
-      const readable=b.tier===3||owned||L.borrowed===id;
-      const readGain=!learned?`入门 ${['','3—5','4—7','5—8'][b.tier]}`:(lv>=100&&b.tier===3?'过百 +1':null);
-      let btns='';
-      if(b.tier<3&&!owned){
-        if(L.borrowed===id)btns+=`<button class="btn btn-line" onclick="Game.libReturn()">提前归还</button>`;
-        else{
-          btns+=`<button class="btn btn-line" ${L.borrowed?'disabled style="opacity:.45"':''} onclick="Game.libBorrow('${b.id}')">借阅</button>`;
-          btns+=`<button class="btn btn-line" ${silver<(b.copy||0)?'disabled style="opacity:.45"':''} onclick="Game.libCopy('${b.id}')">抄录 · ${b.copy}两</button>`;
+    const mini=(label,onclick,dis,on)=>`<button class="minibtn${on?' on':''}"${dis?' disabled':''} onclick="${onclick}">${label}</button>`;
+    const held=[];
+    if(L.borrowed){const b=libBook(L.borrowed);if(b)held.push({b,tag:'借阅中 · 旬末归还'})}
+    if(L.desk){const b=libBook(L.desk);if(b)held.push({b,tag:'案头'})}
+    const heldHtml=held.length?`<div class="sec"><div class="sec-cap">手头谱册</div>`+held.map(({b,tag})=>
+      `<div class="librow"><span class="lr-name">${esc(b.name)} <span class="qbadge ${tierQ(b.tier)}">${esc(LIB_TIERS[b.tier])}</span></span><span class="lr-state">${esc(tag)} · 涉「${esc(b.skill)}」</span><span class="lr-act">${tag.startsWith('借阅')?mini('提前归还','Game.libReturn()'):mini('撤下案头',`Game.libDesk('${b.id}')`)}</span></div>`
+    ).join('')+`</div>`:'';
+    const groups={};
+    for(const id of L.revealed){const b=libBook(id);if(b)(groups[b.skill]=groups[b.skill]||[]).push(b)}
+    const order=[...SKILL_POOL,...Object.keys(groups).filter(k=>!SKILL_POOL.includes(k))];
+    const groupHtml=order.filter(k=>groups[k]&&groups[k].length).map(k=>{
+      const books=groups[k].slice().sort((a,b)=>{
+        const pri=x=>L.borrowed===x.id?0:L.desk===x.id?0:L.owned.includes(x.id)?1:2;
+        return pri(a)-pri(b)||a.tier-b.tier;
+      });
+      const inHand=books.filter(b=>L.borrowed===b.id||L.desk===b.id||L.owned.includes(b.id)).length;
+      const open=libOpen[k]!=null?libOpen[k]:inHand>0;
+      const rows=books.map(b=>{
+        const owned=L.owned.includes(b.id);
+        const learned=skillKeyIn(skills,b.skill),lv=learned?Number(skills[learned])||0:0;
+        const readable=b.tier===3||owned||L.borrowed===b.id;
+        const readGain=!learned?`入门 ${['','3—5','4—7','5—8'][b.tier]}`:(lv>=100&&b.tier===3?'过百 +1':null);
+        const acts=[];
+        if(b.tier<3&&!owned){
+          if(L.borrowed===b.id)acts.push(mini('提前归还','Game.libReturn()'));
+          else{
+            acts.push(mini('借阅',`Game.libBorrow('${b.id}')`,!!L.borrowed,L.borrowed===b.id));
+            acts.push(mini(`抄录 ${b.copy}两`,`Game.libCopy('${b.id}')`,silver<(b.copy||0)));
+          }
         }
-      }
-      if(owned)btns+=`<button class="btn btn-line" onclick="Game.libDesk('${b.id}')">${L.desk===id?'撤下案头':'置为案头'}</button>`;
-      if(readGain)btns+=`<button class="btn btn-line" ${(readDone||energy<10||!readable)?'disabled style="opacity:.45"':''} onclick="Game.libRead('${b.id}')">研读 · 精力 −10（${readGain}）</button>`;
-      else if(b.tier===3&&learned&&lv>0&&lv<100)btns+=`<span class="sheet-note" style="margin:0">已入门：持谱修习取高档；过百后阁内研读可再进益</span>`;
-      else if(learned&&lv>0&&lv<100)btns+=`<span class="sheet-note" style="margin:0">此艺已入门：持谱修习取高档，进益在修习</span>`;
-      const status=b.tier===3?'孤本 · 只许阁内研读':owned?'已抄录':L.borrowed===id?'在你手中':'在架';
-      return `<div class="sec"><div class="sec-cap">${esc(b.name)} <span class="qbadge ${tierQ(b.tier)}">${LIB_TIERS[b.tier]}</span></div>
-        <div class="itemrow"><span>${esc(b.cat)} · 涉「${esc(b.skill)}」 · ${esc(status)}</span></div>
-        <div class="sheet-note" style="margin:0 0 8px">${esc(b.desc)}</div>
-        <div class="setbtns" style="margin:0">${btns||'<span class="sheet-note" style="margin:0">借阅中，旬末归还</span>'}</div></div>`;
+        if(owned)acts.push(mini(L.desk===b.id?'撤下案头':'置为案头',`Game.libDesk('${b.id}')`,false,L.desk===b.id));
+        if(readGain)acts.push(mini(`研读 −10（${readGain}）`,`Game.libRead('${b.id}')`,readDone||energy<10||!readable));
+        const status=b.tier===3?'阁内研读':owned?(L.desk===b.id?'案头':'已抄录'):L.borrowed===b.id?'在你手中':'在架';
+        const hint=(!acts.length&&learned&&lv>0&&lv<100)?(b.tier===3?'已入门：过百后可在阁内研读再进益':'已入门：持谱修习取高档'):'';
+        return `<div class="librow">
+          <span class="lr-name">${esc(b.name)} <span class="qbadge ${tierQ(b.tier)}">${esc(LIB_TIERS[b.tier])}</span></span>
+          <span class="lr-state">${esc(status)}</span>
+          ${acts.length?`<span class="lr-act">${acts.join('')}</span>`:''}
+          <span class="lr-desc">${esc(b.desc)}${hint?` · ${hint}`:''}</span>
+        </div>`;
+      }).join('');
+      return `<details class="libgroup"${open?' open':''} ontoggle="UI.libToggle('${k}',this.open)">
+        <summary><span class="lg-name">${esc(k)}</span><span class="lg-count">${books.length} 部</span><span class="lg-meta">${inHand?`在手/已抄 ${inHand}`:''}</span></summary>
+        ${rows}</details>`;
     }).join('');
-    return `<div class="sheet-note" style="margin-top:2px">寻书每旬一次；可借一册（旬末还）或抄录；孤本只可在阁内研读。</div>
+    return `<div class="sheet-note" style="margin-top:2px">可借一册（旬末还）或抄录；孤本只可在阁内研读。手头有谱册时，修习该艺取高档。</div>
       <div class="sec"><div class="sec-cap">寻书</div>
-        <div class="setbtns"><button class="btn btn-line" ${searched||energy<5?'disabled style="opacity:.45"':''} onclick="Game.libSearch()">${searched?'本旬已寻过':'翻阅书目 · 精力 −5'}</button></div>
-        <div class="sheet-note" style="margin:0">${unseen>0?`尚有 ${unseen} 部未翻见。`:'书目已翻遍。'}　研读每旬一次 · 精力 −10</div></div>
-      ${heldHtml?`<div class="sec"><div class="sec-cap">手头谱册</div>${heldHtml}</div>`:''}
-      ${rows||'<div class="sheet-note">尚未翻见谱册。</div>'}`;
+        <div class="librow" style="border-bottom:0;padding-top:0">
+          <span class="lr-state">寻书每旬一次 · 精力 −5　研读每旬一次 · 精力 −10</span>
+          <span class="lr-act">${mini(searched?'本旬已寻过':'翻阅书目','Game.libSearch()',searched||energy<5)}</span>
+        </div>
+        <div class="sheet-note" style="margin:0">${unseen>0?`尚有 ${unseen} 部未翻见。`:'书目已翻遍。'}</div>
+      </div>
+      ${heldHtml}
+      ${groupHtml?`<div class="sec"><div class="sec-cap">已翻见的谱册（${L.revealed.length} 部）</div>${groupHtml}</div>`:'<div class="sec"><div class="sheet-note">尚未翻见谱册。先翻一翻书目。</div></div>'}`;
   },
   /* 墨妙斋：写字作画（前端自结，不走模型） */
   sheetStudio(){
@@ -7253,44 +7312,59 @@ const UI={
       (ids.length?`<div class="sec"><div class="sec-cap">可拜访的人物（${ids.length}）</div>${ids.map(row).join('')}</div>`:`<div class="sec"><div class="sheet-note">${empty}</div></div>`)+
       `<div class="sheet-note">拜访耗精力 ${focusEnergyCost('社交拜访')}。</div>`;
   },
+  setBagPane(p){bagPane=ITEM_TABS.some(([k])=>k===p)?p:'work';bagPaneTouched=true;UI.renderSheet('行囊')},
   sheetItems(){
     let h='';
-    { // 藏书阁书册：借的、抄的在手，翻见未取的指明去处
+    { // 手头书册：压成一行，点进藏书阁
       const L=libState();
-      const sk=(state.protagonist&&state.protagonist.skills)||{};
       const held=[];
-      if(L.borrowed){const b=libBook(L.borrowed);if(b)held.push({b,tag:'借阅中 · 旬末归还'})}
-      if(L.desk){const b=libBook(L.desk);if(b)held.push({b,tag:'案头'})}
-      const shelf=L.owned.filter(id=>id!==L.desk).length; // 案头外的自抄藏书只记册数，不逐册堆叠
+      if(L.borrowed){const b=libBook(L.borrowed);if(b)held.push(b.name+'（借阅中）')}
+      if(L.desk){const b=libBook(L.desk);if(b)held.push(b.name+'（案头）')}
+      const shelf=L.owned.filter(id=>id!==L.desk).length;
       if(held.length||shelf>0){
-        h+=`<div class="sec"><div class="sec-cap">手头书册</div>`+
-          held.map(({b,tag})=>{
-            const key=skillKeyIn(sk,b.skill),v=key?Number(sk[key])||0:0;
-            const hint=!key||v<=0?`涉「${b.skill}」· 研读可入门`:(v>=100&&b.tier===3?`涉「${b.skill}」· 过百研读可再进益`:`涉「${b.skill}」· 持之修习取高档`);
-            return `<div class="itemrow"><span>${esc(b.name)}</span><span class="cnt">${esc(tag)} · ${esc(hint)}</span></div>`;
-          }).join('')+
-          (shelf>0?`<div class="itemrow"><span>自抄藏书 ${shelf} 册</span><span class="cnt">留在藏书阁 · 任一部可置案头</span></div>`:'')+
-          `<div class="sheet-note" style="margin:0">须往藏书阁办理。</div></div>`;
-      }else if(L.revealed.length){
-        h+=`<div class="sec"><div class="sec-cap">藏书阁</div>
-          <div class="itemrow"><span>阁中已翻见 ${L.revealed.length} 部书</span><span class="cnt">书留在阁中</span></div>
-          <div class="sheet-note" style="margin:0">借阅须往藏书阁。</div></div>`;
+        h+=`<button class="npcrow libstrip" onclick="UI.goSheet('藏书阁')"><span class="nr-main"><span class="nr-name">手头谱册</span><span class="nr-role">${esc(held.join('、')||'无')}${shelf?` · 自抄 ${shelf} 册`:''}</span></span><span class="nr-rel">藏书阁 ›</span></button>`;
       }
     }
     const inv=state.inventory||[];
-    if(inv.length){
-      h+=`<div class="sec"><div class="sec-cap">行囊（${inv.length} 种）</div>`+
-        inv.map((it,i)=>{
-          itemFlags(it);
-          const tags=it.durable
-            ?`<span class="itag on">长期</span><span class="itag${it.equipped!==false?' on':''}">${it.equipped!==false?'佩戴中':'已收存'}</span>`
-            :`<span class="itag${it.usable?' on':''}">${it.usable?'可使用':'不可使用'}</span><span class="itag${it.pawnable?' on':''}">${it.pawnable?'可典当':'不可典当'}</span>`;
-          const qtag=it.crafted?`<span class="itag on">${esc(it.quality||'手作')}</span>`:'';
-          const mtag=(it.mat&&!it.crafted)?`<span class="itag on">手作材料</span>`:'';
-          return `<button class="npcrow" onclick="UI.goSheet('物品详情',${i})"><span class="nr-name">${esc(it.name)}</span>${qtag}${mtag}${tags}<span class="nr-rel num">${it.durable?'':(it.count>0?'×'+esc(it.count):'已典出')}</span></button>`;
-        }).join('')+`</div>`;
+    const counts={work:0,story:0,food:0,tool:0};
+    const rows=inv.map((it,i)=>{itemFlags(it);const k=itemKindOf(it);counts[k]++;return {it,i,k}});
+    if(!bagPaneTouched&&!counts[bagPane]){ // 初次打开：落在第一类有东西的栏上
+      const first=ITEM_TABS.find(([k])=>counts[k]);
+      if(first)bagPane=first[0];
     }
-    return h||'<div class="sheet-note">囊中空空。</div>';
+    const tabs=ITEM_TABS.map(([k,label])=>`<button class="seg ${bagPane===k?'on':''}" onclick="UI.setBagPane('${k}')">${label}<span class="seg-n">${counts[k]}</span></button>`).join('');
+    const notes={
+      work:'修习功课、手作与书画所得，可赠、可献、可陈设。',
+      story:'信物、文书、御赐与查案线索，多半不可典卖。',
+      food:'吃食点心，点开可吃用。',
+      tool:'药物、香露、长期之物与手作材料。'
+    };
+    const empties={
+      work:'还没有修习、手作或书画的成品。',
+      story:'还没有任务、信物或查案所得。',
+      food:'还没有吃食。',
+      tool:'还没有药物、香露或手作物料。'
+    };
+    const list=rows.filter(x=>x.k===bagPane).map(({it,i})=>{
+      const qtag=it.crafted?`<span class="itag on">${esc(it.quality||'手作')}</span>`:'';
+      const ctag=(it.crafted&&it.category)?`<span class="itag">${esc(it.category)}</span>`:'';
+      const ftag=bagPane==='food'?'<span class="itag on">可食</span>':'';
+      const stag=bagPane==='story'?`<span class="itag on">${esc(it.src||'剧情')}</span>`:'';
+      const specialUse=!!(SHOP_CATALOG[it.name]&&SHOP_CATALOG[it.name].usable===false);
+      const ttag=bagPane==='tool'
+        ?(it.durable?`<span class="itag on">长期</span><span class="itag${it.equipped!==false?' on':''}">${it.equipped!==false?'佩戴中':'已收存'}</span>`
+          :`${it.mat?'<span class="itag on">材料</span>':''}<span class="itag${(it.usable||specialUse)?' on':''}">${it.usable?'可使用':(specialUse?'人物谱使用':(it.pawnable===false?'收藏':'不可使用'))}</span>`)
+        :'';
+      const sub=bagPane==='work'?String(it.description||it.effect||'').slice(0,22)
+        :bagPane==='food'?String(it.effect||it.note||'').slice(0,22)
+        :bagPane==='story'?String(it.note||'').slice(0,22)
+        :String(it.mat?'手作材料':(it.effect||it.note||'')).slice(0,20);
+      const count=(bagPane==='work'||it.durable)?'':(Number(it.count)>0?'×'+esc(it.count):'已典出');
+      return `<button class="npcrow" onclick="UI.goSheet('物品详情',${i})"><span class="nr-main"><span class="nr-name">${esc(it.name)}</span>${sub?`<span class="nr-role">${esc(sub)}</span>`:''}</span>${qtag}${ctag}${ftag}${stag}${ttag}<span class="nr-rel num">${count}</span></button>`;
+    }).join('');
+    return h+`<div class="segline bagseg">${tabs}</div>
+      <div class="sheet-note" style="margin:0 0 6px">${esc(notes[bagPane])}</div>`
+      +(list||`<div class="sec"><div class="sheet-note">${esc(empties[bagPane])}</div></div>`);
   },
   sheetGift(){
     const who=sceneCtx?sceneCtx.who:'';
