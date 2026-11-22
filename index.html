@@ -1674,9 +1674,11 @@ function festApproachBlock(fest,meta,now){ // 宴席上有人来搭话：一旬�
     let who=null;
     if(Math.random()<FEST_APPROACH_CHANCE){
       const rel=state.relationships||{},cands=[];
+      const dg=disguiseActive(state); // 易容中：被冒名者本人来搭话会当场穿帮
       for(const id in (state.npcs||{})){
         const n=state.npcs[id];if(!n)continue;
         if(id===emperorKey()||/太后|皇后/.test(id))continue;
+        if(dg&&(id===dg.who||id===dg.name))continue;
         if(/死|废|幽禁|冷宫|禁足|逐出|出家/.test(String(n.status||'')))continue;
         if(rankScoreOf(n.rank||id)>=rankScoreOf('皇后'))continue;
         cands.push({id,w:25+Math.abs(Number((rel[id]||{}).value)||0)}); // 交好与结怨一样惹眼：都更可能凑过来说话
@@ -4067,12 +4069,12 @@ const PLAY_UI_MODULE = [
 '## 二十二、玩家界面（正文只能指这里有的东西）',
 '玩家点得到的入口只有这些，别的一律不存在：',
 '- 住处：宫务（分三栏：行事——自己安排本旬要做的事，查账、领料、写家书、抄经、打点宫人、递帖相邀，以及承宠打算；装潢——换住处背景；吩咐——召配属宫人问话、交代差事、打听消息）、手作、才艺修习、传膳、出门。',
-'- 宫城图（点「出门」后）：养心殿（求见帝）、六宫（拜访后妃、太后、皇后）、藏书阁（寻书、借阅、研读）、墨妙斋（写字作画）、太医院（问医、抄书）、御花园（散步、偶遇）。',
+'- 宫城图（点「出门」后）：养心殿（求见帝）、六宫（拜访后妃、太后、皇后）、藏书阁（寻书、借阅、研读）、墨妙斋（写字作画）、太医院（问医、抄书）、御花园（散步、偶遇）、出宫（须御赐腰牌或本旬易容；东市西市、茶楼、寺观、回府探亲）。',
 '- 顶栏：状态（局面、剧情账、命途）、行囊（使用／典卖／赠礼）、人物、时间、银两（遣人出宫采买）、积分（商城换道具）。',
 '规则：',
 '1. 正文要主控做的事，必须落在上面某一项上，并写清去哪里、点哪一项，例如「去太医院请脉」「吩咐宫人查一查份例的账」「往藏书阁寻一册」。',
 '2. 没有「账房」「内务府值房」「尚服局值房」这类可点的地点：查账、领料、传旨、问话一律写成差人去办、宫人来回话（吩咐），或并进六宫／养心殿／太医院等既有去处。不要让玩家去找界面上不存在的地方，也不要让她「直接去内务府」。',
-'3. 主控做不了的事（亲身赴前朝、出宫远行、私会外男等），写成托人办、办不成，或另寻门路，不要当成可执行指示留在正文与待续事项里。',
+'3. 主控做不了的事（亲身赴前朝、私会外男等），写成托人办、办不成，或另寻门路，不要当成可执行指示留在正文与待续事项里。',
 '4. 待续事项（pending）与「下一步」建议同样遵此：只写玩家下一旬真能安排的行动。',
 '5. 玩家若自行要做界面上没有的事，按世界内方式承接（差遣、托人、等待），不要凭空多出一个可点的场景。'
 ].join('\n');
@@ -4119,6 +4121,7 @@ function presenceCue(s){ // 剧情对话【本场信息】用的一句话
   return bits.join('｜')+(p.pair?`；${p.pair.label}：${p.pair.cue}`:'');
 }
 function presenceBrief(s){ // 每旬系统提示里的档位硬约束
+  if(disguiseActive(s))return ''; // 易容期间言行按被冒名者：另由 disguiseBrief 给，别让主控的数值抢先
   const p=presenceOf(s&&s.protagonist);
   if(p.lookValue==null&&p.fearValue==null)return '';
   const lines=['【本旬言行态度（前端按当前数值生成，硬约束）】'];
@@ -4144,7 +4147,7 @@ function presenceNote(p){ // 面板「属性」里的一行说明
 /* ============================================================ 工具 */
 const $=s=>document.querySelector(s);
 const MONTHS=['','正月','二月','三月','四月','五月','六月','七月','八月','九月','十月','冬月','腊月'];
-const BUILD='2026-11-12·承宠夜话'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
+const BUILD='2026-11-22·出宫易容'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
 /* 月俸：按位份每月下旬末由前端自动入账（单位：两） */
 const SALARY_BY_GRADE={'正一品':220,'从一品':150,'正二品':110,'从二品':80,'正三品':60,'从三品':45,'正四品':36,'从四品':28,'正五品':20,'从五品':15,'正六品':12,'从六品':10,'正七品':8,'从七品':6,'正八品':5,'从八品':4,'正九品':3,'从九品':2};
 const SALARY_TITLES=[[/皇后/,220],[/皇贵妃/,150],[/贵妃/,110],[/贤妃|良妃|淑妃|德妃/,80],[/昭仪|昭容|昭媛|修仪|修容|修媛|充仪|充容|充媛/,45],[/贵嫔/,36],[/嫔/,28],[/贵人/,20],[/才人/,15],[/美人/,12],[/宝林/,10],[/常在/,8],[/答应/,6],[/选侍/,5],[/更衣/,4],[/采女/,3],[/官女子/,2],[/妃/,60]];
@@ -4229,9 +4232,11 @@ function isConsortWho(id,n){ // 此人是否妃嫔（太后与宫人除外；中
 }
 function consortVisitIds(){ // 可主动登门或受邀的妃嫔：已认识、未结怨、未幽禁病重
   const ids=new Set();const npcs=(state&&state.npcs)||{};
+  const dg=disguiseActive(state); // 易容中：被她本人登门/受邀会当场穿帮，先把这张脸从名单里摘掉
   for(const id in npcs){const n=npcs[id]||{};if(n.known&&isConsortWho(id,n))ids.add(id)}
   for(const id in ((state&&state.relationships)||{})){if(isConsortWho(id,npcs[id]||{}))ids.add(id)}
   return [...ids].filter(id=>{
+    if(dg&&(id===dg.who||id===dg.name))return false;
     if(/皇后|中宫/.test(id))return false; // 中宫不轻易移驾/赴低位之约，另走请安与传召
     const n=npcs[id]||{};
     if(n.alive===false||n.dead)return false;
@@ -4350,7 +4355,7 @@ function customActionCtx(text){ // 自拟行动的呼应语境：点到的人物
   const t=String(text||'');const out=[];
   const who=customActionWho(t);
   if(who){const n=(state&&state.npcs&&state.npcs[who])||{};out.push(who);if(n.name&&n.name!==who)out.push(n.name)}
-  ['御花园','藏书阁','墨妙斋','太医院','养心殿','六宫','慈宁宫','冷宫','戏台','马球场','太液池','宫外'].forEach(p=>{if(t.includes(p))out.push(p)});
+  ['御花园','藏书阁','墨妙斋','太医院','养心殿','六宫','慈宁宫','冷宫','戏台','马球场','太液池','出宫','东市','西市','茶楼','寺观','回府'].forEach(p=>{if(t.includes(p))out.push(p)});
   return out;
 }
 /* 才艺池：可培养项固定清单，上限 10 项；解锁新才艺才新增数值行 */
@@ -5640,6 +5645,9 @@ function normalizeState(s){
   if(!Array.isArray(s.schemes))s.schemes=[]; // 暗流账：旧档从空账开始，头几旬由前端按关系与位份起念
   s.schemeMeta=(s.schemeMeta&&typeof s.schemeMeta==='object')?s.schemeMeta:{lastSpawn:-99,tickTurn:-1};
   s.interludeMeta=(s.interludeMeta&&typeof s.interludeMeta==='object')?s.interludeMeta:{turn:-1,last:{},seen:{}}; // 本旬插曲：已出的牌与冷却
+  if(s.disguise&&typeof s.disguise==='object'){ // 易容：只在本旬有效；旧档或跨旬残留一律作废
+    if(!s.disguise.name||Number(s.disguise.turn)!==Number(s.turn))delete s.disguise;
+  }else if(s.disguise)delete s.disguise;
   if(!s.readMindV1)s.readMindV1=true; // 读心笺已入常备货架，由 refreshShop 统一上架
   refreshShop(s); // 商城货色按旬轮换：旧档读入即对齐到当前轮次与新版价目
   if(!s.meetCardV1)s.meetCardV1=true; // 邂逅笺已入轮换珍品池，不必再单独补一件
@@ -5910,6 +5918,11 @@ function compactState(s,focusMsg){ // 只压缩送入模型的那一份，localS
     out.protagonist=Object.assign({},s.protagonist);
     delete out.protagonist.avatar; // 头像由前端按身份分配
   }
+  { // 易容：只送这张脸的名字、位份与形容；旬号与来源留在前端
+    const dg=disguiseActive(s);
+    if(dg)out.disguise={who:dg.who,name:dg.name,rank:dg.rank||'',desc:String(dg.desc||'').slice(0,80)};
+    else delete out.disguise;
+  }
   // 行囊只送名字/件数/短备注：usable/pawnable/src 由前端结算，模型不需要每旬背
   // 手作材料标一句 mat；手作成品补品质、特质与效果，不把完整描述/配方塞进每旬上下文
   if(Array.isArray(s.inventory))out.inventory=s.inventory.map(it=>{
@@ -6046,6 +6059,7 @@ function buildSystem(focusMsg){
   const sys=buildStaticSystem()
     +'\n\n## 十三、当前存档（动态进度的唯一依据，覆盖世界书默认值）\n\n'+JSON.stringify(compactState(state,focusMsg))
     +'\n\n'+presenceBrief(state) // 当前外貌/忌惮档位，每旬随存档变化
+    +'\n\n'+disguiseBrief(state) // 本旬易容：旁人只认这张脸，后果记在被冒名者名下
     +'\n\n'+personaActTable() // 本档在场人物的性情→言行对照：随存档变动，不能进静态前缀
     +emperorPersonaBrief(); // 帝设：每旬给一句执行要求，避免被长存档稀释
   return sys.split('<player>').join(String(state.protagonist.name||'主控')); // 帝设变量：player=主控名讳
@@ -6097,6 +6111,7 @@ SCENE_PARTS_RULES,
 '【已确认】scene.ledger 逐轮累积本场已交代清楚、已有结论的事（每条≤20字，含人物给过的答复与已定的处置）；写进 ledger 的事后续不得再问、不换说法重提，玩家不必重复表态。',
 '【同场】一场对话只在同一日、同一处发生：scene.when 只写当日时辰的推移（如午后→暮色），不得跳到次日、翌日、明日。上一轮已经定下的事（说或不说、去或不去、提或不提），本轮直接按此推进出结果，不得换个日子、换个地方再演一遍准备；要隔日再谈，由玩家结束这场、另外开下一场。',
 '【言行】protagonist.stance 是主控当下的外貌与忌惮档位：对方的措辞、眼神、称呼分寸须据此与位份、关系统一；外貌档位高可写多看一瞬、语气放软，忌惮档位高可写斟酌用词、不敢对视；不报数值与档位。',
+'【易容】若【本场信息】disguise 非空，本场所有人都把主控认作 disguise.name（位份、名声、与对方的交情都按她算），不得认出主控本人；台词里不得称主控本名；赏罚、好感与结怨记在被冒名者名下。npc.relationship 是对方与主控的交情，本场不适用。',
 '【帝设】若【本场信息】中 world.emperor.persona 非空，那是玩家亲撰的帝设：凡与帝相关的演绎（本场对话及一切正文），他的言行、口味与待主控的态度都须严格符合帝设，其优先级高于性情词表与既有印象；persona 中的 <player> 已替换为主控姓名，正文里主控仍称“你”。帝每开口一轮，至少落一处帝设的招牌细节（口癖、手势、旧物、称呼或雷区），不得只写“他神色稍缓”。'
 ].join('\n');
 function buildSceneSystem(who){
@@ -6109,6 +6124,7 @@ function buildSceneSystem(who){
   const p=state.protagonist||{};
   const w=state.world||{};
   const rels=state.relationships||{};
+  const dg=disguiseActive(state);
   const relationship=rels[who]!=null?rels[who]:(n.name&&rels[n.name]!=null?rels[n.name]:null);
   const isEmp=typeof UI!=='undefined'&&UI.isEmperorId(who);
   const isChamber=typeof sceneCtx!=='undefined'&&sceneCtx&&sceneCtx.chamber;
@@ -6121,7 +6137,8 @@ function buildSceneSystem(who){
   const em=state.emperor||{};
   const payload={
     time:fmtTime(),location:state.location,residence:Game.homeLocation(),
-    protagonist:{name:p.name,rank:p.rank,age:p.age,personality:normalizePersona(p.personality),look:p.look,stance:presenceCue(state)},
+    protagonist:{name:p.name,rank:p.rank,age:p.age,personality:normalizePersona(p.personality),look:p.look,stance:dg?`易容·${dg.name}${dg.rank?`（${dg.rank}）`:''}：${dg.desc||'形容如她'}`:presenceCue(state)},
+    disguise:dg?{name:dg.name,rank:dg.rank||'',desc:dg.desc||'',note:'本场所有人只认这张脸；主控的姓名、位份与旧情都不适用。'}:null,
     npc:{name:who,realName:n.realName,rank:n.rank,age:n.age,faction:n.faction,
       traits:normalizePersona(prof.traits),act:personaActText(prof.traits),hidden,relationship,
       rel:(function(){const t=relTier(who);return {label:t.label,value:t.value,allow:t.allow,deny:t.deny}})(),
@@ -6135,6 +6152,7 @@ function buildSceneSystem(who){
     recentFacts:(state.recentConfirmedFacts||[]).slice(-3),
     // 已经发生过的旧账：约定、旧物、帝的共同经历。缺了这一块，本场就会把给过的信物、定过的时辰当成新事重提
     soFar:{
+      disguise:dg?`以下 pending／items／emperor／recentTurns 都是主控自己的旧账，不是「${dg.name}」的；对方不认，也不得当成与这张脸的共同经历。`:null,
       pending:(state.pending||[]).slice(-6).map(x=>String(typeof pendText==='function'?pendText(x):((x&&(x.t||x.text))||x||'')).slice(0,60)).filter(Boolean),
       items:relItems,
       recentTurns:(typeof history!=='undefined'&&Array.isArray(history)?history.slice(-5):[])
@@ -6464,11 +6482,13 @@ function applyPatch(patch){
   const majors=[];
   let rankChanged=false;
   const buffBefore=relSnapshotNum(); // 命途长赐：本轮结束后统一给上涨的关系补点
+  const dgNow=disguiseActive(state); // 本旬易容：旁人认的是这张脸，主控自己的关系与帝前账本旬不动
   let baseCap=Number(state&&state.protagonist&&state.protagonist.constitutionBase)||0; // 体质根基：气血上限
   const pb=patch['protagonist.constitutionBase'];
   if(typeof pb==='number')baseCap=Math.max(baseCap,Math.round(pb)); // 同补丁先抬根基，再按新根基钳气血
   for(const k in patch){
     if(k==='log')continue;
+    if(dgNow&&(/^relationships\./.test(k)||/^emperor\./.test(k)||/^protagonist\.rank$/.test(k)||/^protagonist\.attributes\.(外貌|威望|忌惮|交际)$/.test(k)))continue; // 易容期间：这些账记在被冒名者名下，不落到主控身上
     if(k==='mainBeat'){mainLineNoteBeat(patch[k]);continue} // 命途关目：模型演完后报 id，前端校验后落账
     if(k==='emperorFavor'){ // 帝宠变动：{称谓: 新值}
       const obj=patch[k]||{};for(const w in obj){const n=(state.npcs||{})[w]||Object.values(state.npcs||{}).find(x=>x&&(x.name===w||x.realName===w));if(!n)continue;const old=Number(n.favor)||0;n.favor=clamp01_100(obj[w]);if(Math.abs(n.favor-old)>=8)majors.push(`帝宠「${w}」`)}
@@ -6504,6 +6524,7 @@ function applyPatch(patch){
     }
     if(k==='turn')continue; // 回合数前端自管
     if(k==='time')continue;  // 日历前端自管（两旬制固定规则，避免与模型重复推进）
+    if(k==='disguise')continue; // 易容由前端管理：模型回写整块会把本旬的脸冲掉
     if(k==='inventory.add'){addToInventory(Array.isArray(patch[k])?patch[k]:[patch[k]]);continue} // 行囊入库（前端合并件数）
     if(k==='plots'){ // 剧情台账按 id 增量合并；回写即记 touch=本旬（统一用 xunSerial 旬号，与发酵裁决同一单位）
       const wasDone={};
@@ -6721,6 +6742,9 @@ function finalize(payload,meta){
     const mainBefore=(state.plots||[]).filter(p=>p.line==='主线').map(p=>({id:p.id,stage:p.stage,note:String(p.note||''),title:p.title})); // 主线进度：本步有没有推进
     if(payload.mainBeat&&payload.statePatch&&payload.statePatch.mainBeat==null)payload.statePatch.mainBeat=payload.mainBeat; // 关目也可能写在外面
     const majors=applyPatch(payload.statePatch);
+    if(disguiseActive(state)&&Array.isArray(payload.changes)){ // 易容期间：面板别把记在被冒名者名下的账说成主控的
+      payload.changes=payload.changes.map(c=>/好感|宠爱|威望|忌惮|交际|知心|帝宠/.test(String(c))?`${c}（记在易容之名下）`:c);
+    }
     try{mainLineAfterSettle()}catch(e){console.warn('[命途] 过阶检查失败',e)} // 数值与关目都到了就进下一阶；剧情账主线条目在前端维护
     for(const p of (state.plots||[]).filter(x=>x.line==='主线')){
       if(p.id===DESTINY_PLOT_ID)continue; // 命途进度每旬都刷新，不逐旬记大事记（过阶时另行记）
@@ -7661,6 +7685,10 @@ const UI={
     else if(name==='商品详情')B.innerHTML=this.sheetShopDetail(param);
     else if(name==='采买')B.innerHTML=this.sheetMarket();
     else if(name==='采买详情')B.innerHTML=this.sheetMarketDetail(param);
+    else if(name==='出宫')B.innerHTML=this.sheetOuting();
+    else if(name==='易容')B.innerHTML=this.sheetDisguiseTargets();
+    else if(name==='易容确认')B.innerHTML=this.sheetDisguiseConfirm();
+    else if(name==='借脸')B.innerHTML=this.sheetFrame();
     else if(name==='大事记')B.innerHTML=this.sheetChronicle();
     else if(name==='六宫')B.innerHTML=this.sheetVisit('妃');
     else if(name==='太医院')B.innerHTML=this.sheetVisit('医');
@@ -7701,8 +7729,10 @@ const UI={
     }).join('');
     const talent=`<div class="itemrow"><span>才华</span><span class="cnt num">${esc(at.才华??'—')}</span></div>`;
     const displayed=(state.inventory||[]).filter(it=>it&&it.displayed);
+    const dg=disguiseActive(state);
+    const disguiseRow=dg?`<div class="sheet-note">易容：${esc(dg.name)}${dg.rank?` · ${esc(dg.rank)}`:''}（本旬）${dg.desc?`<br>${esc(dg.desc)}`:''}</div>`:'';
     const panes=[
-      {k:'属性',html:`<div class="sec">${this.meter('精力',Math.round(state.energy??ENERGY_MAX),'m-cinnabar')}${tiMeter}${attrs||'<div class="sheet-note">—</div>'}${stance?`<div class="sheet-note">言行：${esc(stance)}</div>`:''}${baseNote}
+      {k:'属性',html:`<div class="sec">${this.meter('精力',Math.round(state.energy??ENERGY_MAX),'m-cinnabar')}${tiMeter}${attrs||'<div class="sheet-note">—</div>'}${stance?`<div class="sheet-note">言行：${esc(stance)}</div>`:''}${baseNote}${disguiseRow}
         <div class="itemrow"><span>月俸</span><span class="cnt num">每月 ${esc(salary)} 两</span></div></div>`},
       {k:'才艺',html:`<div class="sec">${skills||'<div class="sheet-note">—</div>'}${talent}</div>`}
     ];
@@ -7767,7 +7797,8 @@ const UI={
     const head=kind==='医'?'太医院当值的人不多。':'';
     const npcs=state.npcs||{};
     const all=[...new Set([...Object.keys(npcs).filter(id=>npcs[id].known),...Object.keys(state.relationships||{})])];
-    const ids=kind?all.filter(who=>npcKind(who)===kind):all;
+    const dg=disguiseActive(state);
+    const ids=(kind?all.filter(who=>npcKind(who)===kind):all).filter(who=>!(dg&&(who===dg.who||who===dg.name)));
     const empty=kind==='医'?'暂无相识的太医。<br>太医院人来人往，往后会有熟脸。':(kind==='妃'?'尚无相识的妃嫔。<br>往来多了，六宫自然会熟。':'尚无相识可拜访。');
     const row=who=>this.npcRowHtml(who,`Game.visitNpc('${esc(who)}')`);
     return (head?`<div class="sheet-note" style="margin:0 0 6px">${head}</div>`:'')+
@@ -7906,7 +7937,7 @@ const UI={
     const displayBtn=it.src==='功课'?`<button class="btn btn-line" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.toggleDisplay(${i})">${it.displayed?'收起陈设':'陈设在住处'}</button>`:'';
     const act=it.durable
       ?`<button class="btn btn-primary" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.toggleEquip(${i})">${it.equipped!==false?'收存（停用效用）':'启用（随身佩戴）'}</button>`
-      :(it.usable!==false?`<button class="btn btn-primary" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.useItem(${i})">${it.name==='移性符'?'使用 · 重撰帝设':(it.name==='邂逅笺'?'使用 · 择一人':(SHOP_INSTANT.has(it.name)?'使用 · 即刻生效（不占本旬）':'使用 · 演一场（耗精力 5）'))}</button>`:`<button class="btn" disabled style="opacity:.45;letter-spacing:.1em;text-indent:.1em">不可使用</button>`);
+      :(it.usable!==false?`<button class="btn btn-primary" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.useItem(${i})">${it.name==='移性符'?'使用 · 重撰帝设':(it.name==='邂逅笺'?'使用 · 择一人':(it.name==='易容膏'?'使用 · 择人易容':(SHOP_INSTANT.has(it.name)?'使用 · 即刻生效（不占本旬）':'使用 · 演一场（耗精力 5）')))}</button>`:`<button class="btn" disabled style="opacity:.45;letter-spacing:.1em;text-indent:.1em">不可使用</button>`);
     const wide=(k,v)=>`<div class="rowline" style="align-items:flex-start"><span style="flex:none">${k}</span><span class="cnt" style="white-space:normal;text-align:right;max-width:70%">${esc(v)}</span></div>`;
     const crafted=!!it.crafted;
     const matKindLabel={绣:'绣作',香:'合香',药:'丸散',花:'花作',杂:'杂件'};
@@ -7996,9 +8027,11 @@ const UI={
     const npcs=state.npcs||{};
     const rels=state.relationships||{};
     const empId=Object.keys(npcs).find(id=>this.isEmperorId(id))||Object.keys(rels).find(id=>this.isEmperorId(id))||'皇帝';
+    const dg=disguiseActive(state);
     const ids=[empId];
     for(const id of Object.keys(npcs)){
       if(id===empId)continue;
+      if(dg&&(id===dg.who||id===dg.name))continue;
       const n=npcs[id];if(!n)continue;
       if(!n.known&&!/太后/.test(id+(n.rank||'')))continue; // 未照面的人不在可选之列；太后是例外
       ids.push(id);
@@ -8016,8 +8049,9 @@ const UI={
   sheetKnotTargets(){ // 同心结：择一人相赠
     const npcs=state.npcs||{},rels=state.relationships||{};
     const empId=Object.keys(npcs).find(id=>this.isEmperorId(id))||Object.keys(rels).find(id=>this.isEmperorId(id))||'皇帝';
+    const dg=disguiseActive(state);
     const ids=[empId],seen=new Set(ids);
-    const add=id=>{if(!id||seen.has(id))return;seen.add(id);ids.push(id)};
+    const add=id=>{if(!id||seen.has(id))return;if(dg&&(id===dg.who||id===dg.name))return;seen.add(id);ids.push(id)};
     for(const id of Object.keys(npcs)){
       if(id===empId)continue;
       const n=npcs[id];if(!n)continue;
@@ -8033,6 +8067,87 @@ const UI={
     return `<div class="sheet-note" style="margin-top:0">择一人相赠：好感 +2；赠帝为宠爱 +1。即刻生效，不占本旬、不耗精力。</div>
       <div class="sec"><div class="sec-cap">可赠之人</div>${rows||'<div class="sheet-note">宫中尚无相识之人。</div>'}</div>
       <button class="backbtn" onclick="UI.sheetBack()">◀ 返回行囊</button>`;
+  },
+  sheetOuting(){ // 出宫：门禁（腰牌／易容）与宫外去处
+    const p=state.protagonist||{};
+    const d=disguiseActive(state);
+    const pass=hasPalacePass();
+    const fav=chamberFavor();
+    const canAsk=fav>50;
+    const hasCream=(state.inventory||[]).some(it=>it&&it.name==='易容膏'&&(Number(it.count)||0)>0);
+    const status=`<div class="itemrow"><span>腰牌</span><span class="cnt">${pass?'御赐腰牌在身':'无'}</span></div>
+      <div class="itemrow"><span>易容</span><span class="cnt">${d?`${esc(d.name)}${d.rank?' · '+esc(d.rank):''}（本旬）`:'无'}</span></div>
+      <div class="itemrow"><span>银两</span><span class="cnt num">${esc(p.silver??0)} 两</span></div>`;
+    if(!pass&&!d){
+      return `<div class="sec"><div class="sec-cap">宫门</div>${status}
+        <div class="sheet-note">宫门不轻开：要么有御赐腰牌，要么本旬易容成别人。</div></div>
+        <div class="sec"><div class="sec-cap">求腰牌</div>
+          <button class="npcrow" ${canAsk?'':'disabled style="opacity:.45"'} onclick="Game.askPalacePass()">
+            <span class="nr-main"><span class="nr-name">往养心殿开口</span><span class="nr-role">帝宠 ${esc(fav)}／需 51</span></span>
+            <span class="nr-rel num">精力 ${focusEnergyCost('社交拜访')}</span></button></div>
+        <div class="sec"><div class="sec-cap">以易容混出去</div>
+          ${hasCream?`<button class="npcrow" onclick="Game.disguiseFromGate()">
+            <span class="nr-main"><span class="nr-name">用一盒易容膏</span><span class="nr-role">择人易容，本旬以她的脸出宫</span></span>
+            <span class="nr-rel num">气血 -10</span></button>`
+          :`<button class="npcrow" onclick="UI.goSheet('商城')">
+            <span class="nr-main"><span class="nr-name">囊中无易容膏</span><span class="nr-role">商城常备有售</span></span>
+            <span class="nr-rel">去商城 ›</span></button>`}</div>`;
+    }
+    const row=k=>{const o=OUTINGS[k];return `<button class="npcrow" onclick="Game.outing('${k}')">
+      <span class="nr-main"><span class="nr-name">${esc(o.label)}</span><span class="nr-role">${esc(o.desc)}</span></span>
+      <span class="nr-rel num">精力 ${o.cost}</span></button>`};
+    const frame=d?`<div class="sec"><div class="sec-cap">借脸行事</div>
+      <button class="npcrow" onclick="UI.goSheet('借脸')">
+        <span class="nr-main"><span class="nr-name">以「${esc(d.name)}」的名义做点什么</span><span class="nr-role">赊账、争执、递物、留名帖</span></span>
+        <span class="nr-rel">栽赃 ›</span></button></div>`:'';
+    return `<div class="sec"><div class="sec-cap">宫门</div>${status}
+      <div class="sheet-note">${d?'凭这张脸出宫：门禁未必记得住你，也未必查不出。':'腰牌出入有记档，言行仍会传回宫里。'}</div></div>
+      <div class="sec"><div class="sec-cap">宫外去处</div>${['market','teahouse','temple','family'].map(row).join('')}</div>
+      ${frame}
+      <div class="sheet-note">事毕回宫；每处耗精力按行内所记。</div>`;
+  },
+  sheetDisguiseTargets(){ // 易容膏：择一个已相识之人（帝除外）
+    const npcs=state.npcs||{},rels=state.relationships||{};
+    const ids=[],seen=new Set();
+    for(const id of Object.keys(npcs)){
+      if(this.isEmperorId(id))continue;
+      const n=npcs[id];if(!n)continue;
+      if(!n.known&&!/太后/.test(id+(n.rank||'')))continue;
+      if(seen.has(id))continue;seen.add(id);ids.push(id);
+    }
+    for(const id of Object.keys(rels)){if(!this.isEmperorId(id)&&!seen.has(id)){seen.add(id);ids.push(id)}}
+    const rows=ids.map(id=>{
+      const c=this.npcCard(id);
+      const role=c.role==='只知名讳'?'':c.role;
+      return `<button class="npcrow" onclick="Game.pickDisguiseTarget('${esc(id)}')"><span class="nr-main"><span class="nr-name">${esc(c.name)}</span>${role?`<span class="nr-role">${esc(role)}</span>`:''}</span><span class="nr-rel">${this.relBadge(id)}</span></button>`;
+    }).join('');
+    return `<div class="sheet-note" style="margin-top:0">气血 -10，本旬以她的身份行事；帝不可易容。</div>
+      <div class="sec"><div class="sec-cap">易容成谁</div>${rows||'<div class="sheet-note">宫中尚无相识之人。</div>'}</div>
+      <button class="backbtn" onclick="UI.sheetBack()">◀ 返回</button>`;
+  },
+  sheetDisguiseConfirm(){ // 易容确认：写一句形貌，落定才扣气血
+    const who=Game._disguiseWho||'';
+    const c=this.npcCard(who);
+    const qi=Number(state.protagonist&&state.protagonist.attributes&&state.protagonist.attributes['体质'])||0;
+    return `<button class="backbtn" onclick="UI.sheetBack()">◀ 返回择人</button>
+      <div class="sec"><div class="sec-cap">${esc(c.name)}${c.role&&c.role!=='只知名讳'?` · ${esc(c.role)}`:''}</div>
+        <div class="itemrow"><span>气血</span><span class="cnt num">${esc(qi)} → ${esc(Math.max(1,qi-10))}</span></div>
+        <div class="itemrow"><span>时限</span><span class="cnt">本旬</span></div>
+        <div class="sheet-note" style="margin:10px 0 6px">易容的样子（一句话）</div>
+        <textarea class="craftinsp" id="disguiseDesc" maxlength="120" placeholder="如：眉梢一颗小痣，说话带江南软音；走路时肩头微微一高一低。"></textarea>
+        <div style="margin-top:12px"><button class="btn btn-primary" style="width:100%;letter-spacing:.1em;text-indent:.1em" onclick="Game.applyDisguise()">易容 · 气血 -10</button></div>
+        <div class="sheet-note">旁人只认这张脸；赏罚、好感与流言记在她名下。</div></div>`;
+  },
+  sheetFrame(){ // 借脸行事：以被冒名者的名义留下话柄
+    const d=disguiseActive(state);
+    if(!d)return '<div class="sheet-note">须先易容，才能借这张脸行事。</div>';
+    const rows=Object.entries(FRAME_ACTS).map(([k,v])=>`<button class="npcrow" onclick="Game.frameAct('${k}')">
+      <span class="nr-main"><span class="nr-name">${esc(v.label)}</span><span class="nr-role">${esc(v.desc)}</span></span>
+      <span class="nr-rel num">精力 10</span></button>`).join('');
+    return `<button class="backbtn" onclick="UI.sheetBack()">◀ 返回出宫</button>
+      <div class="sec"><div class="sec-cap">以「${esc(d.name)}」的名义</div>
+        <div class="sheet-note" style="margin:0 0 6px">旁人只看见这张脸。事情记在她的账上，日后查证也先指向她。</div>
+        ${rows}</div>`;
   },
   sheetMarket(){ // 宫市：本月货单一览，品相与存货一目了然
     const p=state.protagonist||{},m=state.market||{};
@@ -8399,7 +8514,7 @@ const WORLD_LIB = {
 /* 商城总商品库（写死 27 种）：类别 / 积分 / 详情 / 用法 / 效用 / 使用方式。
    mode：instant＝前端即结（不占本旬、不耗精力）；scene＝需演一场（占本旬一轮、耗 5 精力）；
          guard＝随身自动触发；system＝系统专用入口。
-   货架＝常备即用 8 件＋护身常备 7 件＋本轮珍品 4 件（每 SHOP_CYCLE 旬轮换）。 */
+   货架＝常备即用 9 件＋护身常备 7 件＋本轮珍品 4 件（每 SHOP_CYCLE 旬轮换）。 */
 const SHOP_CYCLE=3, SHOP_ROTATE=4;
 const SHOP_CATALOG = {
   '读心笺': {kind:'consumable', mode:'system', cost:10, usable:false,
@@ -8446,10 +8561,10 @@ const SHOP_CATALOG = {
     desc:'琥珀色小盒膏子，膏体细滑，带一缕冷香，据说是前朝方士所传。',
     usage:'在行囊详情页点「使用」，晨起妆前点敷，即刻生效；不占本旬、不耗精力。',
     fx:'养颜驻容：外貌 +2（每旬限用一件即效之物，属性至多 100）。'},
-  '易容膏': {kind:'consumable', mode:'scene', cost:50,
-    desc:'灰白药膏，匀敷眉目，半日之间形容移位，水洗即复。',
-    usage:'在行囊详情页点「使用」，需演一场；占本旬一轮、耗 5 精力。',
-    fx:'改换形容半日：避眼线、躲债避人皆可，能否冒名出宫由主持人裁定。'},
+  '易容膏': {kind:'consumable', mode:'system', cost:50,
+    desc:'灰白药膏，匀敷眉目，一旬之内形容移位，水洗不褪。',
+    usage:'在行囊详情页点「使用」，择一位已相识之人（帝除外），写一句易容的样子；即刻生效，不占本旬、不耗精力。',
+    fx:'一旬之内顶着所选之人的脸行事：旁人只认她，不认你；赏罚、好感与流言都记在她名下，可借这张脸栽赃。每次使用气血 -10。'},
   '《青囊残方》': {kind:'consumable', mode:'scene', cost:45,
     desc:'医书残卷一册，缺页少行，药性脉理却讲得透彻。',
     usage:'在行囊详情页点「使用」，需演一场；占本旬一轮、耗 5 精力。',
@@ -8511,14 +8626,14 @@ const SHOP_CATALOG = {
     usage:'行囊里使用，为帝重写一段人设（一千字以内，可插入 <player> 代名讳）；不占回合、不耗精力。',
     fx:'改写皇帝人设：帝自此依新设性情行事、待你。每件限改一次，用毕即焚。'}
 };
-/* 货架分组：常备即用 8 件、护身常备 7 件常驻；其余消耗品三旬轮换 4 件 */
-const SHOP_STAPLES=['读心笺','玉容散','益气丸','安神香','明目露','双鲤笺','同心结','小还丹'];
+/* 货架分组：常备即用 9 件、护身常备 7 件常驻；其余消耗品三旬轮换 4 件 */
+const SHOP_STAPLES=['读心笺','玉容散','益气丸','安神香','明目露','双鲤笺','同心结','小还丹','易容膏'];
 const SHOP_GUARDS=['避毒珠','玉髓杯','敛息佩','免罪金牌（小）','藏锋匣','耳报铃','子嗣缘符'];
-const SHOP_ROTATE_POOL=['驻颜膏','静心香篆','传声鹤','邂逅笺','易容膏','《青囊残方》','迷魂香','壮骨膏','替身纸人','坐胎药','假孕散','移性符'];
+const SHOP_ROTATE_POOL=['驻颜膏','静心香篆','传声鹤','邂逅笺','《青囊残方》','迷魂香','壮骨膏','替身纸人','坐胎药','假孕散','移性符'];
 const SHOP_STAPLE_SET=new Set(SHOP_STAPLES), SHOP_GUARD_SET=new Set(SHOP_GUARDS);
 const SHOP_INSTANT=new Set(['玉容散','驻颜膏','益气丸','小还丹','同心结']);
-const SHOP_SYSTEM=new Set(['读心笺','邂逅笺','移性符']);
-const SHOP_VER=2; // 货架与价目改版：旧档读入时按新版本重排一次
+const SHOP_SYSTEM=new Set(['读心笺','邂逅笺','移性符','易容膏']);
+const SHOP_VER=3; // 货架与价目改版：旧档读入时按新版本重排一次
 const SHOP_MODE_LABEL={instant:'即时',scene:'演一场',guard:'护身',system:'系统'};
 function shopModeOf(name){const c=SHOP_CATALOG[name];return (c&&c.mode)||(SHOP_INSTANT.has(name)?'instant':(SHOP_SYSTEM.has(name)?'system':'scene'))}
 function shopCycleOf(turn){return Math.floor(((Number(turn)||1)-1)/SHOP_CYCLE)} // 第几轮货色（每 3 旬一轮）
@@ -9689,6 +9804,47 @@ async function marketGenerate(ym){ // 首次点开该月：请求模型开货单
   return marketNormalize(o.items,ym);
 }
 
+/* ============================================================ 出宫与易容 */
+/* 出宫门禁：御赐腰牌（宠爱 > 50 时向帝求得，入行囊）或本旬易容。 */
+function hasPalacePass(){
+  return (state.inventory||[]).some(it=>it&&String(it.name||'')==='出宫腰牌'&&(Number(it.count)||0)>0);
+}
+function disguiseActive(s){
+  const d=s&&s.disguise;
+  if(!d||typeof d!=='object'||!d.name)return null;
+  if(Number(d.turn)!==Number(s.turn))return null; // 只在本旬有效：跨旬自动作废
+  return d;
+}
+function disguiseBrief(s){
+  const d=disguiseActive(s);
+  if(!d)return '';
+  return [
+    '【本旬易容·硬约束】',
+    `1. 主控此刻顶着「${d.name}」${d.rank?`（${d.rank}）`:''}的脸与身段，药力维持到本旬结束。${d.desc?`易容细节：${d.desc}。`:''}`,
+    '2. 凡与外人照面（宫人、妃嫔、帝、太后、侍卫、门禁、市井人等），对方都认这张脸：按被冒名者的位份、名声、与对方的交情相待；不得认出主控，不得称主控本名或本位份，不得写“她看出是你”。',
+    '3. 叙述仍用第二人称“你”，但“你”此刻是这张脸的主人：可用其名义说话、受礼、领份例、进出门禁、支使人。主控与对方的旧情不算在这张脸上；对方与主控的旧事不得当成与你的旧事。',
+    '4. 后果记在被冒名者名下：赏赐、好感、结怨、流言、罪责都落到她身上；主控自己的关系、宠爱、威望本旬不因这张脸增减。被冒名者若有孕、病、禁足等状态，不会因你的行动消失。',
+    '5. 可借这张脸栽赃：以她的名义留话柄、赊账、递物、传话、与人争执，旁人只记在她账上；事后查证也会先指向她。是否留下破绽由情境决定，不保证成功。',
+    '6. 帝前风险最高：若以这张脸面圣，帝认得她；除非剧情明确写出起疑，他仍当你是她。一旦被识破即欺君，后果照实写。',
+    '7. 收尾时把被冒名者的处境变化写进 plots / npcArc / pending（如“X被人看见在……”），不要改写主控的位份、宠爱与关系。'
+  ].join('\n');
+}
+const OUTINGS={
+  market:{label:'东市西市',cost:10,desc:'逛市、还价、听市井闲话'},
+  teahouse:{label:'茶楼听书',cost:10,desc:'一壶茶，听半日闲话与传闻'},
+  temple:{label:'寺观上香',cost:10,desc:'上香、求签、听梵音'},
+  family:{label:'回府探亲',cost:20,desc:'回娘家坐半日，看看家里近况'}
+};
+const FRAME_ACTS={
+  debt:{label:'赊账留名',desc:'在铺子里赊一笔，落她的名号',
+    body:d=>`找一家铺子赊一笔账，报「${d.name}」的名号，或留下她的住处、位份作凭。写清铺子、掌柜、赊了什么、旁人听见了什么；日后这张账会找上她。`},
+  quarrel:{label:'当街争执',desc:'与人争执，报她的名号让旁人记住',
+    body:d=>`在街市或茶楼与人口角，故意报出「${d.name}」的名号，或让她身边的人听见。写清因何起争执、谁看见、话传到哪一步；不得写成她本人也在场。`},
+  letter:{label:'递物署名',desc:'递一件东西或帖子，署她的名',
+    body:d=>`把一件东西或一封帖子递到某处（铺子、茶楼、寺观、某府门房），署「${d.name}」的名，或留下她的信物。写清递了什么、交给谁、对方如何记下；日后可被查证。`},
+  incense:{label:'寺观留名帖',desc:'上香时把她的名帖留在香案',
+    body:d=>`往寺观上香，在香案或功德簿上留「${d.name}」的名帖，或替她捐一笔香火。写清庙里谁看见、记在何处；日后可被查证。`}
+};
 /* ============================================================ 游戏流程 */
 const Game={
   /* 开局 */
@@ -9994,7 +10150,11 @@ const Game={
   hsGoOut(){if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}$('#mapClock').textContent=fmtTime();$('#mapview').classList.add('on')}, // 出门＝宫城图选目的地
   mapBack(){$('#mapview').classList.remove('on')},
   _gardenMeetPick(){ // 御花园偶遇人选：帝单独按恩宠掷骰，不与known人物挤同一个池子（池子越大越撞不见帝）；其余为太后与已认识的宫中人物
-    if(state&&state.gardenMeetWhom)return state.gardenMeetWhom; // 邂逅笺：下一次必遇所选之人，不再掷骰
+    const dg=disguiseActive(state); // 易容中：撞见被冒名者本人会当场穿帮，先从名册里摘掉
+    if(state&&state.gardenMeetWhom){
+      if(dg&&(state.gardenMeetWhom===dg.who||state.gardenMeetWhom===dg.name))state.gardenMeetWhom=null; // 邂逅笺记的正是这张脸：作废，改按寻常偶遇
+      else return state.gardenMeetWhom; // 邂逅笺：下一次必遇所选之人，不再掷骰
+    }
     const npcs=(state&&state.npcs)||{};
     const rels=(state&&state.relationships)||{};
     const empRelKey=Object.keys(rels).find(k=>UI.isEmperorId(k)); // 帝的存档键可能是「皇帝」，也可能是本名
@@ -10009,6 +10169,7 @@ const Game={
     if(absence)empChance=0;
     if(empId&&empChance>0&&Math.random()<empChance)return empId;
     const pool=Object.keys(npcs).filter(id=>{const n=npcs[id];if(!n||UI.isEmperorId(id))return false;
+      if(dg&&(id===dg.who||id===dg.name))return false;
       if(/太后/.test(id+(n.rank||'')))return true;
       return !!n.known});
     if(!pool.length)return absence?null:(empId||null);
@@ -10018,8 +10179,8 @@ const Game={
       for(let i=0;i<w;i++)deck.push(id)}
     return deck[Math.floor(Math.random()*deck.length)];
   },
-  mapGo(place){ // 宫城图目的地：养心殿见驾、六宫访妃嫔、太医院问医、藏书阁寻书、墨妙斋写字作画、御花园散步闲逛；出宫目前没有行程
-    if(place==='出宫'){toast('宫门未开：本作暂不设出宫行程；要采买可点顶栏「银两」遣人去办',3200);return}
+  mapGo(place){ // 宫城图目的地：养心殿见驾、六宫访妃嫔、太医院问医、藏书阁寻书、墨妙斋写字作画、御花园散步闲逛、出宫（须腰牌或易容）
+    if(place==='出宫'){UI.openSheet('出宫');return} // 门禁与去处都在面板里：无腰牌时给出求牌／易容两条路
     if(place==='养心殿'){this.visitNpc('皇帝');return}
     if(place==='六宫'){UI.openSheet('六宫');return}       // 不关宫城图：面板浮在图上，拜访落定由 settle 收图
     if(place==='太医院'){UI.openSheet('太医院');return}
@@ -10054,9 +10215,69 @@ const Game={
     }
     toast(place+' · 暂未开放，敬请期待');
   },
+  askPalacePass(){ // 出宫腰牌：宠爱 > 50 时向帝开口，得一块御赐腰牌（入行囊，可反复出入）
+    if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
+    if(hasPalacePass()){toast('御赐腰牌已在囊中');return}
+    const fav=chamberFavor();
+    if(!(fav>50)){toast(`帝宠尚浅（宠爱 ${fav}／需 51），此时开口只会碰壁`,3200);return}
+    if((state.energy??0)<=0){$('#mapview').classList.remove('on');this.collapse();return}
+    UI.closeSheet();
+    addToInventory([{name:'出宫腰牌',count:1,note:'御赐·可出入宫门',usable:false,pawnable:false,src:'御赐'}]);
+    const msg=`第${xunNo()}旬第一轮：玩家往养心殿，向帝开口求一块出宫的腰牌。她如今的宠爱为 ${fav}（已过五十），帝会应下。腰牌已由前端落入行囊——不要写拒绝，也不要写她再讨第二次；正文只写她如何开口、帝如何给、给了什么话或叮嘱。可带一处帝设的招牌细节，也可让他提一句口头约束（几时回、不可声张），但不扣腰牌、不另设条件。本旬其余安排与在途引线照常承接。`;
+    this.round1(msg,'求腰牌',focusEnergyCost('社交拜访'),{skipDice:true,whoHint:'皇帝',mode:{kind:'act',text:'向帝求腰牌',who:'皇帝',ctx:['养心殿','出宫','腰牌']}});
+  },
+  disguiseFromGate(){ // 出宫面板里直接用易容膏：先择人，不占本旬、不耗精力，代价是气血 -10
+    if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
+    if((state.energy??0)<=0){toast('精力已尽，先歇一歇');return}
+    const idx=(state.inventory||[]).findIndex(it=>it&&it.name==='易容膏'&&(Number(it.count)||0)>0);
+    if(idx<0){UI.goSheet('商城');return}
+    this.openDisguisePick(idx,'出宫');
+  },
+  outing(kind){ // 出宫行程：东市西市、茶楼、寺观、回府；事毕回宫，不把 location 留在宫外
+    if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
+    const o=OUTINGS[kind];if(!o)return;
+    const d=disguiseActive(state);
+    if(!d&&!hasPalacePass()){toast('宫门不放行：须有御赐腰牌，或本旬易容',3200);return}
+    if((state.energy??0)<=0){$('#mapview').classList.remove('on');this.collapse();return}
+    UI.closeSheet();
+    const home=this.homeLocation()||'本宫住处';
+    const gate=d
+      ?`你顶着「${d.name}」的脸出宫，宫门、市井、车马行都认这张脸；若这张脸本不该出宫，门禁记档会对不上，事后可能成为把柄。赏罚与流言记在她名下。`
+      :'你持御赐腰牌出宫，宫门验牌放行；出入有记档，言行仍可能传回宫里。';
+    const tips={
+      market:'到东市西市走一遭：看货、问价、还价、听摊贩与行人闲话。带了多少银两自己掂量；若要买什么，按实扣 protagonist.silver 并写 inventory.add，不得白拿。市井人物只作背景，不得凭空添一位与后宫有关的要紧人物；若遇见宫中旧识或某府下人，须合情理。',
+      teahouse:'寻一处茶楼坐下，听说书、听邻桌闲话。可带回一两条市井传闻（写明从谁口中听来、可能失真），与宫中在途引线有关的须自然勾连，不得让主控得到上帝视角。',
+      temple:'往寺观上香、求签、听梵音。签文与香火只作心境与伏笔，不得写成灵验超自然；可遇见香客、尼道、捐资的官眷，言行合身份。',
+      family:'回娘家（或族中在京的宅第）坐半日：见父母兄弟、看家中近况、听家族请托。家世不同，宅第排场与说话分寸不同；可带回银两、物件或一条家里托办的事，须符合家世与情理，不得凭空给大笔横财。'
+    };
+    const ctx=['出宫','宫外',o.label].concat(kind==='family'?['娘家','家族','家书']:kind==='market'?['市集','东市','西市','采买']:kind==='temple'?['寺观','上香','求签']:['茶楼','听书','传闻']);
+    const hits=matchLeads(ctx);
+    const phits=matchPending(ctx);
+    const leadHint=hits.length?`\n【呼应引线】此行与在途引线相关：${hits.map(p=>`「${p.title}」（${p.line}）`).join('；')}。可同场自然带出，能兑现的当旬兑现并回写台账；不必每条都塞进正文。`:'';
+    const pendHint=phits.length?`\n【呼应待续】此行与待续琐事相关：${phits.map(x=>pendText(x)).join('；')}。请顺势办理或问起，办妥的从 statePatch.pending 移除；未办妥的更新一句现状。`:'';
+    const msg=`第${xunNo()}旬第一轮：玩家出宫，${o.label}（耗精力 ${o.cost}）。${gate}\n${tips[kind]}\n这是一日往来，事毕回宫；statePatch.location 仍写本宫住处「${home}」，不要把 location 停在宫外。若本旬触发剧情，按常例给 2—4 个选项并停下；若无事，完整结算本旬。${leadHint}${pendHint}`;
+    this.round1(msg,'出宫·'+o.label,o.cost,{leadIds:hits.map(p=>p.id),pendTexts:phits.map(pendText),mode:{kind:'act',text:'出宫·'+o.label,returnHome:true,ctx}});
+  },
+  frameAct(kind){ // 借易容之名栽赃：只在这一旬、这张脸有效；落成剧情账，不把罪责记到主控头上
+    if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
+    const d=disguiseActive(state);
+    if(!d){toast('须先易容，才能借这张脸行事');return}
+    const act=FRAME_ACTS[kind];if(!act)return;
+    if((state.energy??0)<=0){$('#mapview').classList.remove('on');this.collapse();return}
+    UI.closeSheet();
+    const home=this.homeLocation()||'本宫住处';
+    const ctx=['宫外','出宫','借脸',d.name];
+    const hits=matchLeads(ctx);
+    const phits=matchPending(ctx);
+    const leadHint=hits.length?`\n【呼应引线】此事与在途引线相关：${hits.map(p=>`「${p.title}」（${p.line}）`).join('；')}。可借它推进或埋下新的查证方向。`:'';
+    const pendHint=phits.length?`\n【呼应待续】此事与待续琐事相关：${phits.map(x=>pendText(x)).join('；')}。顺带处理，办妥的从 statePatch.pending 移除。`:'';
+    const msg=`第${xunNo()}旬第一轮：玩家顶着「${d.name}」的脸，在宫外借这张脸行事——${act.label}。${act.body(d)}\n本轮必须把这件事落成一条剧情账：在 statePatch.plots 新增或更新一条（id 用 "p-frame-${state.turn}-${kind}"，line 写"支线"或"敌对"，goal 写清日后这件事如何查到被冒名者头上，note 写当前进展，dueText 写三至六旬内的期限）；同时在 statePatch.pending 写更新后的完整待续（含原有条目，再添这一条）。不要把罪责写到主控名下，也不要写主控当场被认出；是否留下破绽、被谁看见，按情境写。事毕回宫，statePatch.location 仍写本宫住处「${home}」。${leadHint}${pendHint}`;
+    this.round1(msg,'出宫·借脸·'+act.label,10,{skipDice:true,leadIds:hits.map(p=>p.id),pendTexts:phits.map(pendText),frameTarget:d.name,frameLabel:act.label,mode:{kind:'act',text:'借脸·'+act.label,who:d.name,returnHome:true,ctx}});
+  },
   visitNpc(who){
     if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
     if((state.energy??0)<=0){this.collapse();return}
+    {const dg=disguiseActive(state);if(dg&&(who===dg.who||who===dg.name)){toast('顶着她的脸去见她本人，只会当场穿帮',3000);return}}
     UI.closeSheet();
     const npc=(state.npcs&&state.npcs[who]&&(state.npcs[who].name||who))||who;
     const hits=matchLeads([who,npc]);
@@ -10069,6 +10290,7 @@ const Game={
   maidTalk(name){ // 日常宫务：不预调 API、不弹"事发"，本地开场白直入对话；问话不耗精力
     if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
     if((state.energy??0)<=0){this.collapse();return}
+    {const dg=disguiseActive(state);if(dg&&(name===dg.name||name===dg.who)){toast('顶着她的脸去问她话，只会当场穿帮',3000);return}}
     ensureXunBook();
     UI.closeSheet();
     Game._lastAdj=null; // 宫务对话不跑剧情裁决与剧情骰：到期/发酵引线留给本旬后续行动的 round1 照常强制
@@ -10094,6 +10316,7 @@ const Game={
   nextTurn(){ // 休息，进入下一旬：旬数+1，精力回满，日历按两旬制推进
     const prevTime=Object.assign({},state.time);
     const prevTurn=state.turn||0;
+    if(state.disguise){delete state.disguise;toast('易容药力已散，镜中人又是你自己',3000)} // 易容只保一旬
     const dawn=resolveNight(prevTurn); // 本旬末先结敬事房这一夜：时间还停在本旬，弹出的侍寝/夜账才合时序
     state.turn=(state.turn||0)+1;state.energy=ENERGY_MAX;state.energyWarned=false;state.mealCount=0;state.walkCount=0;state.time=advanceTime(state.time);
     let newcomer=null;
@@ -10294,6 +10517,22 @@ const Game={
       soldNotes=[];lastUseIdx=null;
       if(Game._festSerial!=null){state.lastFestSerial=Game._festSerial;Game._festSerial=null} // 节宴已演：记旬号，同旬后续行动不再重复摆宴
       finalize(p,{focus,adj});
+      if(opts&&opts.mode&&opts.mode.returnHome){ // 出宫是一日往来：结算后地点归回本宫住处
+        const hm=Game.homeLocation();if(hm)state.location=hm;
+        saveToSlot(0,true); // 自动档同步改回住处，别把宫外地点带进下次读档
+      }
+      if(opts&&opts.frameTarget){ // 借脸行事：模型没落账时，前端补一条最简引线，保证这件事日后有人查
+        const tn=String(opts.frameTarget);
+        const has=(state.plots||[]).some(pl=>pl&&pl.stage==='进行中'&&(String(pl.title||'').includes(tn)||String(pl.note||'').includes(tn)));
+        if(!has){
+          state.plots=mergePlots(state.plots,[{id:'p-frame-'+state.turn,title:`${tn}·被人冒名`,line:'支线',
+            goal:`查清是谁顶着${tn}的脸在外行事，以及这件事会怎样落到${tn}头上`,
+            note:`${opts.frameLabel||'宫外'}留下了${tn}的名号，尚未查证`,stage:'进行中',dueText:'五旬内'}],xunSerial(state.time));
+          ensurePlotMeta().lastEventTurn=state.turn; // 借脸行事本身算一条内容：本旬不再另起随机剧情
+          saveToSlot(0,true);
+          toast('此事已记入剧情账',2400);
+        }
+      }
       logXunAction(focus);
       if(opts&&opts.leadIds&&opts.leadIds.length){ // 呼应过的引线：模型回写台账才算实质推进（touch 已由 mergePlots 刷新）；只演不写记一次落空
         const now=xunSerial(state.time);
@@ -11104,6 +11343,7 @@ const Game={
   inviteNpc(who){ // 宫务·行事：递帖相邀，先按成算掷骰；应了才调模型，不应则出写好的回绝
     if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
     if(!state||!state.protagonist)return;
+    {const dg=disguiseActive(state);if(dg&&(who===dg.who||who===dg.name)){toast('顶着她的脸给她递帖，只会当场穿帮',3000);return}}
     if(!inviteCandidates().some(c=>c.id===who)){toast('帖子递不出去：此人不在可邀之列');return}
     if(state.inviteTurn===state.turn){toast('本旬的帖子已经递过了，待下旬再说');return}
     if((state.energy??0)<=INVITE_ENERGY){toast(`精力不足：递帖待客要耗 ${INVITE_ENERGY} 精力`);return}
@@ -12019,6 +12259,7 @@ const Game={
     const it=it0;
     if(it.durable){toast('长期之物无需使用：在详情页启用／收存即可');return}
     if(it.usable===false){toast('此物不能使用');return}
+    if(it.name==='易容膏'){this.openDisguisePick(i,'行囊');return} // 先择人、写一句形容；不占本旬，代价是气血 -10
     if(it.name==='移性符'){this.openShiftCharm(i);return} // 系统道具：本地改写帝设，不占回合、不耗精力、不走模型
     if(it.name==='邂逅笺'){this.openMeetPick(i);return} // 指定下次园中偶遇：择人后才耗笺，不占回合、不耗精力
     it.count-=1;const gone=it.count<=0;lastUseIdx=i;
@@ -12115,6 +12356,58 @@ const Game={
       emp?'你寻了个不显眼的时机，把并蒂锦结系在他袖口暗扣上，没多说一句。他低头看了一眼，没有解开。'
          :`你把并蒂锦结递到${nm}手里，只说了一句寻常话。${ta}捏着结心看了看，收下了。`,
       [emp?`宠爱 +${after-before}（${before} → ${after}）`:`好感 +${after-before}（${before} → ${after}）`]);
+  },
+  openDisguisePick(i,from){ // 易容膏：先择人（帝除外），再写一句形容；择定才耗膏、才扣气血
+    if(phase!=='FOCUS_SELECT'){toast('请先结束本旬应对');return}
+    if(!state||!state.protagonist)return;
+    const it=(state.inventory||[])[i];
+    if(!it||it.name!=='易容膏'||(Number(it.count)||0)<=0){toast('囊中没有易容膏');return}
+    if(disguiseActive(state)){toast('本旬已易容，药力未散');return}
+    const qi=Number(state.protagonist.attributes&&state.protagonist.attributes['体质'])||0;
+    if(qi<=10){toast('气血已虚，再受不住这药力');return}
+    Game._disguiseItemIdx=i;Game._disguiseFrom=from||'行囊';
+    UI.goSheet('易容');
+  },
+  pickDisguiseTarget(who){
+    if(!who)return;
+    Game._disguiseWho=who;
+    UI.goSheet('易容确认');
+  },
+  applyDisguise(){ // 易容落地：本旬以这张脸行事，气血 -10；不占精力、不走模型
+    if(phase!=='FOCUS_SELECT'){toast('请先结束本旬应对');return}
+    if(disguiseActive(state)){toast('本旬已易容');return}
+    const idx=Game._disguiseItemIdx;
+    const inv=state.inventory||[];
+    const it=inv[idx];
+    if(!it||it.name!=='易容膏'||(Number(it.count)||0)<=0){Game._disguiseItemIdx=null;toast('此物已不在囊中');return}
+    const who=Game._disguiseWho;
+    if(!who||UI.isEmperorId(who)){toast('这张脸易不得');return}
+    const n=(state.npcs||{})[who]||{};
+    const name=n.realName||n.name||who;
+    if(!name){toast('认不出这个人');return}
+    const p=state.protagonist,at=p.attributes=p.attributes||{};
+    const qi=Number(at['体质'])||0;
+    if(qi<=10){toast('气血已虚，再受不住这药力');return}
+    const ta=$('#disguiseDesc');
+    const desc=ta?String(ta.value||'').trim().slice(0,120):'';
+    const after=Math.max(1,qi-10);
+    state.disguise={who,name,rank:String(n.rank||''),desc,turn:state.turn};
+    at['体质']=after;
+    it.count=(Number(it.count)||0)-1;
+    if(it.count<=0)inv.splice(idx,1);
+    const from=Game._disguiseFrom||'行囊';
+    Game._disguiseItemIdx=null;Game._disguiseWho=null;Game._disguiseFrom=null;
+    ensureXunBook();logXunAction('易容·'+name);
+    persistCurrent();markSafe();UI.updateStatusbar();
+    if(from==='出宫'){
+      UI.renderSheet('出宫');
+      toast(`易容已成：${name}（本旬出宫不必腰牌）`,3200);
+    }else{
+      UI.closeSheet();
+      UI.actResult('易容 · '+name,
+        `你对着镜子，一层层把眉眼改成${name}的样子。${desc?desc+'。':''}药力沉下去时，脸上像多了一层不属于自己的静。`,
+        [`气血 -10（${qi} → ${after}）`,`本旬以「${name}」的身份行事`]);
+    }
   },
   openMeetPick(i){ // 邂逅笺：先择人，择定才耗笺
     if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
