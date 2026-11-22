@@ -5514,13 +5514,9 @@ function normalizeState(s){
   if(!Array.isArray(s.plotMeta.seenMain))s.plotMeta.seenMain=s.plots.filter(p=>p.line==='主线'&&p.stage==='进行中').map(p=>p.id); // 首接：现有主线不补报；之后新发布的主线才弹窗
   if(!Array.isArray(s.schemes))s.schemes=[]; // 暗流账：旧档从空账开始，头几旬由前端按关系与位份起念
   s.schemeMeta=(s.schemeMeta&&typeof s.schemeMeta==='object')?s.schemeMeta:{lastSpawn:-99,tickTurn:-1};
-  if(!s.readMindV1){const sys=s.system=s.system||{};const shop=sys.shop=Array.isArray(sys.shop)?sys.shop:[];if(!shop.some(it=>it&&it.name==='读心笺'))shop.push({name:'读心笺',cost:15});s.readMindV1=true} // 旧档商城补读心笺
-  refreshShop(s); // 商城货色按旬轮换：旧档读入即对齐到当前轮次
-  if(!s.meetCardV1){ // 新上架的邂逅笺：旧档本轮货色里补一件，之后随三旬轮换自然进出
-    const shop=s.system.shop=Array.isArray(s.system.shop)?s.system.shop:[];
-    if(!shop.some(it=>it&&it.name==='邂逅笺'))shop.push({name:'邂逅笺',cost:60});
-    s.meetCardV1=true;
-  }
+  if(!s.readMindV1)s.readMindV1=true; // 读心笺已入常备货架，由 refreshShop 统一上架
+  refreshShop(s); // 商城货色按旬轮换：旧档读入即对齐到当前轮次与新版价目
+  if(!s.meetCardV1)s.meetCardV1=true; // 邂逅笺已入轮换珍品池，不必再单独补一件
   s.pending=(s.pending||[]).filter(x=>!/当票|赎当|已逾期/.test(pendText(x))); // 典当银货两讫、当场结清：不留逾期话口
   s.inventory=(s.inventory||[]).filter(it=>!/当票/.test(String(it.name||''))); // 旧档当票条目一并清除
   backfillAvatars(s); // 头像：旧档主控/人物补配（新档在开局生成时已分配）
@@ -5553,6 +5549,7 @@ function applyShopCatalog(it){ // 商城词条落地：usable=false 写死者（
   const cat=SHOP_CATALOG[it.name];
   if(!cat)return it;
   if(cat.usable===false)it.usable=false;
+  else if(cat.kind==='consumable'&&shopModeOf(it.name)!=='guard')it.usable=true; // 商城消耗品都能在行囊里点用；自动触发的护身物除外
   if(cat.kind!=='durable')return it;
   it.durable=true;it.usable=false;it.pawnable=false;
   if(typeof it.equipped!=='boolean')it.equipped=true;
@@ -5771,7 +5768,7 @@ function compactState(s,focusMsg){ // 只压缩送入模型的那一份，localS
   const out=Object.assign({},s);
   out.turn=xunNoOf(s.turn); // 对外统一 1 起旬号，与指令里的「第N旬」一致
   // 前端内部标记与展示字段不送模型
-  for(const k of ['avatarMap','plotMeta','schemeMeta','xunBook','saveVersion','plotLedgerV1','pawnFix1','itemFlagV1','readMindV1','energyWarned','mealCount','lastSalaryMonth','lastFestSerial','lastFestPerfSerial','items','skillWorks','pieceSeq','craftV1','chamberV1','xunIntent','inviteTurn','postpartumUntil','decor','factionFix1','lastConsortYear','openingWoo','longBuff'])delete out[k];
+  for(const k of ['avatarMap','plotMeta','schemeMeta','xunBook','saveVersion','plotLedgerV1','pawnFix1','itemFlagV1','readMindV1','energyWarned','mealCount','lastSalaryMonth','lastFestSerial','lastFestPerfSerial','items','skillWorks','pieceSeq','craftV1','chamberV1','xunIntent','inviteTurn','postpartumUntil','decor','factionFix1','lastConsortYear','openingWoo','longBuff','itemUseTurn'])delete out[k];
   // 派系账：只送模型够写的部分；排期时刻与期限由前端管，不送出去免得照抄出错位的旬号
   if(Array.isArray(s.factions)){
     out.factions=s.factions.map(f=>({
@@ -5810,7 +5807,7 @@ function compactState(s,focusMsg){ // 只压缩送入模型的那一份，localS
     traits:Array.isArray(pc.traits)?pc.traits.slice(0,3):[]
   }));
   // 商城由前端管理，模型无需每旬背整张价目表
-  if(out.system&&typeof out.system==='object'){out.system=Object.assign({},s.system);delete out.system.shop;delete out.system.shopCycle}
+  if(out.system&&typeof out.system==='object'){out.system=Object.assign({},s.system);delete out.system.shop;delete out.system.shopCycle;delete out.system.shopV}
   // 关系备注截断
   if(s.relationships&&typeof s.relationships==='object'){
     const rels={};
@@ -7531,6 +7528,7 @@ const UI={
     else if(name==='手作结果')B.innerHTML=this.sheetCraftResult();
     else if(name==='物品详情')B.innerHTML=this.sheetItemDetail(param);
     else if(name==='择人')B.innerHTML=this.sheetMeetTargets();
+    else if(name==='赠结')B.innerHTML=this.sheetKnotTargets();
     else if(name==='商城')B.innerHTML=this.sheetShop();
     else if(name==='商品详情')B.innerHTML=this.sheetShopDetail(param);
     else if(name==='采买')B.innerHTML=this.sheetMarket();
@@ -7780,7 +7778,7 @@ const UI={
     const displayBtn=it.src==='功课'?`<button class="btn btn-line" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.toggleDisplay(${i})">${it.displayed?'收起陈设':'陈设在住处'}</button>`:'';
     const act=it.durable
       ?`<button class="btn btn-primary" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.toggleEquip(${i})">${it.equipped!==false?'收存（停用效用）':'启用（随身佩戴）'}</button>`
-      :(it.usable!==false?`<button class="btn btn-primary" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.useItem(${i})">${it.name==='移性符'?'使用 · 重撰帝设':(it.name==='邂逅笺'?'使用 · 择一人':`使用（耗精力 ${focusEnergyCost('使用道具')}）`)}</button>`:`<button class="btn" disabled style="opacity:.45;letter-spacing:.1em;text-indent:.1em">不可使用</button>`);
+      :(it.usable!==false?`<button class="btn btn-primary" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.useItem(${i})">${it.name==='移性符'?'使用 · 重撰帝设':(it.name==='邂逅笺'?'使用 · 择一人':(SHOP_INSTANT.has(it.name)?'使用 · 即刻生效（不占本旬）':'使用 · 演一场（耗精力 5）'))}</button>`:`<button class="btn" disabled style="opacity:.45;letter-spacing:.1em;text-indent:.1em">不可使用</button>`);
     const wide=(k,v)=>`<div class="rowline" style="align-items:flex-start"><span style="flex:none">${k}</span><span class="cnt" style="white-space:normal;text-align:right;max-width:70%">${esc(v)}</span></div>`;
     const crafted=!!it.crafted;
     const matKindLabel={绣:'绣作',香:'合香',药:'丸散',花:'花作',杂:'杂件'};
@@ -7814,46 +7812,57 @@ const UI={
   },
   sheetShop(){
     const p=state.protagonist||{};const shop=(state.system&&state.system.shop)||[];
-    const left=SHOP_CYCLE-(((Number(state.turn)||1)-1)%SHOP_CYCLE); // 本轮货色还剩几旬
+    const left=SHOP_CYCLE-(((Number(state.turn)||1)-1)%SHOP_CYCLE); // 本轮珍品还剩几旬
     const ownOf=nm=>(state.inventory||[]).filter(x=>x.name===nm).reduce((a,x)=>a+(Number(x.count)||0),0);
     const row=(it,i)=>{
       const cat=SHOP_CATALOG[it.name]||{};
       const durable=cat.kind==='durable';
       const owned=durable&&ownOf(it.name)>0;
-      const tag=durable?'<span class="itag on">长期</span>':'<span class="itag">消耗</span>';
+      const mode=shopModeOf(it.name);
+      const tag=`<span class="itag${mode==='instant'?' on':''}">${SHOP_MODE_LABEL[mode]||'消耗'}</span>`;
       const right=owned?'<span class="nr-rel" style="color:var(--ink-soft)">已拥有</span>'
         :`<span class="nr-rel num">积分 ${esc(it.cost)}${!durable&&ownOf(it.name)>0?` · 持有 ×${ownOf(it.name)}`:''}</span>`;
       return `<button class="npcrow" onclick="UI.goSheet('商品详情',${i})"><span class="nr-name">${esc(it.name)}</span>${tag}${right}</button>`;
     };
-    const idx=shop.map((it,i)=>[it,i]);
-    const dur=idx.filter(([it])=>(SHOP_CATALOG[it.name]||{}).kind==='durable');
-    const con=idx.filter(([it])=>(SHOP_CATALOG[it.name]||{}).kind!=='durable');
+    const take=names=>names.map(n=>{const i=shop.findIndex(x=>x.name===n);return i>=0?[shop[i],i]:null}).filter(Boolean);
+    const staples=take(SHOP_STAPLES), guards=take(SHOP_GUARDS);
+    const rot=shop.map((it,i)=>[it,i]).filter(([it])=>!SHOP_STAPLE_SET.has(it.name)&&!SHOP_GUARD_SET.has(it.name));
     const sec=(cap,note,list)=>list.length?`<div class="sec"><div class="sec-cap">${cap}</div><div class="sheet-note" style="margin:0 0 6px">${note}</div>${list.map(([it,i])=>row(it,i)).join('')}</div>`:'';
     return `<div class="sec"><div class="sec-cap">宫斗系统 · 商城</div>
-      <div class="sheet-note" style="margin:0">可用积分：<b class="num">${esc(p.points??0)}</b> · 点物品名看详情与用法 · 货色三旬一换（本轮还剩 ${left} 旬）</div></div>`
-      +sec('长期之物','购入随身为用，不耗件数；入手后在行囊详情页启停。',dur)
-      +sec('消耗品','购入即刻入囊，用毕即无，何时使用由你自定。',con);
+      <div class="sheet-note" style="margin:0">可用积分：<b class="num">${esc(p.points??0)}</b> · 常备货一直有，珍品三旬一换（还剩 ${left} 旬）<br>「即时」之物点用即结，不占本旬；「演一场」占本旬一轮。</div></div>`
+      +sec('即用常备','日常所需，一直有货；用完再买。',staples)
+      +sec('护身常备','买一次便随身生效，不必复购；入手后在行囊详情页启停。',guards)
+      +sec('本轮珍品',`三旬一换，本轮还剩 ${left} 旬。`,rot);
   },
   sheetShopDetail(i){
     const it=((state.system&&state.system.shop)||[])[i];
     if(!it)return '<div class="sheet-note">此物已不在本轮货色中。</div>';
     const cat=SHOP_CATALOG[it.name]||{};
     const durable=cat.kind==='durable';
+    const mode=shopModeOf(it.name);
     const own=(state.inventory||[]).filter(x=>x.name===it.name).reduce((a,x)=>a+(Number(x.count)||0),0);
     const owned=durable&&own>0;
+    const invIdx=(state.inventory||[]).findIndex(x=>x.name===it.name&&(Number(x.count)||0)>0);
+    const modeText=mode==='instant'?'即时 · 点用即结：不占本旬、不耗精力（每旬限用一件即效之物）'
+      :mode==='scene'?'剧情 · 需演一场：占本旬一轮、耗 5 精力'
+      :mode==='guard'?'护身 · 随身生效：自动触发，无需使用'
+      :'系统 · 专用入口：按用法所示使用';
     const wide=(k,v)=>`<div class="rowline" style="align-items:flex-start"><span style="flex:none">${k}</span><span class="cnt" style="white-space:normal;text-align:right;max-width:70%">${esc(v)}</span></div>`;
     const buy=owned
       ?`<button class="btn" disabled style="opacity:.45;letter-spacing:.1em;text-indent:.1em">已拥有 · 随身启用中</button>`
       :`<button class="btn btn-primary" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.buyItem(${i})">购买 · 积分 ${esc(it.cost)}</button>`;
+    const useNow=(mode==='instant'&&invIdx>=0)
+      ?`<button class="btn btn-line" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.useItem(${invIdx})">现在就用 · 不占本旬</button>`:'';
     return `<button class="backbtn" onclick="UI.sheetBack()">◀ 返回商城</button>
       <div class="sec"><div class="sec-cap">${esc(it.name)}</div>
-      <div class="itemrow"><span>类别</span><span class="cnt">${cat.kind==='durable'?'长期之物 · 随身为用':(cat.kind==='consumable'?'消耗品 · 用毕即无':'—')}</span></div>
+      <div class="itemrow"><span>类别</span><span class="cnt">${durable?'长期之物 · 随身为用':'消耗品 · 用毕即无'}</span></div>
+      <div class="itemrow"><span>使用方式</span><span class="cnt">${modeText}</span></div>
       <div class="itemrow"><span>价格</span><span class="cnt num">积分 ${esc(it.cost)}</span></div>
       ${own>0?`<div class="itemrow"><span>持有</span><span class="cnt num">×${own}</span></div>`:''}
       ${cat.desc?wide('详情',cat.desc):''}
       ${cat.usage?wide('用法',cat.usage):''}
       ${cat.fx?wide('效用',cat.fx):''}</div>
-      <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px">${buy}</div>`;
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px">${buy}${useNow}</div>`;
   },
   sheetMeetTargets(){ // 邂逅笺：择定下一次园中必遇之人
     const npcs=state.npcs||{};
@@ -7874,6 +7883,27 @@ const UI={
     const pending=state.gardenMeetWhom;
     return `<div class="sheet-note" style="margin-top:0">下一次往御花园，必遇此人。${pending?`<br>当前已记：<b>${esc(dispName(pending))}</b>，重择即作废。`:''}</div>
       <div class="sec"><div class="sec-cap">可选之人</div>${rows||'<div class="sheet-note">宫中尚无相识之人，暂无可遇。</div>'}</div>
+      <button class="backbtn" onclick="UI.sheetBack()">◀ 返回行囊</button>`;
+  },
+  sheetKnotTargets(){ // 同心结：择一人相赠
+    const npcs=state.npcs||{},rels=state.relationships||{};
+    const empId=Object.keys(npcs).find(id=>this.isEmperorId(id))||Object.keys(rels).find(id=>this.isEmperorId(id))||'皇帝';
+    const ids=[empId],seen=new Set(ids);
+    const add=id=>{if(!id||seen.has(id))return;seen.add(id);ids.push(id)};
+    for(const id of Object.keys(npcs)){
+      if(id===empId)continue;
+      const n=npcs[id];if(!n)continue;
+      if(!n.known&&!/太后/.test(id+(n.rank||'')))continue;
+      add(id);
+    }
+    for(const id of Object.keys(rels))if(!this.isEmperorId(id))add(id); // 只有关系簿、没有档案的旧识也可赠
+    const rows=ids.map(id=>{
+      const c=this.npcCard(id);
+      const role=c.role==='只知名讳'?'':c.role;
+      return `<button class="npcrow" onclick="Game.giveKnot('${esc(id)}')"><span class="nr-main"><span class="nr-name">${esc(c.name)}</span>${role?`<span class="nr-role">${esc(role)}</span>`:''}</span><span class="nr-rel">${this.relBadge(id)}</span></button>`;
+    }).join('');
+    return `<div class="sheet-note" style="margin-top:0">择一人相赠：好感 +2；赠帝为宠爱 +1。即刻生效，不占本旬、不耗精力。</div>
+      <div class="sec"><div class="sec-cap">可赠之人</div>${rows||'<div class="sheet-note">宫中尚无相识之人。</div>'}</div>
       <button class="backbtn" onclick="UI.sheetBack()">◀ 返回行囊</button>`;
   },
   sheetMarket(){ // 宫市：本月货单一览，品相与存货一目了然
@@ -8238,131 +8268,143 @@ const WORLD_LIB = {
   ],
 };
 
-/* 商城总商品库（写死 26 种）：类别 / 积分 / 详情 / 用法 / 效用。
-   每 SHOP_CYCLE 旬从库中轮换 SHOP_SLOTS 件上架（refreshShop），积分价与词条都以名为键在此维护 */
-const SHOP_CYCLE=3, SHOP_SLOTS=10;
+/* 商城总商品库（写死 27 种）：类别 / 积分 / 详情 / 用法 / 效用 / 使用方式。
+   mode：instant＝前端即结（不占本旬、不耗精力）；scene＝需演一场（占本旬一轮、耗 5 精力）；
+         guard＝随身自动触发；system＝系统专用入口。
+   货架＝常备即用 8 件＋护身常备 7 件＋本轮珍品 4 件（每 SHOP_CYCLE 旬轮换）。 */
+const SHOP_CYCLE=3, SHOP_ROTATE=4;
 const SHOP_CATALOG = {
-  '读心笺': {kind:'consumable', cost:15, usable:false,
+  '读心笺': {kind:'consumable', mode:'system', cost:10, usable:false,
     desc:'素白小笺一张，无字无墨，入手微温。系统之物，只你可见可触。',
-    usage:'人物详情里点「其心底如何看待你」即用；所知只此一瞬，不落档。',
+    usage:'人物详情里点「其心底如何看待你」即用；不占回合、不耗精力，所知只此一瞬，不落档。',
     fx:'即时窥见一人此刻对你的真实心意。'},
-  '明目露': {kind:'consumable', cost:30,
+  '明目露': {kind:'consumable', mode:'scene', cost:20,
     desc:'以清晨荷叶露调的眼露，清亮微凉。',
-    usage:'以露滴目，一日两次。行囊详情页点「使用」即滴，耗些许精力。',
+    usage:'在行囊详情页点「使用」，需演一场；占本旬一轮、耗 5 精力。',
     fx:'旬余目明神清：夜读细作不伤眼，修习书画、女红收效稍好（小档）。'},
-  '安神香': {kind:'consumable', cost:35,
+  '安神香': {kind:'consumable', mode:'scene', cost:20,
     desc:'安息香末合制的线香，气味温沉。',
-    usage:'睡前焚于帐外一炷。行囊详情页点「使用」即焚，耗些许精力。',
+    usage:'在行囊详情页点「使用」，需演一场；占本旬一轮、耗 5 精力。',
     fx:'一觉沉酣：病中、惊悸或思虑过度时助眠稳神，体质与心绪小益。'},
-  '双鲤笺': {kind:'consumable', cost:40,
+  '双鲤笺': {kind:'consumable', mode:'scene', cost:25,
     desc:'双鱼纹样的名笺一对，一留一寄。信到即焚，不留纸迹。',
-    usage:'写毕封好，托可靠人手递出，或匿名送入指定宫中。行囊详情页点「使用」即写即递，耗些许精力。',
+    usage:'在行囊详情页点「使用」，需演一场；占本旬一轮、耗 5 精力。',
     fx:'安全通一次书信：传情、报信、试探皆可，途经与风险由主持人裁定。'},
-  '玉容散': {kind:'consumable', cost:45,
+  '玉容散': {kind:'consumable', mode:'instant', cost:30,
     desc:'宫中养颜的细粉，调蜜敷面。据说是旧时贵妃们妆前的私藏，宫婢间千金难求。',
-    usage:'晚间洁面后调蜜匀敷，一次一盒。行囊详情页点「使用」即敷，耗些许精力。',
-    fx:'敷后肤色细润，外貌小幅进益（小档，渐进而非骤变）。'},
-  '同心结': {kind:'consumable', cost:45,
+    usage:'在行囊详情页点「使用」，调蜜匀敷，即刻生效；不占本旬、不耗精力。',
+    fx:'敷后肤色细润：外貌 +1（每旬限用一件即效之物，属性至多 100）。'},
+  '同心结': {kind:'consumable', mode:'instant', cost:30,
     desc:'并蒂锦结一枚，结心无痕，赠人有情。',
-    usage:'亲手系上对方腕间，或随一份礼悄悄附去。行囊详情页点「使用」即相赠，耗些许精力。',
-    fx:'相赠之时对方好感小增（对帝亦然，只是增益更微）。'},
-  '静心香篆': {kind:'consumable', cost:50,
+    usage:'在行囊详情页点「使用」，择一人相赠，即刻生效；不占本旬、不耗精力。',
+    fx:'相赠之时对方好感 +2（帝为宠爱 +1，增益更微）。'},
+  '静心香篆': {kind:'consumable', mode:'scene', cost:35,
     desc:'篆香一盘，焚之烟细如线，气味清苦回甘，能定心神。',
-    usage:'于室内焚香静坐，一盘整燃。行囊详情页点「使用」即焚，耗些许精力。',
+    usage:'在行囊详情页点「使用」，需演一场；占本旬一轮、耗 5 精力。',
     fx:'宁神定志：缓和惊悸与戾气，心绪宁定时不易生事、不易树敌。'},
-  '益气丸': {kind:'consumable', cost:50,
+  '益气丸': {kind:'consumable', mode:'instant', cost:35,
     desc:'温补丸药，丸小力沉，与太医院益气固本的路数同源。',
-    usage:'温水送服，一次一丸。行囊详情页点「使用」即服，耗些许精力。',
-    fx:'补养气血：气血低于根基时助其回升；要拔高根基，仍须长期调理。'},
-  '传声鹤': {kind:'consumable', cost:55,
+    usage:'在行囊详情页点「使用」，温水送服，即刻生效；不占本旬、不耗精力。气血已足根基时服之无益。',
+    fx:'补养气血：气血 +5，至多回到根基；根基不由此拔高。'},
+  '传声鹤': {kind:'consumable', mode:'scene', cost:40,
     desc:'折纸白鹤，吹气即成，翅振三声便到那人耳边，说完即散作光尘。',
-    usage:'对着鹤轻声嘱托一句紧要话，指明收话人。行囊详情页点「使用」即遣，耗些许精力。',
+    usage:'在行囊详情页点「使用」，需演一场；占本旬一轮、耗 5 精力。',
     fx:'隔空传一句话：不经人手、不落字迹，隔墙有耳时最稳。'},
-  '邂逅笺': {kind:'consumable', cost:60,
+  '邂逅笺': {kind:'consumable', mode:'system', cost:45,
     desc:'当你有话想说，又不愿显得刻意。',
-    usage:'行囊里使用，择定一人；下一次往御花园必遇。',
+    usage:'行囊里使用，择定一人；不占回合、不耗精力。下一次往御花园必遇。',
     fx:'下一次御花园散步必遇所选之人：帝、太后、妃嫔、皇嗣、宫人皆可（重择会作废前一次）。'},
-  '驻颜膏': {kind:'consumable', cost:60,
+  '驻颜膏': {kind:'consumable', mode:'instant', cost:40,
     desc:'琥珀色小盒膏子，膏体细滑，带一缕冷香，据说是前朝方士所传。',
-    usage:'晨起妆前点敷眼角唇边，一次一盒。行囊详情页点「使用」即敷，耗些许精力。',
-    fx:'养颜驻容：外貌进益较玉容散更显著（仍为小档，非改头换面）。'},
-  '易容膏': {kind:'consumable', cost:65,
+    usage:'在行囊详情页点「使用」，晨起妆前点敷，即刻生效；不占本旬、不耗精力。',
+    fx:'养颜驻容：外貌 +2（每旬限用一件即效之物，属性至多 100）。'},
+  '易容膏': {kind:'consumable', mode:'scene', cost:50,
     desc:'灰白药膏，匀敷眉目，半日之间形容移位，水洗即复。',
-    usage:'出门前匀敷面颈，半日后水洗复原。行囊详情页点「使用」即敷，耗些许精力。',
+    usage:'在行囊详情页点「使用」，需演一场；占本旬一轮、耗 5 精力。',
     fx:'改换形容半日：避眼线、躲债避人皆可，能否冒名出宫由主持人裁定。'},
-  '《青囊残方》': {kind:'consumable', cost:70,
+  '《青囊残方》': {kind:'consumable', mode:'scene', cost:45,
     desc:'医书残卷一册，缺页少行，药性脉理却讲得透彻。',
-    usage:'闭门手抄精读，一旬读完。行囊详情页点「使用」即读，耗些许精力。',
+    usage:'在行囊详情页点「使用」，需演一场；占本旬一轮、耗 5 精力。',
     fx:'医理入门：医术·药理小幅进益，兼能识毒辨药。'},
-  '迷魂香': {kind:'consumable', cost:75,
+  '迷魂香': {kind:'consumable', mode:'scene', cost:55,
     desc:'甜腻香饼一块，嗅之骨软神恍。',
-    usage:'焚于密闭室内，人一入即效。行囊详情页点「使用」即焚，耗些许精力。',
+    usage:'在行囊详情页点「使用」，需演一场；占本旬一轮、耗 5 精力。',
     fx:'嗅者恍惚一盏茶工夫，问什么答什么；对高位者效力与败露风险俱增。'},
-  '壮骨膏': {kind:'consumable', cost:85,
+  '壮骨膏': {kind:'consumable', mode:'scene', cost:60,
     desc:'黑亮膏药一方，药气辛辣，专治筋骨亏虚。',
-    usage:'揉敷筋骨，旬日不辍，须配合骑射舞剑之力行。行囊详情页点「使用」即敷，耗些许精力。',
+    usage:'在行囊详情页点「使用」，需演一场；占本旬一轮、耗 5 精力。',
     fx:'拔高体质根基（单次至多+1、上限90，须同写 constitutionBase 与体质）。'},
-  '替身纸人': {kind:'consumable', cost:90,
+  '替身纸人': {kind:'consumable', mode:'guard', cost:65,
     desc:'剪纸成人形，以指尖血点目，眉目酷似主控。',
-    usage:'贴身收好，不言不动，祸起时它代你受过。行囊详情页点「使用」即替身。',
-    fx:'自动替身：挡一次暗算或小祸（毒、针、坠物、顶罪皆可），挡过即焚。'},
-  '小还丹': {kind:'consumable', cost:95,
+    usage:'贴身收好，不言不动，祸起时它代你受过；挡过即焚。',
+    fx:'自动替身：挡一次暗算或小祸（毒、针、坠物、顶罪皆可）。'},
+  '小还丹': {kind:'consumable', mode:'instant', cost:60,
     desc:'龙眼大的一丸丹药，色如蜜珀，有价无市。',
-    usage:'重伤濒危时温水化服。行囊详情页点「使用」即服，耗些许精力。',
-    fx:'吊住一口气：重伤濒危时保命回阳，气血回到安全线，仍须静养。'},
-  '坐胎药': {kind:'consumable', cost:110,
+    usage:'在行囊详情页点「使用」，即刻生效；不占本旬、不耗精力。气血在 30 以上时不必用它。',
+    fx:'吊住一口气：气血低于 30 时服下，回到 30，仍须静养。'},
+  '坐胎药': {kind:'consumable', mode:'scene', cost:80,
     desc:'温养宫胞的丸药，太医院对妃嫔不外传的方子。',
-    usage:'月信后连服旬日。行囊详情页点「使用」即服，耗些许精力。',
+    usage:'在行囊详情页点「使用」，需演一场；占本旬一轮、耗 5 精力。',
     fx:'一段时日内提升受孕之望；与子嗣缘符同用更佳。'},
-  '假孕散': {kind:'consumable', cost:120,
+  '假孕散': {kind:'consumable', mode:'scene', cost:90,
     desc:'色味皆无的药散，入水即溶，饮后脉象如孕。',
-    usage:'化入日常饮食自服，神不知鬼不觉。行囊详情页点「使用」即服，耗些许精力。',
+    usage:'在行囊详情页点「使用」，需演一场；占本旬一轮、耗 5 精力。',
     fx:'近两月脉象如孕，可欺太医与六宫；败露之日大祸临头，慎用。'},
-  '玉髓杯': {kind:'durable', cost:65,
+  '玉髓杯': {kind:'durable', mode:'guard', cost:50,
     desc:'白玉小杯，莹润生光；酒液有毒，杯壁即泛青色。',
     usage:'宴饮自斟必用此杯，入手即随身启用。行囊详情页可「收存」停用。',
     fx:'长期之效：入口之前先验酒食——饮用之物有毒即显形。'},
-  '避毒珠': {kind:'durable', cost:70,
+  '避毒珠': {kind:'durable', mode:'guard', cost:55,
     desc:'乌沉珠子一颗，贴身戴着冬暖夏凉；百毒近身，则微微发烫示警。',
     usage:'佩着即生效；行囊里可「收存」摘下。',
     fx:'长期之效：佩戴中可避寻常毒物与慢药暗算——凡针对你的下毒皆不能得手，毒近身时珠身发烫，你会有所察觉。'},
-  '敛息佩': {kind:'durable', cost:75,
+  '敛息佩': {kind:'durable', mode:'guard', cost:60,
     desc:'墨玉小佩，佩之气息内收，人往人堆里一站便不起眼。',
     usage:'随身佩戴（入手即启用）。行囊详情页可「收存」停用。',
     fx:'长期之效：行止低调、不易被留意；他人打探、跟踪、嫁祸于你更难成。'},
-  '免罪金牌（小）': {kind:'durable', cost:80,
+  '免罪金牌（小）': {kind:'durable', mode:'guard', cost:65,
     desc:'小小一枚鎏金令牌，先朝式样，宫中旧档可验，能抵一次小过。',
     usage:'长期收好即可，无需使用。闯下小祸（言语失当、礼仪有亏之类）时它自动替你挡下一次责罚，挡过即碎。',
     fx:'遇事自动生效：抵一次小罪责罚；大逆不赦之罪不抵。'},
-  '藏锋匣': {kind:'durable', cost:90,
+  '藏锋匣': {kind:'durable', mode:'guard', cost:70,
     desc:'夹层小匣，外看是寻常妆匣，内里一格暗层，锁钥精巧。',
     usage:'安置在住处夹墙或妆台暗处（入手即安置妥当），无需也不可「使用」。行囊详情页可「收存」停用。',
     fx:'长期之效：启用中可匿藏密信、违禁样本等物，不列入明面清点，搜查时更难暴露。'},
-  '耳报铃': {kind:'durable', cost:95,
+  '耳报铃': {kind:'durable', mode:'guard', cost:75,
     desc:'黄铜小铃，不响于风，只响于人近。',
     usage:'系在住处窗棂或门轴暗处（入手即启用）。行囊详情页可「收存」停用。',
     fx:'长期之效：有人夜近窗门、翻检物件时铃先轻响，眼线与夜客难近身。'},
-  '子嗣缘符': {kind:'durable', cost:100,
+  '子嗣缘符': {kind:'durable', mode:'guard', cost:75,
     desc:'朱砂符纸折成的符令，贴身收着，微微发热。',
     usage:'贴身佩戴（入手即启用），无需也不可「使用」。行囊详情页可「收存」停用，再「启用」戴回。',
     fx:'长期之效：佩戴中增益子嗣缘，帷帐之事后更易有信；收存则无效。'},
-  '移性符': {kind:'consumable', cost:100,
+  '移性符': {kind:'consumable', mode:'system', cost:80,
     desc:'朱砂符纸一道，纹如蟠龙，入手微温，不焚不化。系统之物，只你可见可触。',
-    usage:'行囊里使用，为帝重写一段人设（一千字以内，可插入 <player> 代名讳）。',
+    usage:'行囊里使用，为帝重写一段人设（一千字以内，可插入 <player> 代名讳）；不占回合、不耗精力。',
     fx:'改写皇帝人设：帝自此依新设性情行事、待你。每件限改一次，用毕即焚。'}
 };
+/* 货架分组：常备即用 8 件、护身常备 7 件常驻；其余消耗品三旬轮换 4 件 */
+const SHOP_STAPLES=['读心笺','玉容散','益气丸','安神香','明目露','双鲤笺','同心结','小还丹'];
+const SHOP_GUARDS=['避毒珠','玉髓杯','敛息佩','免罪金牌（小）','藏锋匣','耳报铃','子嗣缘符'];
+const SHOP_ROTATE_POOL=['驻颜膏','静心香篆','传声鹤','邂逅笺','易容膏','《青囊残方》','迷魂香','壮骨膏','替身纸人','坐胎药','假孕散','移性符'];
+const SHOP_STAPLE_SET=new Set(SHOP_STAPLES), SHOP_GUARD_SET=new Set(SHOP_GUARDS);
+const SHOP_INSTANT=new Set(['玉容散','驻颜膏','益气丸','小还丹','同心结']);
+const SHOP_SYSTEM=new Set(['读心笺','邂逅笺','移性符']);
+const SHOP_VER=2; // 货架与价目改版：旧档读入时按新版本重排一次
+const SHOP_MODE_LABEL={instant:'即时',scene:'演一场',guard:'护身',system:'系统'};
+function shopModeOf(name){const c=SHOP_CATALOG[name];return (c&&c.mode)||(SHOP_INSTANT.has(name)?'instant':(SHOP_SYSTEM.has(name)?'system':'scene'))}
 function shopCycleOf(turn){return Math.floor(((Number(turn)||1)-1)/SHOP_CYCLE)} // 第几轮货色（每 3 旬一轮）
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
-function refreshShop(s){ // 三旬一换：从总商品库按轮次挑 SHOP_SLOTS 件（同轮货色固定，旧档读入与新旬推进都会重算）
+function refreshShop(s){ // 常备货固定，珍品按轮次洗牌：同轮货色固定，旧档读入与新旬推进都会重算
   const sys=s.system=s.system||{};if(!Array.isArray(sys.shop))sys.shop=[];
   const cycle=shopCycleOf(s.turn);
-  if(sys.shopCycle===cycle&&sys.shop.length)return;
-  const names=Object.keys(SHOP_CATALOG);
+  if(sys.shopV===SHOP_VER&&sys.shopCycle===cycle&&sys.shop.length)return;
   const rnd=mulberry32((cycle+1)*2654435761>>>0);
-  const idx=names.map((_,i)=>i);
-  for(let i=idx.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));const t=idx[i];idx[i]=idx[j];idx[j]=t}
-  sys.shop=idx.slice(0,SHOP_SLOTS).map(i=>({name:names[i],cost:SHOP_CATALOG[names[i]].cost}));
-  sys.shopCycle=cycle;
+  const pool=SHOP_ROTATE_POOL.slice();
+  for(let i=pool.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));const t=pool[i];pool[i]=pool[j];pool[j]=t}
+  const names=SHOP_STAPLES.concat(SHOP_GUARDS,pool.slice(0,SHOP_ROTATE));
+  sys.shop=names.map(n=>({name:n,cost:SHOP_CATALOG[n].cost}));
+  sys.shopCycle=cycle;sys.shopV=SHOP_VER;
 }
 
 /* ============================================================ 手作系统（后端）
@@ -11047,14 +11089,15 @@ const Game={
     const it=(state.system.shop||[])[i];if(!it)return;
     const cat=SHOP_CATALOG[it.name]||{};
     if(cat.kind==='durable'&&(state.inventory||[]).some(x=>x.name===it.name&&(Number(x.count)||0)>0)){toast('此物已在囊中随身启用，不必复购');return}
-    ensureXunBook();
     const pts=Number(state.protagonist.points)||0;
     if(pts<it.cost){toast('积分不足');return}
+    ensureXunBook();
     state.protagonist.points=pts-it.cost;
     const obj={name:it.name,count:1,src:'商城购入'};
     if(it.name==='读心笺')obj.note='系统道具：窥一人此刻对你的真实心意';
     addToInventory([obj]);
-    toast(`已购「${it.name}」，即刻入囊`);
+    const mode=shopModeOf(it.name);
+    toast(mode==='instant'?`已购「${it.name}」· 点「现在就用」即刻生效`:(mode==='guard'?`已购「${it.name}」，即刻随身生效`:`已购「${it.name}」，即刻入囊`));
     logXunAction(`商城·${it.name}`);
     persistCurrent();markSafe();UI.renderSheet('商品详情',i);UI.updateStatusbar();
   },
@@ -11828,8 +11871,10 @@ const Game={
   /* 行囊 */
   useItem(i){
     if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
+    const it0=(state.inventory||[])[i];if(!it0||it0.count<=0)return;
+    if(SHOP_INSTANT.has(it0.name)){this.useInstant(i);return} // 即时之物：前端即结，不占本旬、不耗精力
     if((state.energy??0)<=0){this.collapse();return}
-    const it=(state.inventory||[])[i];if(!it||it.count<=0)return;
+    const it=it0;
     if(it.durable){toast('长期之物无需使用：在详情页启用／收存即可');return}
     if(it.usable===false){toast('此物不能使用');return}
     if(it.name==='移性符'){this.openShiftCharm(i);return} // 系统道具：本地改写帝设，不占回合、不耗精力、不走模型
@@ -11841,6 +11886,93 @@ const Game={
     const fxNote=cat?`此物效用：${cat.fx}`:(it.effect?`此物效用：${it.effect}${Array.isArray(it.traits)&&it.traits.length?`（特质：${it.traits.join('、')}；品质：${it.quality||'—'}）`:''}`:'');
     UI.closeSheet();
     this.round1(`第${xunNo()}旬第一轮：玩家消耗精力 ${cost} ${label}（${gone?'已用尽':'尚余 '+it.count+' 件'}${it.note?'；'+it.note:''}）。${fxNote}演绎使用此物的具体过程与其效果，然后决定是否触发剧情（hasEvent）。`,label,cost,{mode:{kind:'act',text:label}});
+  },
+  useInstant(i){ // 即时之物：本地结算，不占本旬、不耗精力（每旬限一件，防刷属性）
+    if(phase!=='FOCUS_SELECT'){toast('请先结束本旬应对');return}
+    if(!state||!state.protagonist)return;
+    const inv=state.inventory||[];
+    const it=inv[i];
+    if(!it||(Number(it.count)||0)<=0){toast('此物已不在囊中');return}
+    if(Number(state.itemUseTurn)===Number(state.turn)){toast('本旬已用过一件即效之物，余下的留到下旬');return}
+    if(it.name==='同心结'){this.openKnotPick(i);return}
+    const p=state.protagonist,at=p.attributes=p.attributes||{};
+    const qi=clamp01_100(Number(at['体质'])||0);
+    const base=clamp01_100(Number(p.constitutionBase)||qi);
+    let flavor='',deltas=[],apply=null;
+    if(it.name==='玉容散'||it.name==='驻颜膏'){
+      const step=it.name==='玉容散'?1:2;
+      const before=clamp01_100(Number(at['外貌'])||0);
+      if(before>=100){toast('已是增一分则过的时候，再敷也无益');return}
+      const after=clamp01_100(before+step);
+      apply=()=>{at['外貌']=after};
+      flavor=it.name==='玉容散'
+        ?'你调了蜜，将玉容散薄薄敷在面上。镜中人肤色细润了一分，笑意也松了些。'
+        :'晨起妆前，你挑一点驻颜膏匀在眼角唇边。膏体凉而不腻，气色比昨日通透。';
+      deltas=[`外貌 +${after-before}（${before} → ${after}）`];
+    }else if(it.name==='益气丸'){
+      if(qi>=base){toast('气血已足根基，此时进补无益，留着体虚时再用');return}
+      const after=Math.min(base,qi+5);
+      apply=()=>{at['体质']=after};
+      flavor='温水送下一丸，药力缓缓化开，胸口的乏意退去几分。';
+      deltas=[`气血 +${after-qi}（${qi} → ${after}，根基 ${base}）`];
+    }else if(it.name==='小还丹'){
+      if(qi>=30){toast('不到用它吊命的时候，先收着');return}
+      apply=()=>{at['体质']=30};
+      flavor='丹丸入口即化，一线热意从喉间坠到心口，你才觉出自己又能喘匀这口气。';
+      deltas=[`气血 ${qi} → 30（仍需静养）`];
+    }else{toast('此物暂不能即用');return}
+    ensureXunBook(); // 先记本旬起点，再落数值：旬末小结才看得出这一笔
+    apply();
+    it.count=(Number(it.count)||0)-1;
+    if(it.count<=0)inv.splice(i,1);
+    state.itemUseTurn=state.turn;
+    logXunAction('用物·'+it.name);
+    persistCurrent();markSafe();UI.updateStatusbar();UI.closeSheet();
+    UI.actResult('用物 · '+it.name,flavor,deltas);
+  },
+  openKnotPick(i){ // 同心结：先择人，择定才耗结
+    if(phase!=='FOCUS_SELECT'){toast('请先结束本旬应对');return}
+    if(!state||!state.protagonist)return;
+    const it=(state.inventory||[])[i];
+    if(!it||it.name!=='同心结'||(Number(it.count)||0)<=0){toast('囊中没有同心结');return}
+    if(Number(state.itemUseTurn)===Number(state.turn)){toast('本旬已用过一件即效之物，余下的留到下旬');return}
+    Game._knotItemIdx=i;
+    UI.goSheet('赠结');
+  },
+  giveKnot(who){
+    if(phase!=='FOCUS_SELECT'){toast('请先结束本旬应对');return}
+    if(Number(state.itemUseTurn)===Number(state.turn)){toast('本旬已用过一件即效之物，余下的留到下旬');return}
+    const idx=Game._knotItemIdx;
+    const inv=state.inventory||[];
+    const it=inv[idx];
+    if(!it||it.name!=='同心结'||(Number(it.count)||0)<=0){Game._knotItemIdx=null;toast('此物已不在囊中');return}
+    const emp=UI.isEmperorId(who);
+    const rels=state.relationships=state.relationships||{};
+    let rel=rels[who],before=0,after=0;
+    if(emp){
+      if(!rel||typeof rel!=='object')rel=rels[who]={type:'宠爱',value:0};
+      before=Number.isFinite(Number(rel.value))?Number(rel.value):0;
+      after=Math.min(100,before+1);
+      rel.value=after;rel.type=rel.type||'宠爱';
+    }else{
+      if(rel==null)rel=rels[who]={type:'好感',value:0};
+      if(!rel||typeof rel!=='object'||typeof rel.value!=='number'||!Number.isFinite(rel.value)){
+        toast('此人与你之间不是一枚结能说清的——换个人罢');return;
+      }
+      before=rel.value;after=Math.min(100,before+2);rel.value=after;
+    }
+    ensureXunBook();
+    it.count=(Number(it.count)||0)-1;
+    if(it.count<=0)inv.splice(idx,1);
+    state.itemUseTurn=state.turn;
+    Game._knotItemIdx=null;
+    const nm=emp?'帝':dispName(who),ta=npcSexOf(state,who)==='m'?'他':'她';
+    logXunAction('赠结·'+nm);
+    persistCurrent();markSafe();UI.updateStatusbar();UI.closeSheet();
+    UI.actResult('赠结 · '+nm,
+      emp?'你寻了个不显眼的时机，把并蒂锦结系在他袖口暗扣上，没多说一句。他低头看了一眼，没有解开。'
+         :`你把并蒂锦结递到${nm}手里，只说了一句寻常话。${ta}捏着结心看了看，收下了。`,
+      [emp?`宠爱 +${after-before}（${before} → ${after}）`:`好感 +${after-before}（${before} → ${after}）`]);
   },
   openMeetPick(i){ // 邂逅笺：先择人，择定才耗笺
     if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
