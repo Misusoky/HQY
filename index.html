@@ -2044,18 +2044,19 @@ function autoSettleDuePlots(adj){ // 模型漏写台账时由前端结账；当�
       expired.push(cur.title||cur.id);
       continue;
     }
-    cur.stage='已兑现';
     if(cur.factionId){ // 派系排的账：到期无人应对，这一步就真落了地，不能无声揭过
+      cur.stage='已兑现';
       const f=(state.factions||[]).find(x=>x.name===cur.factionId);
       const ch=factionLandUnopposed(f);
       factionClearStep(f);
       cur.note=(cur.note?cur.note+'；':'')+'无人应对，这一步落了地'+(ch?`（${ch}）`:'');
-    }else{
-      cur.note=(cur.note?cur.note+'；':'')+'前端自动结账：到期已兑现';
+    }else{ // 主控这边没人办成：按错过销账，不算任务兑现，也不发积分
+      cur.stage='已作废';
+      cur.note=(cur.note?cur.note+'；':'')+'到期没人办，时机已过（前端销账，不计积分）';
     }
     settled.push(cur.title||cur.id);
   }
-  if(settled.length){console.info('[台账] 前端自动结账：'+settled.join('、'));awardQuestPoints(settled.length);longBuffQuestPoints(settled.length)}
+  if(settled.length)console.info('[台账] 到期未办，前端销账：'+settled.join('、')); // 没人办成的事不发积分
   if(expired.length)console.info('[台账] 超期太久，前端自动作废：'+expired.join('、'));
   return settled.concat(expired);
 }
@@ -3303,20 +3304,19 @@ function longBuffAfterGains(before){ // before＝涨之前的数值快照；给�
   if(out.length)toast('命途长赐：'+out.join('、'),2600);
   return out;
 }
-function awardQuestPoints(n){ // 任务兑现：积分由前端按条目发放，模型不写 points
+function awardQuestPoints(n){ // 任务兑现：积分由前端按条目发放，模型不写 points（提示由调用方合并成一句）
   if(!state||!n)return 0;
   const p=state.protagonist||{};
   const add=QUEST_POINTS*n;
   p.points=(Number(p.points)||0)+add;
-  toast('任务兑现：积分 +'+add,3000);
   return add;
 }
-function longBuffQuestPoints(n){ // 翻手为云：每兑现一件任务，额外 10 积分
+function longBuffQuestPoints(n,silent){ // 翻手为云：每兑现一件任务，额外 10 积分
   const ml=state&&state.mainLine;if(!ml||ml.id!=='fan'||!n)return 0;
   const p=state.protagonist||{};
   const add=10*n;
   p.points=(Number(p.points)||0)+add;
-  toast('命途长赐：任务积分 +'+add,2600);
+  if(!silent)toast('命途长赐：任务积分 +'+add,2600);
   return add;
 }
 function mainLineAdvance(){
@@ -4295,6 +4295,8 @@ function rollAllowanceFood(){ // 厨下食料：按位份 3—5 种，每种 1�
 /* 精力系统 */
 const ENERGY_MAX=100;        // 每旬精力上限
 const FOOD_ENERGY_GAIN=5;    // 行囊吃食：吃用不耗精力，演一场后精力略复（传膳另算，见 MEAL_MENUS）
+/* 小厨房菜式的实际回补：基础 5 点，再加上按品质、投入精力与食材算出的份量（黑暗料理不再加，另掷奇效或生病） */
+function foodRestoreOf(it){return FOOD_ENERGY_GAIN+(it&&!it.dark?(Number(it.cookEnergy)||0):0)}
 const MEAL_LIMIT_PER_XUN=3; // 每旬最多传膳次数
 /* 传膳菜单：预制六单，每三旬轮换一单；银两不同、回精力不同；每单最贵一味另加属性 1 点 */
 const MEAL_MENUS=[
@@ -5769,6 +5771,7 @@ function normalizeState(s){
   if(!s.itemFlagV1){for(const it of s.inventory)it.usable=guessUsable(it.name,it.note);s.itemFlagV1=true} // 旧档一次性重算可否使用
   for(const it of s.inventory)itemFlags(it); // 补齐缺失词条
   for(const it of s.inventory)if(it.crafted&&it.matValue==null)revalueCraftItem(it); // 旧档手作按「料钱＋工钱」重估
+  for(const it of s.inventory)if(it.cook&&it.matValue==null)revalueCookItem(it); // 旧档菜式同款重估：价钱与回补都按品质、精力、食材算
   ensureCraftState(s); // 手作：补 craft 状态；旧档首次接入补一份入门材料
   ensureKitchenState(s); // 小厨房与月份例账：旧档补空账，不追发往月
   migrateEmperor(s); // 恩宠账：旧档补知心/上次接触/共同经历（内部一次性守卫）
@@ -5929,11 +5932,11 @@ function consumeInventoryRef(ref){ // 按对象引用扣一件；用尽即除名
   if(it.count<=0)state.inventory.splice(idx,1);
   return true;
 }
-function pawnPrice(it){ // 典卖估价：手作按「料钱＋工钱」，其余按质地分档（本地即时结算，通报主持人）
-  if(it&&it.crafted){ // 手作成品：按生成时记下的估价；旧档未记则只算工钱
+function pawnPrice(it){ // 典卖估价：手作与小厨房菜式按「料钱＋工钱」，其余按质地分档（本地即时结算，通报主持人）
+  if(it&&(it.crafted||it.cook)){ // 成品：按生成时记下的估价；旧档未记则只算工钱
     const v=Number(it.craftValue);
     if(Number.isFinite(v)&&v>0)return Math.max(1,Math.round(v));
-    return Math.max(2,CRAFT_QUALITY_VALUE[it.quality]||0);
+    return Math.max(2,(it.cook?COOK_LABOR:CRAFT_QUALITY_VALUE)[it.quality]||0);
   }
   const s=String(it.name||'')+String(it.note||'');
   if(/赤金|金错|东珠|红宝石|白玉|翡翠|玛瑙/.test(s))return 20;
@@ -6686,12 +6689,16 @@ function applyPatch(patch){
     if(k==='disguise')continue; // 易容由前端管理：模型回写整块会把本旬的脸冲掉
     if(k==='inventory.add'){addToInventory(Array.isArray(patch[k])?patch[k]:[patch[k]]);continue} // 行囊入库（前端合并件数）
     if(k==='plots'){ // 剧情台账按 id 增量合并；回写即记 touch=本旬（统一用 xunSerial 旬号，与发酵裁决同一单位）
-      const wasDone={};
-      for(const p of (state.plots||[]))if(p&&p.id)wasDone[p.id]=p.stage==='已兑现';
+      const wasActive={}; // 只认「本来就是进行中、这一轮被模型改成已兑现」的条目：新立的、重复发来的都不算任务完成
+      for(const p of (state.plots||[]))if(p&&p.id)wasActive[p.id]=p.stage==='进行中';
       state.plots=mergePlots(state.plots,patch[k],xunSerial(state.time));
       let newlyDone=0;
-      for(const p of (state.plots||[]))if(p&&p.id&&!wasDone[p.id]&&p.stage==='已兑现')newlyDone++;
-      if(newlyDone){awardQuestPoints(newlyDone);longBuffQuestPoints(newlyDone)} // 任务兑现：前端发积分；翻手为云另补长赐
+      for(const p of (state.plots||[]))if(p&&p.id&&wasActive[p.id]&&p.stage==='已兑现')newlyDone++;
+      if(newlyDone){ // 任务兑现：前端发积分，翻手为云另补长赐，合成一句提示
+        const base=awardQuestPoints(newlyDone);
+        const bonus=longBuffQuestPoints(newlyDone,true);
+        toast(bonus?`任务兑现 ×${newlyDone}：积分 +${base}（含命途长赐 +${bonus}）`:`任务兑现 ×${newlyDone}：积分 +${base}`,3200);
+      }
       for(const f of (state.factions||[])){ // 派系那一步已结：清掉当前一步，免得模型照着旧棋继续演
         if(!f.stepPlotId)continue;
         const p=(state.plots||[]).find(x=>x.id===f.stepPlotId);
@@ -7865,6 +7872,7 @@ const UI={
     const selList=Object.keys(kitSel.mats).map(name=>({name,count:kitSel.mats[name]}));
     const selText=selList.length?selList.map(x=>`${x.name}×${x.count}`).join('、'):'尚未放食材';
     const total=selList.reduce((a,b)=>a+b.count,0);
+    const selMatValue=selList.reduce((a,x)=>{const m=mats.find(y=>y.name===x.name);const t=Math.max(1,Math.min(4,Math.round(Number(m&&m.tier)||1)));return a+(CRAFT_MAT_VALUE[t]||2)*x.count},0);
     const chips=[10,20,30,40,50].map(v=>`<button class="craftchip${kitSel.energy===v?' on':''}" ${energy<v?'disabled':''} onclick="Game.kitEnergy(${v})">${v}</button>`).join('');
     const v=Cook.validate({materials:selList,energy:kitSel.energy,inspiration:kitSel.inspiration});
     const errs=v.errors.filter(e=>e!=='先写一句灵感');
@@ -7884,7 +7892,7 @@ const UI={
         <textarea class="craftinsp" id="kitInsp" maxlength="${COOK_INSPIRATION_MAX}" placeholder="想做什么菜、什么口味、给谁吃？" oninput="Game.kitInsp(this.value)">${esc(insp)}</textarea>
         <div class="craftcount" id="kitInspCount">${insp.length}／${COOK_INSPIRATION_MAX}</div></div>
       <div class="sec"><div class="sec-cap">本道用料</div>
-        <div class="craftsum"><b>${esc(selText)}</b>${total?`（${selList.length} 种 / ${total} 份）`:''}<br>投入精力 ${kitSel.energy}${errs.length?`<br><span style="color:var(--cinnabar)">${esc(errs[0])}</span>`:''}</div></div>
+        <div class="craftsum"><b>${esc(selText)}</b>${total?`（${selList.length} 种 / ${total} 份 · 料钱约 ${selMatValue} 两）`:''}<br>投入精力 ${kitSel.energy}${errs.length?`<br><span style="color:var(--cinnabar)">${esc(errs[0])}</span>`:''}</div></div>
       <button class="btn btn-primary" id="kitGo" style="letter-spacing:.14em;text-indent:.14em;font-size:15px;margin-top:14px" ${canGo?'':'disabled'} onclick="Game.kitSubmit()">下厨 · 精力 −${kitSel.energy}</button>
       <div class="sheet-note">至多 ${COOK_MAX_KINDS} 种、${COOK_MAX_TOTAL} 份；食材配得离谱，会做成黑暗料理。</div>`;
   },
@@ -7902,6 +7910,8 @@ const UI={
         <div class="cr-effect"><b>尝味</b>　${esc(it.effect||'')}</div>
         <div class="itemrow"><span>耗料</span><span class="cnt">${esc((it.materials||[]).join('、'))}</span></div>
         <div class="itemrow"><span>耗精力</span><span class="cnt num">${esc(it.energy??'—')}</span></div>
+        ${it.craftValue?`<div class="itemrow"><span>估价</span><span class="cnt num">${it.dark?`残料半价 ${esc(it.craftValue)} 两`:`料钱 ${esc(it.matValue||0)} ＋ 工钱 ${esc(it.labor||0)} ＝ ${esc(it.craftValue)} 两`}</span></div>`:''}
+        <div class="itemrow"><span>吃用回补</span><span class="cnt num">${it.dark?'看运气':'精力 +'+foodRestoreOf(it)}</span></div>
         <div class="itemrow"><span>烹饪</span><span class="cnt num">+${esc(it.skillGain||1)}</span></div>
         <div class="itemrow"><span>下厨人</span><span class="cnt">${esc(it.maker||'')}</span></div>
       </div></div>
@@ -8280,11 +8290,17 @@ const UI={
     const displayBtn=it.src==='功课'?`<button class="btn btn-line" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.toggleDisplay(${i})">${it.displayed?'收起陈设':'陈设在住处'}</button>`:'';
     const act=it.durable
       ?`<button class="btn btn-primary" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.toggleEquip(${i})">${it.equipped!==false?'收存（停用效用）':'启用（随身佩戴）'}</button>`
-      :(it.usable!==false?`<button class="btn btn-primary" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.useItem(${i})">${it.name==='移性符'?'使用 · 重撰帝设':(it.name==='邂逅笺'?'使用 · 择一人':(it.name==='易容膏'?'使用 · 择人易容':(SHOP_INSTANT.has(it.name)?'使用 · 即刻生效（不占本旬）':(isFood?`吃用 · 演一场（精力 +${FOOD_ENERGY_GAIN}）`:'使用 · 演一场（耗精力 5）'))))}</button>`:`<button class="btn" disabled style="opacity:.45;letter-spacing:.1em;text-indent:.1em">不可使用</button>`);
+      :(it.usable!==false?`<button class="btn btn-primary" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.useItem(${i})">${it.name==='移性符'?'使用 · 重撰帝设':(it.name==='邂逅笺'?'使用 · 择一人':(it.name==='易容膏'?'使用 · 择人易容':(SHOP_INSTANT.has(it.name)?'使用 · 即刻生效（不占本旬）':(isFood?(it.dark?'吃用 · 演一场（看运气）':`吃用 · 演一场（精力 +${foodRestoreOf(it)}）`):'使用 · 演一场（耗精力 5）'))))}</button>`:`<button class="btn" disabled style="opacity:.45;letter-spacing:.1em;text-indent:.1em">不可使用</button>`);
     const wide=(k,v)=>`<div class="rowline" style="align-items:flex-start"><span style="flex:none">${k}</span><span class="cnt" style="white-space:normal;text-align:right;max-width:70%">${esc(v)}</span></div>`;
     const crafted=!!it.crafted;
     const matKindLabel={绣:'绣作',香:'合香',药:'丸散',花:'花作',杂:'杂件'};
     const matRow=(it.mat&&!crafted)?`<div class="itemrow"><span>手作</span><span class="cnt">可作${esc(matKindLabel[it.matKind]||'手作')}材料，在手作面板放料</span></div>`:'';
+    const cookBlock=it.cook?`<div class="itemrow"><span>品质</span><span class="cnt"><span class="qbadge ${this.qualityClass(it.quality)}">${esc(it.quality||'—')}</span></span></div>
+      ${it.craftValue?`<div class="itemrow"><span>估价</span><span class="cnt num">${it.dark?`残料半价 ${esc(it.craftValue)} 两`:`料钱 ${esc(it.matValue||0)} ＋ 工钱 ${esc(it.labor||0)} ＝ ${esc(it.craftValue)} 两`}</span></div>`:''}
+      ${Array.isArray(it.traits)&&it.traits.length?`<div class="rowline" style="align-items:flex-start"><span style="flex:none">特质</span><span class="cnt" style="text-align:right;max-width:70%">${it.traits.map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</span></div>`:''}
+      ${Array.isArray(it.materials)&&it.materials.length?`<div class="itemrow"><span>耗料</span><span class="cnt">${esc(it.materials.join('、'))}</span></div>`:''}
+      ${it.energy!=null?`<div class="itemrow"><span>耗精力</span><span class="cnt num">${esc(it.energy)}</span></div>`:''}
+      ${it.inspiration?wide('灵感',it.inspiration):''}`:'';
     const craftedBlock=crafted?`<div class="itemrow"><span>类别</span><span class="cnt">${esc(it.category||'手作')} · ${it.src==='墨妙斋'?'亲笔':'手作'}</span></div>
       <div class="itemrow"><span>品质</span><span class="cnt"><span class="qbadge ${this.qualityClass(it.quality)}">${esc(it.quality||'—')}</span></span></div>
       ${it.craftValue?`<div class="itemrow"><span>估价</span><span class="cnt num">料钱 ${esc(it.matValue||0)} ＋ 工钱 ${esc(it.labor||0)} ＝ ${esc(it.craftValue)} 两</span></div>`:''}
@@ -8297,7 +8313,8 @@ const UI={
       ${it.inspiration?wide('灵感',it.inspiration):''}`:'';
     return `<div class="sec"><div class="sec-cap">${esc(it.name)}</div>
       ${matRow}
-      ${isFood?`<div class="itemrow"><span>吃用</span><span class="cnt num">不耗精力 · 精力 +${FOOD_ENERGY_GAIN}</span></div>`:''}
+      ${cookBlock}
+      ${isFood?`<div class="itemrow"><span>吃用</span><span class="cnt num">不耗精力 · ${it.dark?'看相不对，福祸未定':'精力 +'+foodRestoreOf(it)}</span></div>`:''}
       ${cat.kind?`<div class="itemrow"><span>类别</span><span class="cnt">${cat.kind==='durable'?'长期之物 · 随身为用':'消耗品 · 用毕即无'}</span></div>`:''}
       ${craftedBlock}
       ${it.durable?'':`<div class="itemrow"><span>件数</span><span class="cnt num">×${esc(it.count)}</span></div>`}
@@ -9095,6 +9112,8 @@ const KITCHEN_MATERIALS={
 };
 const KITCHEN_SHARED=['蜂蜜','干桂花','干茉莉','荷花瓣','白菊','忍冬','黄酒']; // 手作料里也能入菜的几样
 const COOK_QUALITY=CRAFT_QUALITY;
+const COOK_LABOR={'粗陋':0,'寻常':2,'精巧':6,'珍品':12,'绝品':20};   // 菜的手艺钱：食物卖价低于手作，别靠下厨套银
+const COOK_RESTORE={'粗陋':1,'寻常':3,'精巧':5,'珍品':8,'绝品':12}; // 品质本身带来的精力回补
 const COOK_ENERGY_MIN=10;
 const COOK_ENERGY_MAX=50;
 const COOK_MAX_KINDS=6;
@@ -9549,6 +9568,37 @@ function cookParse(raw,data){
   const pawnable=obj.pawnable!==false;
   return {name,quality,traits,description,effect,dark,usable,pawnable};
 }
+function cookValueParts(parsed,data){ // 菜的估价与精力回补：品质、投入精力、食材三者一起算
+  const matValue=craftMaterialValue(data.materials);
+  const labor=parsed.dark?0:(COOK_LABOR[parsed.quality]||0); // 做坏了没手艺钱，只当半价料处理
+  const eBase=COOK_RESTORE[parsed.quality]||0;
+  const eLabor=Math.round((Number(data.energy)||0)/10);
+  const eMat=Math.min(6,(data.materials||[]).reduce((a,m)=>a+Math.max(0,(Number(m.tier)||1)-1)*(Number(m.count)||1),0));
+  return {
+    matValue,labor,value:Math.max(1,Math.round(parsed.dark?matValue*0.5:matValue+labor)),
+    cookEnergy:parsed.dark?0:Math.max(0,eBase+eLabor+eMat),
+    eBase,eLabor,eMat
+  };
+}
+function revalueCookItem(it){ // 旧档菜式按同一套重估：耗料记作「名×N」，品级查厨下食材表
+  if(!it||!it.cook)return;
+  const rows=Array.isArray(it.materials)?it.materials:[];
+  let matValue=0,eMat=0;
+  for(const raw of rows){
+    const m=/^(.+?)\s*[×xX]\s*(\d+)$/.exec(String(raw||'').trim());
+    const name=(m?m[1]:String(raw||'')).trim();
+    const n=m?Math.max(1,Math.round(Number(m[2])||1)):1;
+    const meta=kitchenMetaOf(name)||craftMaterialMeta(name);
+    const tier=Math.max(1,Math.min(4,Math.round(Number(meta&&meta.tier)||1)));
+    matValue+=(CRAFT_MAT_VALUE[tier]||2)*n;
+    eMat+=Math.max(0,tier-1)*n;
+  }
+  eMat=Math.min(6,eMat);
+  const labor=it.dark?0:(COOK_LABOR[it.quality]||0);
+  it.matValue=matValue;it.labor=labor;
+  it.craftValue=Math.max(1,Math.round(it.dark?matValue*0.5:matValue+labor));
+  it.cookEnergy=it.dark?0:(COOK_RESTORE[it.quality]||0)+Math.round((Number(it.energy)||0)/10)+eMat;
+}
 function cookCommit(data,parsed,s){
   s=s||state;
   for(const m of data.materials){
@@ -9563,7 +9613,8 @@ function cookCommit(data,parsed,s){
   const qIdx=Math.max(0,COOK_QUALITY.indexOf(parsed.quality));
   const skillGain=1+(qIdx>=2?1:0);
   p.skills['烹饪']=Math.min(SKILL_MAX,oldSkill+skillGain);
-  const cookEnergy=parsed.dark?0:(qIdx>=4?8:qIdx>=3?5:qIdx>=2?3:0);
+  const worth=cookValueParts(parsed,data);
+  const cookEnergy=worth.cookEnergy;
   const item={
     name:parsed.name,count:1,kind:'食物',
     note:'小厨房·'+parsed.quality+(parsed.dark?'·黑暗料理':'')+'·'+parsed.traits.join('・'),
@@ -9573,6 +9624,7 @@ function cookCommit(data,parsed,s){
     inspiration:data.inspiration,
     materials:data.materials.map(m=>m.name+'×'+m.count),
     energy:data.energy,maker:p.name||'',madeAt:fmtTime(),
+    matValue:worth.matValue,labor:worth.labor,craftValue:worth.value,
     cookEnergy,cookQi:!parsed.dark&&qIdx>=2,cookGlow:!parsed.dark&&qIdx>=4,
     skillGain
   };
