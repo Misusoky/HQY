@@ -2008,6 +2008,131 @@ function autoExpireStalePlots(adj){ // 发酵条目模型连续不理会：计 s
 }
 function cur_note(p){return (p.note?p.note+'；':'')}
 
+/* ============================================================ 本旬插曲（写死的牌堆）
+   前端每旬抽一张小插曲，作为「本旬发生的一件小事」交给模型演。
+   牌面只写条件与底本，不写固定人名：人名、地点、旧事由当前存档填。
+   每旬至多一张；本旬已有到期引线／暗流／节宴／来客／偶遇时不抽，避免压过大戏。 */
+const INTERLUDE_CHANCE=0.45, INTERLUDE_COOLDOWN=12;
+const INTERLUDE_SEASON={1:'春',2:'春',3:'春',4:'夏',5:'夏',6:'夏',7:'秋',8:'秋',9:'秋',10:'冬',11:'冬',12:'冬'};
+function interludeSeasonOf(s){return INTERLUDE_SEASON[Number((s&&s.time&&s.time.month)||1)]||'春'}
+function interludePick(a){return Array.isArray(a)&&a.length?a[Math.floor(Math.random()*a.length)]:null}
+function interludeNeighbors(s){
+  const out=[];
+  const add=id=>{
+    if(!id||out.includes(id))return;
+    if(/皇帝|太后|皇后/.test(id))return; // 帝、太后、中宫不按“邻宫”送吃食
+    const n=(s.npcs||{})[id]||{};
+    if(!rankTitleOf(id)&&!rankTitleOf(n.rank||''))return; // 只留带位份的妃嫔，太医、宫人、外臣不在此列
+    out.push(id);
+  };
+  for(const id in (s.relationships||{}))add(id);
+  if(!out.length)for(const id in (s.npcs||{})){const n=s.npcs[id];if(n&&n.known&&n.rank)add(id)}
+  return out;
+}
+function interludeHostile(s){
+  const rels=s.relationships||{};
+  for(const id in rels){const r=rels[id]||{};if(r.type==='仇恨'||Number(r.value)<0)return id}
+  const sc=(s.schemes||[]).find(x=>x&&x.who);
+  return sc?sc.who:null;
+}
+function interludeOldThing(s){
+  const it=(s.inventory||[]).find(x=>x&&/御赐|旧|先皇后|绣样|手串|旧函|香囊|帕|信/.test(String(x.name||'')+String(x.note||'')));
+  return it?it.name:null;
+}
+const INTERLUDES=[
+  {id:'supply_short',title:'份例短了一截',cat:'宫务',tone:'bad',weight:3,cooldown:12,event:true,
+   check:s=>{const r=rankScoreOf((s.protagonist||{}).rank);const se=interludeSeasonOf(s);return r>=3&&r<=11&&(se==='冬'||se==='夏')},
+   build:s=>{
+     const winter=interludeSeasonOf(s)==='冬',thing=winter?'炭火':'冰例';
+     return {hook:`内务府送来的${thing}比上月短了一截，管事的只说“路上损耗”。`,
+       prompt:`内务府送来的${thing}比账上少了约两成，管事太监赔着笑说“路上损耗”，账册却记着足数。这事不大，却足够让宫里人看你的笑话。\n分寸：不是暗流发难，没有必须揪出的幕后黑手；可以问、可以忍、可以敲打自己宫里的人。若你查到经手人，最多得到一句名字或一句推脱，不要当场翻出大案。\n结算：只动银两、份例、宫人忠诚或一句可记的线索；不改位份、不触发暗流。`};
+   }},
+  {id:'maid_gossip',title:'廊下嘴碎',cat:'宫务',tone:'neutral',weight:3,cooldown:10,event:true,
+   check:s=>Array.isArray((s.protagonist||{}).maids)&&s.protagonist.maids.length>0,
+   build:s=>{
+     const maid=interludePick((s.protagonist||{}).maids)||'宫女';
+     return {hook:`两个宫女在廊下咬耳朵，见你过来立刻散了；其中一个是你屋里的${maid}。`,
+       prompt:`她们方才在议论一件与你有关的闲事——可能是别宫传来的话，也可能是你近来的行止。不是阴谋，只是嘴碎。\n分寸：可以装作没听见、当面问、暗中留意、或借别的事敲打一句。若追问，最多得到一句半真半假的传闻；若发作，宫人忠诚小损，且话会传得更快。不要写成有人要害你。\n结算：只动宫人忠诚、一句传闻或一点心绪，不改位份、不触发暗流。`};
+   }},
+  {id:'old_thing',title:'旧物触景',cat:'旧事',tone:'neutral',weight:2,cooldown:14,event:false,
+   check:s=>!!interludeOldThing(s)||!!(((s.emperor||{}).memories||[]).length),
+   build:s=>{
+     const thing=interludeOldThing(s)||'一只旧香囊';
+     return {hook:`收拾妆奁时，翻出一件旧物：${thing}。`,
+       prompt:`这件旧物牵出一段旧事——帝的旧赐、故人的手迹、母家带来的东西，依当前存档里真有的关系与旧事写，不得另编一段大历史。\n分寸：只写触景与心绪，可以收起来或摆出来；不给选项，不改数值、不立台账。若主控自己提起要送还或写信，再由你按实际记一条 statePatch.pending 或一句人情。`};
+   }},
+  {id:'neighbor_gift',title:'邻宫送糕',cat:'人情',tone:'good',weight:3,cooldown:10,event:true,
+   check:s=>interludeNeighbors(s).length>0,
+   build:s=>{
+     const who=interludePick(interludeNeighbors(s))||'邻宫';
+     const se=interludeSeasonOf(s);
+     const food=se==='春'?'枣泥糕':se==='夏'?'莲子酥':se==='秋'?'桂花糕':'栗粉糕';
+     return {hook:`${who}宫里的宫女送来一碟${food}，说“顺路，尝个鲜”。`,
+       prompt:`这是一次寻常人情往来，不是下毒试探，也不预设对方别有用心。\n分寸：可以收下并回一份礼、先验再吃、原样退回、或亲自去谢。收下回礼要花一点银两或欠一份小人情；退回会让对方没脸；验得太明显会被传“多心”。\n结算：只动少量银两、好感或一句宫中人议论，不改位份、不触发暗流。`};
+   }},
+  {id:'rain_cat',title:'雨夜猫',cat:'风物',tone:'neutral',weight:2,cooldown:8,event:false,
+   build:()=>({hook:'夜里落雨，檐下有只猫叫了半宿。',
+     prompt:'纯闲笔：写雨声、灯影、宫人要不要去赶猫，可带一句主控自己的心事。不安排人物登场，不设选择，不改数值，不立台账。'})},
+  {id:'rain_eaves',title:'午后急雨',cat:'风物',tone:'neutral',weight:2,cooldown:7,event:false,
+   build:()=>({hook:'午后一阵急雨，把檐下的铜铃打得乱响。',
+     prompt:'纯闲笔：写雨势、檐溜、廊下宫人收衣裳的动静，可带一句主控的走神。不安排人物登场，不设选择，不改数值，不立台账。'})},
+  {id:'flower_sprig',title:'案头花信',cat:'风物',tone:'good',weight:2,cooldown:9,event:false,
+   build:s=>{
+     const se=interludeSeasonOf(s);
+     const flower=se==='春'?'一枝杏花':se==='夏'?'半盏荷花':se==='秋'?'两枝木樨':'一枝早梅';
+     return {hook:`宫人从园里回来，顺手折了${flower}插在你案头。`,
+       prompt:'纯闲笔：写花气、瓶影、宫人一句闲话，可带一句主控对时令的感触。不安排人物登场，不设选择，不改数值，不立台账。'};
+   }},
+  {id:'wrong_message',title:'递错话',cat:'小人',tone:'bad',weight:2,cooldown:12,event:true,
+   check:s=>!!interludeHostile(s),
+   build:s=>{
+     const who=interludeHostile(s)||'一位近来不大来往的妃嫔';
+     return {hook:`一个小太监把别宫的话错递到了你门上，话里提到${who}。`,
+       prompt:`这不是暗流发难，只是一次错递；话里可能有一句有用的消息，也可能是有人借错递来挑拨。\n分寸：可以装没听见、追问、把话递回去、或告诉一个可信的人。若追问，最多得到一句模糊线索；若声张，可能得罪人，也可能让对方收敛。不要当场揭出大案，不要替主控断定真假。\n结算：只动一句线索、少量好感或一点风险；不改位份、不触发暗流。`};
+   }}
+];
+function interludeMetaOf(s){
+  s=s||state;
+  const m=(s.interludeMeta&&typeof s.interludeMeta==='object')?s.interludeMeta:{};
+  if(!m.last||typeof m.last!=='object')m.last={};
+  if(!m.seen||typeof m.seen!=='object')m.seen={};
+  m.turn=Number.isFinite(Number(m.turn))?Number(m.turn):-1;
+  s.interludeMeta=m;
+  return m;
+}
+function drawInterlude(s,ctx){
+  if(!s)return null;
+  const meta=interludeMetaOf(s),turn=Number(s.turn)||0;
+  if(meta.turn===turn)return null;
+  if(ctx&&ctx.bigEvent)return null;
+  meta.turn=turn; // 本旬只掷一次：掷不中也算用掉这一旬的插曲额度，免得多做几件事反复抽
+  if(Math.random()>=INTERLUDE_CHANCE)return null;
+  const pool=INTERLUDES.filter(c=>{
+    if(!c)return false;
+    if(c.once&&meta.seen[c.id])return false;
+    const last=Number(meta.last[c.id]);
+    if(Number.isFinite(last)&&turn-last<(c.cooldown||INTERLUDE_COOLDOWN))return false;
+    try{return !c.check||!!c.check(s,ctx)}catch(e){return false}
+  });
+  if(!pool.length)return null;
+  let total=0;for(const c of pool)total+=(Number(c.weight)||1);
+  let r=Math.random()*total,card=pool[pool.length-1];
+  for(const c of pool){r-=(Number(c.weight)||1);if(r<=0){card=c;break}}
+  let built={};
+  try{built=(card.build?card.build(s,ctx):{hook:card.hook||'',prompt:card.prompt||''})||{}}catch(e){built={}}
+  meta.last[card.id]=turn;meta.seen[card.id]=(meta.seen[card.id]||0)+1;
+  return {card,hook:built.hook||'',prompt:built.prompt||'',event:!!card.event,focus:(ctx&&ctx.focus)||''};
+}
+function interludePromptOf(d){
+  if(!d||!d.card)return '';
+  const c=d.card;
+  const mode=d.event
+    ? '这张插曲就是本旬唯一需要应对的事：hasEvent=true，给 2—4 个方向不同的选项后停下。它不是暗流发难，不预设有人害你，也不要当场翻出大案。'
+    : '这张插曲只是生活细节：hasEvent=false，不给选项，只写进正文，不改数值、不立台账。';
+  const focus=d.focus?`\n主控本旬原定安排是「${d.focus}」；插曲发生在其中或旁边，不要让她改掉原定的事。`:'';
+  return `【本旬插曲·${c.title}】（前端抽定；本旬就这一段小事，除此之外不要另起剧情）\n${d.hook}\n${d.prompt}${focus}\n${mode}\n若与主控本旬所做的事不搭，写成“事发生在身边／路上／回屋时”，不要打断她正在做的事，也不要替她改变原定安排。`;
+}
+
 /* ============================================================ 暗流账（Schemes）
    前端管"谁在何时动手"：每条图谋有布子、发难两个时刻；布子只给征兆，发难必演；不应对就真扣。
    模型只负责演，胜负由前端判定，不依赖模型自觉。 */
@@ -5514,6 +5639,7 @@ function normalizeState(s){
   if(!Array.isArray(s.plotMeta.seenMain))s.plotMeta.seenMain=s.plots.filter(p=>p.line==='主线'&&p.stage==='进行中').map(p=>p.id); // 首接：现有主线不补报；之后新发布的主线才弹窗
   if(!Array.isArray(s.schemes))s.schemes=[]; // 暗流账：旧档从空账开始，头几旬由前端按关系与位份起念
   s.schemeMeta=(s.schemeMeta&&typeof s.schemeMeta==='object')?s.schemeMeta:{lastSpawn:-99,tickTurn:-1};
+  s.interludeMeta=(s.interludeMeta&&typeof s.interludeMeta==='object')?s.interludeMeta:{turn:-1,last:{},seen:{}}; // 本旬插曲：已出的牌与冷却
   if(!s.readMindV1)s.readMindV1=true; // 读心笺已入常备货架，由 refreshShop 统一上架
   refreshShop(s); // 商城货色按旬轮换：旧档读入即对齐到当前轮次与新版价目
   if(!s.meetCardV1)s.meetCardV1=true; // 邂逅笺已入轮换珍品池，不必再单独补一件
@@ -5768,7 +5894,7 @@ function compactState(s,focusMsg){ // 只压缩送入模型的那一份，localS
   const out=Object.assign({},s);
   out.turn=xunNoOf(s.turn); // 对外统一 1 起旬号，与指令里的「第N旬」一致
   // 前端内部标记与展示字段不送模型
-  for(const k of ['avatarMap','plotMeta','schemeMeta','xunBook','saveVersion','plotLedgerV1','pawnFix1','itemFlagV1','readMindV1','energyWarned','mealCount','lastSalaryMonth','lastFestSerial','lastFestPerfSerial','items','skillWorks','pieceSeq','craftV1','chamberV1','xunIntent','inviteTurn','postpartumUntil','decor','factionFix1','lastConsortYear','openingWoo','longBuff','itemUseTurn'])delete out[k];
+  for(const k of ['avatarMap','plotMeta','schemeMeta','xunBook','saveVersion','plotLedgerV1','pawnFix1','itemFlagV1','readMindV1','energyWarned','mealCount','lastSalaryMonth','lastFestSerial','lastFestPerfSerial','items','skillWorks','pieceSeq','craftV1','chamberV1','xunIntent','inviteTurn','postpartumUntil','decor','factionFix1','lastConsortYear','openingWoo','longBuff','itemUseTurn','interludeMeta'])delete out[k];
   // 派系账：只送模型够写的部分；排期时刻与期限由前端管，不送出去免得照抄出错位的旬号
   if(Array.isArray(s.factions)){
     out.factions=s.factions.map(f=>({
@@ -6713,9 +6839,11 @@ const UI={
     const news=filterText(payload.haremNews||'');
     const todo=(payload.todo&&payload.todo.length)?`<div class="todo"><b>待续</b>　${esc(payload.todo.join('；'))}</div>`:'';
     const title=meta.choice?`<div class="card-title">应对</div>`:'';
+    const itl=(typeof Game!=='undefined'&&Game._lastInterlude)||null;
+    const itlTag=itl?`<span class="itag on" style="margin-left:6px">插曲·${esc(itl.card.title)}</span>`:'';
     this.pushCard(`<article class="turncard">
       <div class="card-head"><div>
-        <div class="card-focus">${meta.choice?'当场应对 ·':'本旬安排 · '}<b>${esc(meta.focus)}</b></div>${title}</div>
+        <div class="card-focus">${meta.choice?'当场应对 ·':'本旬安排 · '}<b>${esc(meta.focus)}</b>${itlTag}</div>${title}</div>
         ${this.seal()}</div>
       <div class="card-body">${esc(filterText(payload.narrative))}</div>
       ${news?`<div class="news"><b>后宫动态</b>${esc(news)}</div>`:''}
@@ -10128,6 +10256,7 @@ const Game={
     this.maybeIncomingVisit(); // 精力落到阈值：可能有人登门
   },
   round1(msg,focus,cost,opts){
+    Game._lastInterlude=null; // 每次行动重置：本旬插曲只在抽中的那一轮挂出去
     ensureXunBook(); // 先记本旬起点，再发起行动
     const schemeNotes=schemeTick(); // 暗流账：每旬只跑一次；旬首已跑过则此处为空
     for(const n of schemeNotes){
@@ -10151,6 +10280,13 @@ const Game={
     const craftHint=craftQuestHint();
     if(craftHint)msg+='\n【手作·新成品】'+craftHint;
     if(adj.text)msg+='\n'+adj.text;
+    // 本旬插曲：只在大戏之外抽；拜访、来客、节宴、求师、偶遇等自带说话人的场次不抽
+    const bigEvent=!!(adj.hit||adj.mainPub||adj.needMain||(adj.due&&adj.due.length)||(adj.overdue&&adj.overdue.length)||(adj.schemeFire&&adj.schemeFire.length)||adj.fest||adj.gardenMeet);
+    const sceneLike=!!(opts&&(opts._xunPop||opts.whoHint||opts.meetWho||(opts.mode&&(opts.mode.kind==='fest'||opts.mode.who))));
+    if(!bigEvent&&!sceneLike){
+      const itl=drawInterlude(state,{focus,bigEvent:false});
+      if(itl){Game._lastInterlude=itl;msg+='\n'+interludePromptOf(itl)}
+    }
     lastRequest={type:'r1',msg,focus,cost,opts};
     const settle=p=>{
       $('#mapview').classList.remove('on'); // 目的地行动落定即收起宫城图（加载层 z-60 本就叠在图上）
@@ -10185,13 +10321,14 @@ const Game={
       else{ // 无事发生：本旬结果原地弹窗呈现，不再经纪事中转
         this.backHome(); // 散步、赴宴等一过性外出到此收束：地点归回本宫住处
         const todo=(p.todo&&p.todo.length)?['待续：'+p.todo.join('；')]:[];
-        UI.actResult(focus,filterText(p.narrative),todo);
+        const itl=Game._lastInterlude;
+        UI.actResult(focus+(itl?` · 插曲「${itl.card.title}」`:''),filterText(p.narrative),todo);
       }
     };
     callModel(msg).then(raw=>{
       const p0=parsePayload(raw);
       const newMainIn=Array.isArray(p0.statePatch&&p0.statePatch.plots)&&p0.statePatch.plots.some(x=>x&&x.line==='主线'&&(!x.stage||x.stage==='进行中')); // 新主线已借正文或与发酵处置同场埋入并落账：hasEvent=false 也算兑现，不再纠正
-      const noEvent=((this._eventMandated(adj)&&!(adj.mainPub&&newMainIn))||(opts&&opts._xunPop))&&!p0.hasEvent; // 裁决要求触发而模型没触发：仍纠正一次（旬首发酵弹出为硬强制）
+      const noEvent=(((this._eventMandated(adj)||(this._lastInterlude&&this._lastInterlude.event))&&!(adj.mainPub&&newMainIn))||(opts&&opts._xunPop))&&!p0.hasEvent; // 裁决或插曲要求触发而模型没触发：仍纠正一次（旬首发酵弹出为硬强制）
       if(noEvent){
         const fixMsg=msg+`\n【纠正】前端剧情裁决已裁定本旬必须触发剧情（${this._mandateText(adj,opts)}），你却输出 hasEvent=false。请重新输出完整 JSON：hasEvent=true，用剧情对话 scene 结构呈现本轮剧情（scene.state="ongoing"、scene.parts 按语义分段：act 写对方动作神态，say 写对方台词，quote 写转述他人原话，narr 只写其他人物与客观场面，台词都不带引号、不按标点硬切；顶层 options 给 2—4 个接话选项），停下等待玩家应对、不结算后果；本旬养成过程简要并入 narrative。`;
         lastRequest={type:'r1',msg:fixMsg,focus,cost,opts};
@@ -10230,7 +10367,10 @@ const Game={
   _eventMandated(adj){return !!(adj&&((adj.schemeFire&&adj.schemeFire.length)||(adj.fest&&!adj.festSoft)||adj.due&&adj.due.length||adj.overdue&&adj.overdue.length||adj.hit||adj.mainPub||adj.gardenMeet||adj.empDue))},
   _mandateText(adj,opts){
     if(!adj)return '';
-    const names=[...(adj.overdue||[]),...(adj.due||[])].map(p=>`「${p.title}」到期须兑现`);
+    const names=[];
+    const itl=this._lastInterlude;
+    if(itl&&itl.event)names.push(`本旬插曲「${itl.card.title}」须当场应对`);
+    names.push(...[...(adj.overdue||[]),...(adj.due||[])].map(p=>`「${p.title}」到期须兑现`));
     if(adj.schemeFire&&adj.schemeFire.length)names.push(adj.schemeFire.map(s=>`「${s.who}」发难须当旬应对`).join('；'));
     if(adj.fest&&!adj.festSoft)names.push(`固定节宴「${adj.fest.name}」须当旬演出`);
     if(opts&&opts._mainPubPop)names.push('主线断档须以 scene 开新主线并落账');
@@ -10291,7 +10431,9 @@ const Game={
     const setup=filterText(p.narrative||'');
     const setupTail=setup?setup.split(/(?<=[。！？])/).filter(Boolean).slice(-2).join('').slice(-180):''; // 先交代在何处遇上谁，避免剧情凭空开始
     $('#incTitle').textContent=scheme?('暗流 · '+title):(title==='事发'?'事发':'事发 · '+title);
+    const itl=Game._lastInterlude;
     $('#incBody').innerHTML=(meta?`<div style="font-size:12px;color:var(--ink-soft);letter-spacing:.08em;margin-bottom:8px">${esc(meta)}</div>`:'')
+      +(itl?`<div style="margin-bottom:8px"><span class="itag on">本旬插曲·${esc(itl.card.title)}</span></div>`:'')
       +(setupTail&&setupTail!==lead?`<div style="line-height:1.9;margin-bottom:8px">${esc(setupTail)}</div>`:'')
       +`<div style="line-height:1.9">${esc(lead)}</div>`;
     Game._pendingEvent=p;
