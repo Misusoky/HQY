@@ -1,6 +1,6 @@
 /* 红墙引 · 离线缓存：首屏 HTML 走网络优先（保证 push 后能拿到新版），字体与图片走缓存优先。
    改了 assets 里的字体或图片，把 VERSION 加一：旧缓存会在下次激活时清掉，客户端随即换新。 */
-const VERSION = 'hqy-7';
+const VERSION = 'hqy-8';
 const ASSET_CACHE = VERSION + '·assets'; // 只有一本账：HTML、字体、图片、音频都存这里，VERSION 一加全部换新
 
 /* 页面首次加载完会发 precache：这些是每次启动都要用到的，先存下，之后离线也能开 */
