@@ -6278,7 +6278,7 @@ SCENE_PARTS_RULES,
 '【台词】每轮 scene.parts 至少一段 say：对方的原话必须落在 say 的 text 里（动作神态放 act，场面旁白放 narr），不得只写 act 就把台词吞掉，也不得把台词挪去 scene.line。若对方确实一言不发，须在 act 或 narr 里写明缘由（只摇了摇头、转身走了、把帘子放下），并照常给接话选项。',
 '【琐事不成场】核对簿册、传话、礼数、花色、茶点等，除非直接牵连位份/恩宠/银钱/子嗣/性命/把柄/派系/任务，否则不得单独成场。她手上的小事（断线、找物、缺人、赶不上时辰）只作场景底色：可以让你看见她的窘迫，但不由她先开口请你搭手——帮不帮由玩家自己提。',
 '【称谓】scene.parts 的 say/quote 中，人物提到天子一律称「陛下」，不得写「帝」；narr 与 narrative 等叙述仍称「帝」。',
-'【在场人】scene.who 写场上开口的那位在册人物的称谓（如「赵贵妃」「冯常在」；帝写「皇帝」），同一场沿用同一称呼，不得写「…」「⋯」「某人」「宫人」这类占位——写成占位，前端就查不到她的性情与交情，人物会当场走形。一轮里换人时在对应 part 标 who。',
+'【在场人】scene.who 写场上开口的那位在册人物的称谓（如「赵贵妃」「冯常在」；帝写「皇帝」，也可写「帝」），同一场沿用同一称呼，不得写「…」「⋯」「某人」「宫人」这类占位——写成占位，前端就查不到她的性情与交情，人物会当场走形。一轮里不止一人开口时，每一段 act/say 都要在 who 写明是谁（包括当前说话人的段），前端按 who 分气泡、换头像；没标 who 的台词按上一位说话人算。换个说话人先写一段 narr 交代过场，再让新人开口。',
 '【推进】不得原地盘问：问过并得到回答的事不再问、不换说法重问；关键信息一轮给足，不拆成多轮挤牙膏。问完必须给出自己的立场、条件或处置，不能只问不答。每轮至少推进一项：新信息、决定、态度/关系变化、后果或新的具体行动。',
 '【选项】本轮 options 与上一轮不同，不重复原句或同义改写，玩家已选过的方向不再作为选项；每个选项是不同策略（答应、拒绝、拖延、反将、求助、交换条件），并写出当下可见的机会或代价，不得全是「答：……」。从第二轮起至少一个选项是把事推进的动作（递出去、去见某人、当场办、暂且搁下、起身告退）。选项一律写成现场言行：括号内是她此刻的动作/神情/环境，括号外是当场说出口的原话，不带引号；不用转述口吻，不把「回殿后连夜理清」「次日送来」这类后话写进选项。整轮只做动作、不开口时，整个选项放括号里。',
 '【玩家】用户消息里「玩家应对」引号内的文字是主控这一轮的言行：括号内是动作/神情，括号外是当场说出口的话。NPC 只回应她实际做了与说了的，不得把她没开口的打算、离开之后的安排当成她当众说出的台词来复述或应答。',
@@ -8096,7 +8096,7 @@ const UI={
   },
   isEmperorId(who){
     const w=String(who||'').trim();
-    if(/^(皇帝|皇上|陛下|圣上|圣人|天子|万岁|今上|官家|大家)$/.test(w))return true; // 古代称谓都归到帝，正文里模型未必写「皇帝」
+    if(/^(皇帝|皇上|陛下|圣上|圣人|天子|万岁|今上|官家|大家|帝)$/.test(w))return true; // 古代称谓都归到帝：模型常把 who 写成单字「帝」
     return w==='皇帝'||(state.world&&state.world.emperor&&state.world.emperor.name===w)||(((state.relationships||{})[w]||{}).type==='宠爱');
   },
   empPill(who){ // 列表行知心徽标：只显阶段不显数字
@@ -10205,14 +10205,19 @@ function sceneHandoffTarget(parts,narr,cur){ // 该不该把对话人交回正�
   const presence=/御案|御笔|御前|御览|御座|御书|御膳|龙颜|龙袍|上首|天子/.test(scene)||/(^|[。！？；\s])(陛下|皇上|圣上)[，,]/.test(says);
   return presence?emperorSceneId():'';
 }
-function applySceneHandoff(parts,narr,cur){ // 交人：未标 who 的台词归正主，提到御用之物的动作也归正主，其余动作仍归原说话人
+function applySceneHandoff(parts,narr,cur){ // 交人：未标 who 的台词归正主，交人后的动作也归正主，宫人的陪衬动作仍归宫人
   const to=sceneHandoffTarget(parts,narr,cur);
   if(!to)return '';
+  const curName=String(cur||'');
+  const empSpeaks=(parts||[]).some(p=>p&&p.type==='say'&&isPlaceholderWho(p.who)); // 正主开口却没标 who：这时没点名的动作就是在写他
   for(const p of parts||[]){
     if(!p)continue;
     if(p.who&&p.type==='say'&&/朕|寡人/.test(String(p.text||''))&&canonicalSceneWho(p.who)!==to)p.who=to; // 帝自称的台词被错挂到旁人名下
     if(!isPlaceholderWho(p.who)||(p.type!=='act'&&p.type!=='say'))continue;
-    p.who=p.type==='say'?to:(/御|龙|朕|陛下|皇上|圣上|天子/.test(String(p.text||''))?to:cur);
+    if(p.type==='say'){p.who=to;continue}
+    const txt=String(p.text||'');
+    const aboutCur=(curName&&txt.includes(curName))||/奴才|奴婢|公公|太监|宫人|内侍|退到一边|退了出去/.test(txt); // 明确写宫人的动作：仍归他
+    p.who=(/御|龙|朕|陛下|皇上|圣上|天子/.test(txt)||(empSpeaks&&!aboutCur))?to:cur;
   }
   return to;
 }
@@ -11691,13 +11696,23 @@ const Game={
     const fallback=who||(sceneCtx?sceneCtx.who:'');
     const proto=String((state&&state.protagonist&&state.protagonist.name)||'');
     parts=(Array.isArray(parts)?parts:[]).map(p=>Object.assign({},p));
-    // 没标 who 的动作，多半是下一位的过场（「（赵贵妃从廊那头过来）」后面跟着她的台词）：
-    // 先认后面最近一个标了人的段，再认前面；否则这条动作会被塞进上一位的气泡，看着像没换人
+    // 没标 who 的段认人：
+    // 台词是当前说话人接着说的，只往回认；若往后认，上一句就会被挂到下一位名下，同一只气泡里混进两个人的话。
+    // 动作默认也算当前说话人的；只有这条动作点名了后面那位（「（赵贵妃从廊那头过来）」），才算是对方的过场。
+    const nameHit=(text,whoId)=>{
+      const t=String(text||''),w=String(whoId||'').trim();if(!t||!w)return false;
+      if(t.includes(w))return true;
+      const n=(state&&state.npcs||{})[w]||Object.values((state&&state.npcs)||{}).find(x=>x&&(x.name===w||x.realName===w))||{};
+      for(const nm of [n.name,n.realName,dispName(w)]){const s=String(nm||'').trim();if(s.length>=2&&t.includes(s))return true}
+      return false;
+    };
     for(let i=0;i<parts.length;i++){
       const p=parts[i];
       if(!p||p.who||(p.type!=='act'&&p.type!=='say'))continue;
       let pick='';
-      for(let j=i+1;j<parts.length;j++){const q=parts[j];if(!q||q.type==='narr'||q.type==='quote')break;if(q.who){pick=q.who;break}}
+      if(p.type==='act'){
+        for(let j=i+1;j<parts.length;j++){const q=parts[j];if(!q||q.type==='narr'||q.type==='quote')break;if(q.who){if(nameHit(p.text,q.who))pick=q.who;break}}
+      }
       if(!pick)for(let j=i-1;j>=0;j--){const q=parts[j];if(!q||q.type==='narr'||q.type==='quote')break;if(q.who){pick=q.who;break}}
       if(pick)p.who=pick;
     }
@@ -11720,7 +11735,7 @@ const Game={
       if(!group.length)return;
       const segs=group.map(p=>p.type==='act'?{act:p.text}:{text:p.text});
       const plain=group.map(p=>p.type==='act'?'（'+p.text+'）':p.text).join('');
-      const speaker=groupWho||fallback;
+      const speaker=groupWho||who||(sceneCtx?sceneCtx.who:'')||fallback; // 未标人的段归“此刻的”说话人，上一段换过人也要跟上
       applySpeaker(speaker,group.some(p=>p.type==='say'||p.type==='quote'));
       this.bubble('npc',speaker,'',segs);
       if(sceneCtx)sceneCtx.lines.push({who:'npc',name:speaker,text:plain});
@@ -12117,9 +12132,25 @@ const Game={
     }
     const plainChoice=!/[（(【]/.test(String(choice||'')); // 老式选项只有叙述、没标动作与台词：额外交代一句，别把打算当成她说出口的话
     const parseNote=plainChoice?'这一条没有用括号标出动作、也没标明哪句是说出口的原话：按她此刻的言行演绎，NPC 只回应她实际做了、说了的，不得把她心里的打算当作已说出口的承诺来复述。':'';
+    const whoNote='一轮里两人以上开口时，每段 act/say 都要标 who（含当前说话人的段），换人先写一句 narr 过场；没标 who 的台词按上一位说话人算。';
+    const addressee=(function(){ // 玩家点名冲另一个人说话：由那个人回应，别让当前对话人一直代答
+      const t=String(choice||'');if(!t||!state)return '';
+      const cur=String(sceneCtx.who||'');
+      const proto=String((state.protagonist||{}).name||'');
+      const hits=[];
+      for(const id in (state.npcs||{})){
+        const n=state.npcs[id]||{};if(!id||id===cur||id===proto)continue;
+        const names=[id,n.name,n.realName].filter(Boolean).map(String).filter(s=>s.length>=2);
+        if(names.some(nm=>t.includes(nm))&&!hits.includes(id))hits.push(id);
+      }
+      const emp=emperorSceneId();
+      if(emp&&emp!==cur&&/陛下|皇上|圣上/.test(t)&&!hits.includes(emp))hits.push(emp); // 「陛下」：帝在场就交给帝
+      return hits.length===1?hits[0]:'';
+    })();
+    const addrNote=addressee?`这一轮玩家是冲「${addressee}」说的：由${addressee}本人回应（台词标 who，并把 scene.who 改为「${addressee}」），当前对话人${sceneCtx.who}只作陪衬，不得代他作答。`:'';
     const personaCue=npcActCue(sceneCtx.who);
     const relNote=relCue(sceneCtx.who);
-    let msg=`第${xunNo()}旬剧情对话第${r}轮：玩家应对「${choice}」（括号内是主控的动作/神情，括号外是当场说出口的话；未加括号的叙述按她此刻要说/要做的事理解，其中离开之后的安排不是她当众说出的台词）。${parseNote}演绎场上人物的当即反应与场面变化：scene.parts 总长 ≤120 字，另给 scene.ledger（逐条累积已确认的事）与 2—3 个接话选项（按【选项写法】）；scene.state 只写 "ongoing"，不结算数值。${banquet?'':`${sceneCtx.who}（或当场正主）必须回应玩家这一轮的言行，不能不作答就走。`}${handoffNote}${briefNote}${banquetNote}${optNote}${askedNote}${paceNote}${maidNote}${chamberNote}${personaCue?'\n【性情】'+personaCue:''}${relNote?'\n【分寸】'+relNote:''}`+this.sceneContextBlock();
+    let msg=`第${xunNo()}旬剧情对话第${r}轮：玩家应对「${choice}」（括号内是主控的动作/神情，括号外是当场说出口的话；未加括号的叙述按她此刻要说/要做的事理解，其中离开之后的安排不是她当众说出的台词）。${parseNote}演绎场上人物的当即反应与场面变化：scene.parts 总长 ≤120 字，另给 scene.ledger（逐条累积已确认的事）与 2—3 个接话选项（按【选项写法】）；scene.state 只写 "ongoing"，不结算数值。${addrNote?addrNote:banquet?'':`${sceneCtx.who}（或当场正主）必须回应玩家这一轮的言行，不能不作答就走。`}${handoffNote}${briefNote}${banquetNote}${optNote}${askedNote}${paceNote}${maidNote}${chamberNote}${whoNote?'\n【换人】'+whoNote:''}${personaCue?'\n【性情】'+personaCue:''}${relNote?'\n【分寸】'+relNote:''}`+this.sceneContextBlock();
     if(sceneCtx.chamber)msg=msg.replace(/她/g,'帝');
     this.requestScene(msg,choice,MAX_OUTPUT_TOKENS,true,true); // 正常接话轮永不结算：聊多久由玩家决定，点「结束对话」才收场
   },
