@@ -241,6 +241,8 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
 .segline .seg{flex:1;min-height:38px;border:1px solid var(--line-strong);border-radius:2px;background:var(--card);font-size:14px;letter-spacing:.14em;text-indent:.14em;color:var(--ink-soft)}
 .segline .seg:hover{border-color:var(--gold)}
 .segline .seg.on{border-color:var(--cinnabar);color:var(--cinnabar)}
+/* 宫谱内容区：固定高度，展开／收起分组与切换人物／派系都不改面板高度，只在框内滚动 */
+.gongpu-body{height:clamp(320px,52dvh,560px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding-right:2px}
 /* 藏书阁：按才艺折叠，一本书一行 */
 .libgroup{border-bottom:1px dashed var(--line)}
 .libgroup>summary{display:flex;align-items:center;gap:8px;min-height:44px;list-style:none;cursor:pointer;font-size:15px;letter-spacing:.04em}
@@ -8483,7 +8485,7 @@ const UI={
     const ids=Object.keys(npcs).filter(id=>npcs[id].known);
     const rels=Object.keys(state.relationships||{});
     const all=[...ids,...rels.filter(who=>!ids.includes(who))];
-    if(!all.length)return seg+'<div class="sec"><div class="sheet-note">尚无相识之人。</div></div>';
+    if(!all.length)return seg+'<div class="gongpu-body"><div class="sec"><div class="sheet-note">尚无相识之人。</div></div></div>';
     const row=who=>this.npcRowHtml(who,`UI.goSheet('NPC详情','${esc(who)}')`);
     const cls=who=>avatarClassOf(this.isEmperorId(who)?'皇帝':who,(npcs[who]&&npcs[who].rank)||'');
     const G={top:[],consort:[],maid:[],eunuch:[],misc:[]};
@@ -8494,8 +8496,8 @@ const UI={
     });
     const block=(label,list,open)=>list.length?`<details class="libgroup npcgroup"${open?' open':''}><summary>${label}（${list.length}）</summary>${list.map(row).join('')}</details>`:'';
     const topLabel=!G.top.length?'':(G.top.every(who=>cls(who)==='dowager')?'太后':(G.top.every(who=>cls(who)==='emperor')?'帝':'帝与太后'));
-    return seg+(G.top.length?`<div class="sec"><div class="sec-cap">${topLabel}</div>${G.top.map(row).join('')}</div>`:'')
-      +block('妃嫔',G.consort,true)+block('宫女',G.maid)+block('太监',G.eunuch)+block('其他',G.misc);
+    return seg+'<div class="gongpu-body">'+(G.top.length?`<div class="sec"><div class="sec-cap">${topLabel}</div>${G.top.map(row).join('')}</div>`:'')
+      +block('妃嫔',G.consort,true)+block('宫女',G.maid)+block('太监',G.eunuch)+block('其他',G.misc)+'</div>';
   },
   sheetFactions(){ // 宫中派系：只列主控可知的部分，暗中图谋仍在暗流账
     const fs=(state.factions||[]).slice();
@@ -8511,7 +8513,7 @@ const UI={
            <div class="rowline"><span class="rk">成员</span><span class="rv">${(own.members||[]).length?own.members.map(m=>esc(m)).join('、'):'尚无'}</span></div>`
         : `<button class="npcrow" style="width:100%"${canFound?'':' disabled style="opacity:.45"'} onclick="Game.foundFaction()"><span class="nr-name">自立一系</span><span class="nr-depth">${okRank?'':'须嫔及以上'}　相熟 ${followers.length}/2　银两 ${Math.round(Number(me.silver)||0)}/30　精力 ${Math.round(Number(state.energy)||0)}/10</span></button>`)+
       `</div>`;
-    if(!fs.length)return seg+ownBlock+'<div class="sec"><div class="sheet-note">宫中尚无成形的派系。</div></div>';
+    if(!fs.length)return seg+'<div class="gongpu-body">'+ownBlock+'<div class="sec"><div class="sheet-note">宫中尚无成形的派系。</div></div></div>';
     const order={敌对:0,压制:1,观望:2,拉拢:3,盟友:4};
     fs.sort((a,b)=>(a.defunct?9:(order[a.attitude]??8))-(b.defunct?9:(order[b.attitude]??8)));
     const cards=fs.map(f=>{
@@ -8535,8 +8537,8 @@ const UI={
         ${notes?`<div class="sheet-note" style="margin-top:8px">最近动向<br>${notes}</div>`:''}
       </div>`;
     }).join('');
-    return seg+ownBlock+`<div class="sec"><div class="sec-cap">宫中派系（${fs.filter(f=>!f.defunct).length} 系在世）</div>${cards}</div>
-      <div class="sheet-note">只列听说过的成员。</div>`;
+    return seg+'<div class="gongpu-body">'+ownBlock+`<div class="sec"><div class="sec-cap">宫中派系（${fs.filter(f=>!f.defunct).length} 系在世）</div>${cards}</div>
+      <div class="sheet-note">只列听说过的成员。</div>`+'</div>';
   },
   mindSection(id){ // 对方对你：默认不可知；印象位即按钮，点击即耗读心笺一张即时生成，不落档
     const ta=npcSexOf(state,id)==='m'?'他':'她';
