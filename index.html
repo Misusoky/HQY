@@ -6692,12 +6692,14 @@ function applyPatch(patch){
       const wasActive={}; // 只认「本来就是进行中、这一轮被模型改成已兑现」的条目：新立的、重复发来的都不算任务完成
       for(const p of (state.plots||[]))if(p&&p.id)wasActive[p.id]=p.stage==='进行中';
       state.plots=mergePlots(state.plots,patch[k],xunSerial(state.time));
-      let newlyDone=0;
-      for(const p of (state.plots||[]))if(p&&p.id&&wasActive[p.id]&&p.stage==='已兑现')newlyDone++;
-      if(newlyDone){ // 任务兑现：前端发积分，翻手为云另补长赐，合成一句提示
-        const base=awardQuestPoints(newlyDone);
-        const bonus=longBuffQuestPoints(newlyDone,true);
-        toast(bonus?`任务兑现 ×${newlyDone}：积分 +${base}（含命途长赐 +${bonus}）`:`任务兑现 ×${newlyDone}：积分 +${base}`,3200);
+      const doneNow=[];
+      for(const p of (state.plots||[]))if(p&&p.id&&wasActive[p.id]&&p.stage==='已兑现')doneNow.push({id:p.id,title:p.title||p.id});
+      if(doneNow.length){ // 任务兑现：前端发积分，翻手为云另补长赐，提示里写明是哪几件
+        const base=awardQuestPoints(doneNow.length);
+        const bonus=longBuffQuestPoints(doneNow.length,true);
+        for(const d of doneNow){const p=(state.plots||[]).find(x=>x.id===d.id);if(p){p.paid=true;p.paidXun=xunSerial(state.time)}}
+        const names=doneNow.slice(0,2).map(d=>`「${d.title}」`).join('、')+(doneNow.length>2?`等 ${doneNow.length} 件`:'');
+        toast(`任务完成：${names} +${base} 分${bonus?`（另命途长赐 +${bonus}）`:''}`,3600);
       }
       for(const f of (state.factions||[])){ // 派系那一步已结：清掉当前一步，免得模型照着旧棋继续演
         if(!f.stepPlotId)continue;
@@ -6961,22 +6963,17 @@ function plotUrgency(){ // 只读视角：哪些到期、超期、搁置——�
     pendStale:((state&&state.pending)||[]).filter(x=>(state.turn||0)-(x.touch??state.turn)>=STALE_PLOT_XUN)
   };
 }
-function leadHintText(urg){ // 宫务·行事顶端的临期提示：同一件事只写一次，最多四条，多的只报条数
-  if(!state)return '';
-  const u=urg||plotUrgency();
-  const out=[],seen=new Set();
-  const add=(tag,txt)=>{const k=plotKeyOf(txt);if(!k||seen.has(k))return;seen.add(k);out.push(tag+txt)};
-  for(const p of u.overdue)add('【过期】',p.title);
-  for(const p of u.due)add('【到期】',p.title);
-  for(const p of u.stale)add('【搁置】',p.title);
-  for(const x of (state.pending||[])){
-    const t=pendText(x),k=plotKeyOf(t);
-    if(!k||seen.has(k))continue;
-    seen.add(k);
-    out.push(((state.turn||0)-(x.touch??state.turn)>=STALE_PLOT_XUN?'【琐事·挂久了】':'【琐事】')+t);
-  }
-  const head=out.slice(0,4);
-  return head.length?head.join('；')+(out.length>4?`；另有 ${out.length-4} 条`:''):'';
+function questPointsText(){ // 一条任务兑现能拿多少分：翻手为云另有长赐
+  const bonus=state&&state.mainLine&&state.mainLine.id==='fan'?10:0;
+  const total=QUEST_POINTS+bonus;
+  return bonus?`积分 +${total}（含命途长赐 +${bonus}）`:`积分 +${total}`;
+}
+function questRewardLine(p){ // 剧情详情里写清这条兑现给多少分、有没有发过
+  if(!p)return '';
+  if(String(p.id)===DESTINY_PLOT_ID)return '命途不另计任务积分';
+  if(p.stage==='已兑现')return p.paid?`已发 ${questPointsText()}`:'已了结，未计任务积分';
+  if(p.stage==='已作废')return '未兑现，不发积分';
+  return questPointsText();
 }
 
 /* ============================================================ UI */
@@ -7105,11 +7102,9 @@ const UI={
       return `<div class="sheet-note" style="margin:0 0 6px">这一旬先定个章法：</div>`+
         Game._openingOptions.map((t,i)=>`<button class="npcrow" onclick="Game.pickOpening(${i})"><span class="nr-name">${esc(t)}</span><span class="nr-depth">耗精力${focusEnergyCost(t)}</span></button>`).join('');
     }
-    const pend=leadHintText(); // 临期／过期／搁置：只读去重，最多四条
     const fest=festivalOf(state.time);
     const festNote=(fest&&state.lastFestSerial!==xunSerial(state.time))?`<div class="sheet-note" style="margin:0 0 8px">本旬节宴：<b>${esc(fest.name)}</b>（${esc(fest.scale)}）——座次、仪注与席上机缘见「局面」。</div>`:'';
     return `<div class="focus-cap">— 行事 · 精力 ${state.energy}／${ENERGY_MAX} —</div>`+festNote+this.festPerfHtml()+this.nightIntentHtml()+
-      (pend?`<div class="sheet-note" style="margin:0 0 8px">临期引线：${esc(pend)}</div>`:'')+
       `<div class="sec"><div class="sec-cap">自己安排一件</div>
         <textarea class="craftinsp" id="focusText" maxlength="120" placeholder="查一查份例的账 / 写封家书 / 差人去内务府领料 / 去给柳妃递句话…"></textarea>
         <div class="setbtns"><button class="btn btn-primary" onclick="Game.customFocus()">安排下去</button></div>
@@ -7255,6 +7250,7 @@ const UI={
         <div class="itemrow"><span>类别</span><span class="cnt">${esc(p.line)}</span></div>
         <div class="itemrow"><span>状态</span><span class="cnt">${esc(stageText)}</span></div>
         ${dueText?`<div class="itemrow"><span>期限</span><span class="cnt">${esc(dueText)}</span></div>`:''}
+        <div class="itemrow"><span>兑现</span><span class="cnt num">${esc(questRewardLine(p))}</span></div>
         ${p.earliest!=null?`<div class="itemrow"><span>起于</span><span class="cnt">${esc(serialTimeText(p.earliest))}</span></div>`:''}
         ${p.latest!=null?`<div class="itemrow"><span>限期</span><span class="cnt">${esc(serialTimeText(p.latest))}</span></div>`:''}
       </div>
