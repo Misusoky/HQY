@@ -4576,7 +4576,8 @@ function advanceSkillWork(k,skillName,mode,accepted,skillValue){ // 推进一件
     delete W[skillName];
     return {work:w,completed:true,piece:pc};
   }
-  const item={name:w.title,count:1,note:`功课·${skillName}`,usable:false,pawnable:true,crafted:true,category:w.kind,quality,traits,description,src:'功课',maker:(state.protagonist&&state.protagonist.name)||'',inspiration:`${skillName}·${w.kind}`};
+  const laborFor=CRAFT_QUALITY_VALUE[quality]||0; // 功课是自己练出来的，无料钱，只算工钱
+  const item={name:w.title,count:1,note:`功课·${skillName}`,usable:false,pawnable:true,crafted:true,category:w.kind,quality,traits,description,src:'功课',maker:(state.protagonist&&state.protagonist.name)||'',inspiration:`${skillName}·${w.kind}`,matValue:0,labor:laborFor,craftValue:Math.max(1,laborFor)};
   addToInventory([item]);
   delete W[skillName];
   return {work:w,completed:true,item};
@@ -5658,6 +5659,7 @@ function normalizeState(s){
   if(!s.pawnFix1){for(const it of s.inventory)it.pawnable=guessPawnable(it.name,it.note);s.pawnFix1=true} // 一次性重算可否典卖
   if(!s.itemFlagV1){for(const it of s.inventory)it.usable=guessUsable(it.name,it.note);s.itemFlagV1=true} // 旧档一次性重算可否使用
   for(const it of s.inventory)itemFlags(it); // 补齐缺失词条
+  for(const it of s.inventory)if(it.crafted&&it.matValue==null)revalueCraftItem(it); // 旧档手作按「料钱＋工钱」重估
   ensureCraftState(s); // 手作：补 craft 状态；旧档首次接入补一份入门材料
   migrateEmperor(s); // 恩宠账：旧档补知心/上次接触/共同经历（内部一次性守卫）
   migrateChamber(s); // 承宠账/孕事/皇嗣册：旧档补字段并从 world.heirs 文本尽量建档
@@ -5811,11 +5813,11 @@ function consumeInventoryRef(ref){ // 按对象引用扣一件；用尽即除名
   if(it.count<=0)state.inventory.splice(idx,1);
   return true;
 }
-function pawnPrice(it){ // 典卖估价：按质地分档（本地即时结算，通报主持人）
-  if(it&&it.crafted){ // 手作成品：按生成时记下的估价与品质走
+function pawnPrice(it){ // 典卖估价：手作按「料钱＋工钱」，其余按质地分档（本地即时结算，通报主持人）
+  if(it&&it.crafted){ // 手作成品：按生成时记下的估价；旧档未记则只算工钱
     const v=Number(it.craftValue);
     if(Number.isFinite(v)&&v>0)return Math.max(1,Math.round(v));
-    return CRAFT_QUALITY_VALUE[it.quality]||4;
+    return Math.max(2,CRAFT_QUALITY_VALUE[it.quality]||0);
   }
   const s=String(it.name||'')+String(it.note||'');
   if(/赤金|金错|东珠|红宝石|白玉|翡翠|玛瑙/.test(s))return 20;
@@ -7624,6 +7626,7 @@ const UI={
     const selList=Object.keys(craftSel.mats).map(name=>({name,count:craftSel.mats[name]}));
     const selText=selList.length?selList.map(x=>`${x.name}×${x.count}`).join('、'):'尚未放料';
     const total=selList.reduce((a,b)=>a+b.count,0);
+    const selMatValue=selList.reduce((a,x)=>{const m=mats.find(y=>y.name===x.name);const t=Math.max(1,Math.min(4,Math.round(Number(m&&m.tier)||1)));return a+(CRAFT_MAT_VALUE[t]||2)*x.count},0);
     const chips=[10,20,30,40,50].map(v=>`<button class="craftchip${craftSel.energy===v?' on':''}" ${energy<v?'disabled':''} onclick="Game.craftEnergy(${v})">${v}</button>`).join('');
     const v=Craft.validate({materials:selList,energy:craftSel.energy,inspiration:craftSel.inspiration});
     const errs=v.errors.filter(e=>e!=='先写一句灵感');
@@ -7647,7 +7650,7 @@ const UI={
         <textarea class="craftinsp" id="craftInsp" maxlength="${CRAFT_INSPIRATION_MAX}" placeholder="想做什么、给谁、要什么味道或样子？写得越具体，成品越容易合心意。" oninput="Game.craftInsp(this.value)">${esc(insp)}</textarea>
         <div class="craftcount" id="craftInspCount">${insp.length}／${CRAFT_INSPIRATION_MAX}</div></div>
       <div class="sec"><div class="sec-cap">本件用料</div>
-        <div class="craftsum"><b>${esc(selText)}</b>${total?`（${selList.length} 种 / ${total} 份）`:''}<br>投入精力 ${craftSel.energy}${errs.length?`<br><span style="color:var(--cinnabar)">${esc(errs[0])}</span>`:''}</div></div>
+        <div class="craftsum"><b>${esc(selText)}</b>${total?`（${selList.length} 种 / ${total} 份 · 料钱约 ${selMatValue} 两）`:''}<br>投入精力 ${craftSel.energy}${errs.length?`<br><span style="color:var(--cinnabar)">${esc(errs[0])}</span>`:''}</div></div>
       <button class="btn btn-primary" id="craftGo" style="letter-spacing:.14em;text-indent:.14em;font-size:15px;margin-top:14px" ${canGo?'':'disabled'} onclick="Game.craftSubmit()">开做 · 精力 −${craftSel.energy}</button>
       <div class="sheet-note">至多 ${CRAFT_MAX_KINDS} 种、${CRAFT_MAX_TOTAL} 份，同类。</div>`;
   },
@@ -8048,6 +8051,7 @@ const UI={
     const matRow=(it.mat&&!crafted)?`<div class="itemrow"><span>手作</span><span class="cnt">可作${esc(matKindLabel[it.matKind]||'手作')}材料，在手作面板放料</span></div>`:'';
     const craftedBlock=crafted?`<div class="itemrow"><span>类别</span><span class="cnt">${esc(it.category||'手作')} · ${it.src==='墨妙斋'?'亲笔':'手作'}</span></div>
       <div class="itemrow"><span>品质</span><span class="cnt"><span class="qbadge ${this.qualityClass(it.quality)}">${esc(it.quality||'—')}</span></span></div>
+      ${it.craftValue?`<div class="itemrow"><span>估价</span><span class="cnt num">料钱 ${esc(it.matValue||0)} ＋ 工钱 ${esc(it.labor||0)} ＝ ${esc(it.craftValue)} 两</span></div>`:''}
       ${Array.isArray(it.traits)&&it.traits.length?`<div class="rowline" style="align-items:flex-start"><span style="flex:none">特质</span><span class="cnt" style="text-align:right;max-width:70%">${it.traits.map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</span></div>`:''}
       ${it.description?wide(it.src==='墨妙斋'?'纸墨':'形貌',it.description):''}
       ${it.effect?wide('效用',it.effect):''}
@@ -8766,7 +8770,8 @@ const CRAFT_QUALITY_ALIAS={
   '珍品':'珍品','珍稀':'珍品','珍异':'珍品','极品':'珍品','上上品':'珍品',
   '绝品':'绝品','神品':'绝品','孤品':'绝品','传世':'绝品','无双':'绝品'
 };
-const CRAFT_QUALITY_VALUE={'粗陋':2,'寻常':4,'精巧':8,'珍品':16,'绝品':30};
+const CRAFT_QUALITY_VALUE={'粗陋':0,'寻常':4,'精巧':10,'珍品':20,'绝品':38}; // 品质→工钱，叠在料钱之上
+const CRAFT_MAT_VALUE={1:2,2:6,3:15,4:35};                              // 材料品级→每份折银（低于市价，买了再卖不划算）
 const CRAFT_ENERGY_MIN=10;
 const CRAFT_ENERGY_MAX=50;
 const CRAFT_MAX_KINDS=4;       // 一次最多放几种材料
@@ -9036,10 +9041,34 @@ function craftParse(raw,data){
   if(/剧毒|禁物|御赐|僭越|信物/.test(traits.join('')+description+effect))pawnable=false;
   return {name,category,quality,traits,description,effect,usable,pawnable};
 }
-function craftValueFor(parsed,data){
-  const base=CRAFT_QUALITY_VALUE[parsed.quality]||4;
-  const tierSum=(data.materials||[]).reduce((a,m)=>a+(Number(m.tier)||1),0);
-  return Math.max(1,Math.round(base+tierSum*0.5));
+function craftMaterialValue(mats){ // 料钱：按材料品级与份数折算
+  return (mats||[]).reduce((a,m)=>{
+    const tier=Math.max(1,Math.min(4,Math.round(Number(m&&m.tier)||1)));
+    const n=Math.max(1,Math.round(Number(m&&m.count)||1));
+    return a+(CRAFT_MAT_VALUE[tier]||2)*n;
+  },0);
+}
+function craftValueParts(parsed,data){ // 估价＝料钱＋工钱：料看品级与份数，工钱看品质
+  const matValue=craftMaterialValue(data.materials);
+  const labor=CRAFT_QUALITY_VALUE[parsed.quality]||0;
+  return {matValue,labor,value:Math.max(1,Math.round(matValue+labor))};
+}
+function revalueCraftItem(it){ // 旧档手作按「料钱＋工钱」重估：耗料记作「名×N」，按名查材料品级（书画查纸价）
+  if(!it||!it.crafted)return;
+  let matValue=0;
+  for(const raw of (Array.isArray(it.materials)?it.materials:[])){
+    const m=/^(.+?)\s*[×xX]\s*(\d+)$/.exec(String(raw||'').trim());
+    const name=(m?m[1]:String(raw||'')).trim();
+    const n=m?Math.max(1,Math.round(Number(m[2])||1)):1;
+    let unit=0;
+    const meta=CRAFT_MATERIALS[name];
+    if(meta)unit=CRAFT_MAT_VALUE[Math.max(1,Math.min(4,Math.round(Number(meta.tier)||1)))]||2;
+    else{const paper=STUDIO_PAPERS.find(pp=>pp.name===name);if(paper)unit=Number(paper.cost)||0}
+    matValue+=unit*n;
+  }
+  it.matValue=matValue;
+  it.labor=CRAFT_QUALITY_VALUE[it.quality]||0;
+  it.craftValue=Math.max(1,Math.round(it.matValue+it.labor));
 }
 function craftConsumeMaterials(s,mats){
   for(const m of mats){
@@ -9063,6 +9092,7 @@ function craftCommit(data,parsed,s){ // 校验通过且 API 返回成功后，�
   if((Number(s.energy)||0)<data.energy)throw new Error('精力不足，手作未成');
   craftConsumeMaterials(s,data.materials);
   s.energy=Math.max(0,Math.round((Number(s.energy)||0)-data.energy));
+  const worth=craftValueParts(parsed,data);
   const item={
     name:parsed.name,count:1,
     note:'手作·'+parsed.quality+'·'+parsed.traits.join('・'),
@@ -9074,7 +9104,7 @@ function craftCommit(data,parsed,s){ // 校验通过且 API 返回成功后，�
     energy:data.energy,
     maker:(s.protagonist&&s.protagonist.name)||'',
     madeAt:fmtTime(),
-    craftValue:craftValueFor(parsed,data)
+    matValue:worth.matValue,labor:worth.labor,craftValue:worth.value
   };
   craftPushItemTo(s,item); // 用捕获的存档入库：避免请求期间切换存档后写错档
   if(typeof acquiredThisTurn!=='undefined'&&Array.isArray(acquiredThisTurn)){
@@ -9776,7 +9806,8 @@ function studioMake(s,opt){ // 只生成作品与文案；扣银扣精力在 Gam
     quality,traits,description:studioDescribe(type,form,quality,paper,title),
     effect:'可作赠礼、陈设或典卖；懂书画的人，看得出其中工夫。',
     maker:p.name||'主控',materials:[paper.name],energy,
-    craftValue:(CRAFT_QUALITY_VALUE[quality]||4)+Math.round(paper.cost/3)
+    matValue:paper.cost,labor:CRAFT_QUALITY_VALUE[quality]||0,
+    craftValue:Math.max(1,paper.cost+(CRAFT_QUALITY_VALUE[quality]||0))
   };
   return {item,type,form,paper,energy,title,skill,quality,
     flavor:studioFlavor(type,quality,paper),score:Math.round(score)};
