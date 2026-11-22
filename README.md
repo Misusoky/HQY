@@ -8,7 +8,11 @@
 |---|---|
 | `index.html` | 游戏本体：界面、回合状态机、本地存档与模型调用（内联 CSS/JS） |
 | `sw.js` | PWA 离线缓存：HTML 网络优先，字体与图片缓存优先 |
-| `assets/` | 字体（前端只用子集）、头像、住处与宫城图、BGM、PWA 图标 |
+| `assets/scenes/` | 剧情场景底图：宫城图各处、庭院、御花园、他宫殿堂 |
+| `assets/rooms/` | 住处装潢（`suju.jpg` 为默认素居） |
+| `assets/ui/` | 开局封面、宫城图 |
+| `assets/audio/` | BGM |
+| `assets/` | 字体（前端只用子集）、头像、PWA 图标 |
 | `tools/subset-font.py` | 重新生成字体子集（改文案后用） |
 | `宫斗模拟器原料/` | 世界书、叙事文风、提示词与存档示例；内联文案的源头 |
 | `design/` | Kimi Design 源文件与设计令牌 |

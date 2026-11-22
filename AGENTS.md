@@ -3,6 +3,7 @@
 ## 代码结构
 
 - 交付物是单文件 `index.html`：CSS/JS 内联，无构建步骤、无外部依赖（字体、图片与音频放 `assets/`）。不要拆分为外部 CSS/JS。
+- 资源分目录：`assets/scenes/`（剧情场景底图，含御花园 `garden.jpg`、他宫殿堂 `hall.jpg`）、`assets/rooms/`（住处装潢，`suju.jpg` 为默认）、`assets/ui/`（封面 `cover.jpg`、宫城图 `map.jpg`）、`assets/audio/`（BGM）、`assets/avatars/`、`assets/icons/`、`assets/fonts/`。新图按用途归入对应目录，不要放在 `assets/` 根下。
 - PWA 离线缓存：`sw.js` 预缓存 `index.html`、子集字体与常驻图；导航请求走网络优先（push 后能拿到新版），字体与图片走缓存优先。页面在 `load` 后注册并 `postMessage({type:'precache'})`。**改了 `assets/` 里的字体或图片，必须把 `sw.js` 的 `VERSION` 加一**，否则老客户端会一直吃旧缓存。
 - 字体是子集：前端只引 `assets/fonts/zhuque-fangsong-subset.woff2`（GB2312 一级汉字＋本作文案用字，约 1.46MB）。完整字库 `zhuque-fangsong.woff2`（4.47MB）只作底本，不要在前端引用；新增界面文案若有个别字回落系统字体，跑 `python3 tools/subset-font.py` 重新生成（需 fonttools＋brotli）。
 - 内联文案（世界书、叙事文风、提示词、默认档）的源头是 `宫斗模拟器原料/`；改源文件后同步 `index.html` 中的常量。
@@ -40,7 +41,7 @@
 - 商城按「使用方式」分流（`SHOP_CATALOG[...].mode`）：instant 走前端即结（`SHOP_INSTANT`／`Game.useInstant`，不占回合、不耗精力，每旬限一件即效之物）；scene 走 `round1`，占本旬一轮；guard 随身／自动触发；system（读心笺、邂逅笺、移性符、易容膏）各有专用入口。货架＝`SHOP_STAPLES` 9 件常备＋`SHOP_GUARDS` 7 件护身常备＋`SHOP_ROTATE_POOL` 每 3 旬轮换 4 件；价目与词条只在 `SHOP_CATALOG` 维护。改货架或价目要升 `SHOP_VER`，旧档读入时才会重排；新增即时道具必须在 `useInstant` 写本地结算，不能只写 `fx` 交给模型。
 - 出宫与易容（`OUTINGS`／`FRAME_ACTS`／`hasPalacePass`／`disguiseActive`）：宫城图「出宫」不再直接拒绝，而是开 `sheetOuting`。门禁两条：御赐腰牌（`Game.askPalacePass`，宠爱 > 50 时向帝求得，入行囊「出宫腰牌」，可反复出入）或本旬易容。宫外去处四地（东市西市／茶楼／寺观／回府）在面板里点开各自的场景页，玩家在场景里点「逛市／听书／上香／回府探亲」才走 `Game.outing`，事毕回宫，`opts.mode.returnHome` 在结算后把 `state.location` 归回住处。易容膏在商城常备货里：`Game.openDisguisePick` 择一已相识之人（帝除外），写一句形貌，`state.disguise` 只在本旬有效，扣气血 10；`disguiseBrief` 与 `SCENE_RULES` 的【易容】条把「旁人只认这张脸、后果记在被冒名者名下」写进主提示与对话提示；`applyPatch` 在易容期间丢弃 `relationships.*`／`emperor.*`／主控位份与外貌威望忌惮交际的改动，免得账落到主控头上。`FRAME_ACTS` 的「借脸行事」必须落一条 `p-frame-*` 剧情账（模型漏写时 `round1.settle` 兜底补），用于栽赃。`nextTurn` 开头清掉 `state.disguise`；`compactState` 只送名字、位份与形容。
 - 马球场与骑射：宫城图「马球场」开 `UI.sheetHorse`；观赛走 `Game.horseWatch`（`round1`，10 精力），下场走 `Game.horseTrain`（本地结算，20 精力，不调模型）。骑射在 `SKILL_POOL` 但不在 `ART_SKILLS`（开局不预置、不进节宴献艺、不走求师／谱册／日常修习），只能在马球场练；`horseTrain` 按体质给 +1—3 点，骑射每跨过一个 20 的整槛，`constitutionBase` +1、气血同增 1（气血仍以 100 为顶，根基不设上限），骑射本身也不设上限。`SKILL_MAX` 已改为 `Infinity`，`applyPatch` 对 `protagonist.constitutionBase` 只保留 30 的下限、不再夹 90。`烹饪` 只在 `SKILL_POOL` 与才艺面板留一个「待细做」位，不进 `ART_SKILLS`、不预置、不能修习；后续细做时再接菜谱与成品。
-- 场景页与底图：宫城图每个去处先开 `#placeview`（顶栏＋整屏底图＋底部行动单），玩家择行动才进 `round1`——不要改回「点地点即开局」。住处另有「庭院」（热区在门口右下，与「出门」隔开）直接进同一套场景页，院内「子女」进 `nursery`、「小厨房」进 `kitchen`，两处只搭壳（`go:'shell'` 弹一句「尚未细做」），内容待做。去处、行动单与返回层级只在 `PLACES` 维护（`back:'home'` 回住处、`back:<placeKey>` 回上一层、其余回宫城图；`Game.enterPlace`／`renderPlaceActs`／`placeAct`／`placeBack`），`Game._place` 记当前场景，为空即已回住处。底图放 `assets/places/`，缺图按 `bg → fallback → 御花园` 逐层落下；御花园用 `assets/garden.jpg`，他宫殿堂仍用 `assets/hall.jpg`。剧情期间场景页不关：`showIncident` 的简报直接压在这张景上（`applySceneBg` 见 `_place` 即不换回住处）；`settle` 无事发生、`sceneDone`、`collapse`、`nextTurn`、来客登门五处由 `leavePlace()` 收页。剧情对话的 `#chatBg` 按 `scene.where`／当前场景铺一层 26% 的淡底图，自行行事（修习、问话等）没有对应场景图时保持留白；`chatview` 的 z-index 必须高于场景页（40 对 30），否则对话会被景压住。
+- 场景页与底图：宫城图每个去处先开 `#placeview`（顶栏＋整屏底图＋底部行动单），玩家择行动才进 `round1`——不要改回「点地点即开局」。住处另有「庭院」（热区在门口右下，与「出门」隔开）直接进同一套场景页，院内「子女」进 `nursery`、「小厨房」进 `kitchen`，两处只搭壳（`go:'shell'` 弹一句「尚未细做」），内容待做。去处、行动单与返回层级只在 `PLACES` 维护（`back:'home'` 回住处、`back:<placeKey>` 回上一层、其余回宫城图；`Game.enterPlace`／`renderPlaceActs`／`placeAct`／`placeBack`），`Game._place` 记当前场景，为空即已回住处。底图放 `assets/scenes/`，缺图按 `bg → fallback → 御花园` 逐层落下；御花园用 `assets/scenes/garden.jpg`，他宫殿堂仍用 `assets/scenes/hall.jpg`。剧情期间场景页不关：`showIncident` 的简报直接压在这张景上（`applySceneBg` 见 `_place` 即不换回住处）；`settle` 无事发生、`sceneDone`、`collapse`、`nextTurn`、来客登门五处由 `leavePlace()` 收页。剧情对话的 `#chatBg` 按 `scene.where`／当前场景铺一层 26% 的淡底图，自行行事（修习、问话等）没有对应场景图时保持留白；`chatview` 的 z-index 必须高于场景页（40 对 30），否则对话会被景压住。
 
 - 本旬插曲：`INTERLUDES` 牌堆由前端抽（`drawInterlude`）。只在本旬无到期引线／暗流／节宴／来客／偶遇时抽；每旬至多一张，`state.interludeMeta` 记冷却与已出牌。`round1` 把 `interludePromptOf` 拼进请求，叙事卡／结果弹窗／事发简报都会标「插曲」；event 牌若模型没写 `hasEvent=true` 会被纠正一次。牌面只写条件与底本，人名由当前存档填，不写死某档角色；不改暗流胜负、不改位份。
 - 行囊与藏书阁的展示：行囊按「作品／剧情／食品／道具」四栏（`ITEM_TABS`、`itemKindOf`；作品＝`crafted`，剧情＝不可用又不可卖的珍藏／文书，食品按名称词条，其余为道具），默认落在第一类有物的栏（`bagPane`／`bagPaneTouched`），手头谱册压成一行点进藏书阁。藏书阁按才艺折叠（`libOpen` + `<details>`，`UI.libToggle`），一本书一行、动作用 `minibtn`，有在手／已抄的组默认展开；别再改回逐本整块卡片与全宽按钮。
@@ -54,7 +55,7 @@
 
 ## 开局页
 
-- `#screen-start` 是全屏封面：背景 `assets/cover.jpg`（《红墙引》海报，书法标题与印章已烧录在图里），底部叠暗角渐变，主菜单按钮（继续/开新档/设置）浮于下方，**绢签式**样式（`#screen-start .btn` 作用域，弹窗与其他界面的 `.btn` 不要跟着改）。
+- `#screen-start` 是全屏封面：背景 `assets/ui/cover.jpg`（《红墙引》海报，书法标题与印章已烧录在图里），底部叠暗角渐变，主菜单按钮（继续/开新档/设置）浮于下方，**绢签式**样式（`#screen-start .btn` 作用域，弹窗与其他界面的 `.btn` 不要跟着改）。
 - 封面**不再叠加** HTML 标题/副标题/装饰（`title-cal/title-sub/ornament` 已移除，海报即标题视觉），也**禁止**添加任何说明性小字，包括版本号、build 号、字体、素材来源、署名等。用户已明确要求永久移除，不要恢复。
 
 ## 提交与推送

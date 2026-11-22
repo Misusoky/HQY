@@ -78,8 +78,8 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
 .screen{display:none;min-height:100dvh;flex-direction:column}
 .screen.active{display:flex}
 
-/* ---------- ① 开局页：封面＝《红墙引》海报（assets/cover.jpg），按钮＝绢签式 ---------- */
-#screen-start{position:relative;align-items:center;justify-content:flex-end;text-align:center;padding:calc(var(--sat) + 24px) 28px calc(var(--sab) + 34px);background:url(assets/cover.jpg) center/cover no-repeat #241f19}
+/* ---------- ① 开局页：封面＝《红墙引》海报（assets/ui/cover.jpg），按钮＝绢签式 ---------- */
+#screen-start{position:relative;align-items:center;justify-content:flex-end;text-align:center;padding:calc(var(--sat) + 24px) 28px calc(var(--sab) + 34px);background:url(assets/ui/cover.jpg) center/cover no-repeat #241f19}
 #screen-start::before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(26,18,12,.18),rgba(26,18,12,0) 26%,rgba(26,18,12,0) 50%,rgba(26,18,12,.66) 100%)}
 #screen-start>*{position:relative;z-index:1}
 .btn{display:flex;align-items:center;justify-content:center;width:100%;min-height:48px;border-radius:2px;font-size:15px;letter-spacing:.28em;text-indent:.28em;transition:border-color .2s,background .2s,box-shadow .2s,transform .1s}
@@ -382,7 +382,7 @@ button.itemrow .cnt{flex:none;max-width:48%;overflow:hidden;text-overflow:ellips
    ============================================================ */
 #screen-main{position:fixed;inset:0;overflow:hidden;background:#d8cdb8}
 /* 房间图占满全屏，锚定底部（顶部可裁），热区按同一裁剪框换算坐标 */
-.homebg{position:absolute;inset:0;z-index:0;background:url(assets/room.jpg) center bottom/cover no-repeat #d8cdb8}
+.homebg{position:absolute;inset:0;z-index:0;background:url(assets/rooms/suju.jpg) center bottom/cover no-repeat #d8cdb8}
 .homebg::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(30,25,18,.10),rgba(30,25,18,0) 18%,rgba(30,25,18,0) 72%,rgba(30,25,18,.22))}
 /* 顶栏：时间盒 + 位份/银两/积分 */
 .topbar{position:absolute;top:0;left:0;right:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--indigo);color:#f5efe3;padding:calc(var(--sat) + 10px) 14px 10px;box-shadow:0 1px 0 rgba(30,25,18,.3)}
@@ -503,9 +503,9 @@ button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:cente
 .chatview{position:fixed;inset:0;z-index:40;display:none;flex-direction:column;background:var(--paper)}
 .chatview.on{display:flex}
 /* 场景底图：淡在纸下，只作氛围；没有对应场景图时保持留白 */
-.chat-bg{position:absolute;inset:0;z-index:0;pointer-events:none;background:var(--paper);opacity:0;transition:opacity .4s}
-.chat-bg.on{opacity:1}
-.chat-bg::before{content:'';position:absolute;inset:0;background-image:var(--bg);background-position:center bottom;background-size:cover;background-repeat:no-repeat;opacity:.26}
+.chat-bg{position:absolute;inset:0;z-index:0;pointer-events:none}
+.chat-bg::before{content:'';position:absolute;inset:0;background-image:var(--bg);background-position:center bottom;background-size:cover;background-repeat:no-repeat;opacity:0;transition:opacity .4s}
+.chat-bg.on::before{opacity:.26}
 .chat-head,.chat-body,.chat-opts{position:relative;z-index:1}
 .chat-head{flex:none;display:flex;align-items:center;gap:10px;padding:calc(var(--sat) + 10px) 14px 10px;background:var(--indigo);color:#f5efe3}
 .chat-head button{color:#f5efe3;font-size:15px;min-height:34px;padding:0 4px}
@@ -576,7 +576,7 @@ button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:cente
 .map-head{flex:none;display:flex;align-items:center;gap:12px;padding:calc(var(--sat) + 10px) 14px 10px;background:var(--indigo);color:#f5efe3}
 .map-head button{color:#f5efe3;font-size:15px;min-height:34px;padding:0 4px}
 .map-head span{flex:1;font-size:16px;letter-spacing:.2em;text-align:center}
-.map-bg{flex:1;position:relative;background:url(assets/map.jpg) center/cover no-repeat #d8cdb8}
+.map-bg{flex:1;position:relative;background:url(assets/ui/map.jpg) center/cover no-repeat #d8cdb8}
 /* 场景页：进了门先看景，再择行事；底图按 PLACES 换，缺图时退到御花园 */
 .placeview{position:fixed;inset:0;z-index:30;display:none;flex-direction:column;background:#221d16}
 .placeview.on{display:flex}
@@ -1490,7 +1490,7 @@ const DEFAULT_SAVE = {"game": "带着系统去宫斗", "saveVersion": "v36", "tu
 /* 装潢：住处背景。素居默认拥有，其余每幅 10 两解锁，解锁后免费更换。 */
 const DECOR_COST=10;
 const DECOR_ROOMS=[
-  {id:'suju',name:'素居',file:'assets/room.jpg',thumb:'assets/rooms/thumbs/suju.jpg',cost:0},
+  {id:'suju',name:'素居',file:'assets/rooms/suju.jpg',thumb:'assets/rooms/thumbs/suju.jpg',cost:0},
   {id:'qingling',name:'青绫',file:'assets/rooms/qingling.jpg',thumb:'assets/rooms/thumbs/qingling.jpg',cost:DECOR_COST},
   {id:'zixiao',name:'紫绡',file:'assets/rooms/zixiao.jpg',thumb:'assets/rooms/thumbs/zixiao.jpg',cost:DECOR_COST},
   {id:'xuanlu',name:'玄炉',file:'assets/rooms/xuanlu.jpg',thumb:'assets/rooms/thumbs/xuanlu.jpg',cost:DECOR_COST},
@@ -5446,8 +5446,8 @@ function apiProfileActive(p,s){
    曲目按加入顺序命名：一、二、三……；新增曲目只需在 BGM_TRACKS 末尾追加一项。
    默认开启，受浏览器自动播放限制，首次点击页面后启动；设置里可随时切换曲目、开关与变速率。 */
 const BGM_TRACKS=[
-  {id:1,name:'一',src:'assets/bgm.m4a'},
-  {id:2,name:'二',src:'assets/bgm2-aac.m4a'}
+  {id:1,name:'一',src:'assets/audio/bgm.m4a'},
+  {id:2,name:'二',src:'assets/audio/bgm2-aac.m4a'}
 ];
 const BGM=(()=>{
   const FADE_MS=800,VOL=0.6;
@@ -9980,52 +9980,52 @@ const FRAME_ACTS={
   incense:{label:'寺观留名帖',desc:'上香时把她的名帖留在香案',
     body:d=>`往寺观上香，在香案或功德簿上留「${d.name}」的名帖，或替她捐一笔香火。写清庙里谁看见、记在何处；日后可被查证。`}
 };
-/* 宫城图各处的场景页：进门先看景，再择行事。底图在 assets/places/，缺图时退到御花园 */
-const PLACE_BG_FALLBACK='assets/garden.jpg';
+/* 宫城图各处的场景页：进门先看景，再择行事。底图在 assets/scenes/，缺图时退到御花园 */
+const PLACE_BG_FALLBACK='assets/scenes/garden.jpg';
 const PLACES={
-  yangxin:{name:'养心殿',keys:['养心殿','御案','御书房'],bg:'assets/places/yangxin.jpg',acts:[
+  yangxin:{name:'养心殿',keys:['养心殿','御案','御书房'],bg:'assets/scenes/yangxin.jpg',acts:[
     {label:'求见',go:'visitNpc',arg:'皇帝',cost:20},
     {label:'求出宫腰牌',go:'askPalacePass',cost:20,show:()=>chamberFavor()>50&&!hasPalacePass()}
   ]},
-  liugong:{name:'六宫',keys:['六宫','宫道','宫墙','长街','夹道'],bg:'assets/places/liugong.jpg',acts:[
+  liugong:{name:'六宫',keys:['六宫','宫道','宫墙','长街','夹道'],bg:'assets/scenes/liugong.jpg',acts:[
     {label:'往各宫拜访',go:'openPlaceSheet',arg:'六宫'}
   ]},
-  library:{name:'藏书阁',keys:['藏书阁','书阁'],bg:'assets/places/library.jpg',acts:[
+  library:{name:'藏书阁',keys:['藏书阁','书阁'],bg:'assets/scenes/library.jpg',acts:[
     {label:'寻书借阅',go:'openPlaceSheet',arg:'藏书阁'}
   ]},
-  studio:{name:'墨妙斋',keys:['墨妙斋'],bg:'assets/places/studio.jpg',acts:[
+  studio:{name:'墨妙斋',keys:['墨妙斋'],bg:'assets/scenes/studio.jpg',acts:[
     {label:'写字作画',go:'openPlaceSheet',arg:'墨妙斋'}
   ]},
-  hospital:{name:'太医院',keys:['太医院','太医署','药房'],bg:'assets/places/hospital.jpg',acts:[
+  hospital:{name:'太医院',keys:['太医院','太医署','药房'],bg:'assets/scenes/hospital.jpg',acts:[
     {label:'问医求药',go:'openPlaceSheet',arg:'太医院'}
   ]},
-  garden:{name:'御花园',keys:['御花园','花园','御苑','梅林','菊山'],bg:'assets/garden.jpg',acts:[
+  garden:{name:'御花园',keys:['御花园','花园','御苑','梅林','菊山'],bg:'assets/scenes/garden.jpg',acts:[
     {label:'闲逛',go:'gardenWalk',cost:10}
   ]},
-  polo:{name:'马球场',keys:['马球场','球场','马场'],bg:'assets/places/polo.jpg',acts:[
+  polo:{name:'马球场',keys:['马球场','球场','马场'],bg:'assets/scenes/polo.jpg',acts:[
     {label:'场边观赛',go:'horseWatch',cost:10},
     {label:'下场学骑射',go:'horseTrain',cost:20}
   ]},
-  market:{name:'东市西市',keys:['东市','西市','市集','街市','市井'],bg:'assets/places/market.jpg',acts:[
+  market:{name:'东市西市',keys:['东市','西市','市集','街市','市井'],bg:'assets/scenes/market.jpg',acts:[
     {label:'逛市',go:'outing',arg:'market',cost:10}
   ]},
-  teahouse:{name:'茶楼',keys:['茶楼','茶馆','茶肆'],bg:'assets/places/teahouse.jpg',acts:[
+  teahouse:{name:'茶楼',keys:['茶楼','茶馆','茶肆'],bg:'assets/scenes/teahouse.jpg',acts:[
     {label:'听书',go:'outing',arg:'teahouse',cost:10}
   ]},
-  temple:{name:'寺观',keys:['寺观','寺庙','道观','佛寺','山门','香火'],bg:'assets/places/temple.jpg',acts:[
+  temple:{name:'寺观',keys:['寺观','寺庙','道观','佛寺','山门','香火'],bg:'assets/scenes/temple.jpg',acts:[
     {label:'上香',go:'outing',arg:'temple',cost:10}
   ]},
-  family:{name:'回府',keys:['回府','娘家','府中','家宅','祖宅'],bg:'assets/places/family.jpg',acts:[
+  family:{name:'回府',keys:['回府','娘家','府中','家宅','祖宅'],bg:'assets/scenes/family.jpg',acts:[
     {label:'回府探亲',go:'outing',arg:'family',cost:20}
   ]},
-  courtyard:{name:'庭院',keys:['庭院','院中','天井'],bg:'assets/places/courtyard.jpg',back:'home',acts:[
+  courtyard:{name:'庭院',keys:['庭院','院中','天井'],bg:'assets/scenes/courtyard.jpg',back:'home',acts:[
     {label:'子女',go:'enterPlace',arg:'nursery'},
     {label:'小厨房',go:'enterPlace',arg:'kitchen'}
   ]},
-  nursery:{name:'子女的房间',keys:['子女的房间','儿女房','皇嗣房'],bg:'assets/places/nursery.jpg',fallback:'assets/places/courtyard.jpg',back:'courtyard',acts:[
+  nursery:{name:'子女的房间',keys:['子女的房间','儿女房','皇嗣房'],bg:'assets/scenes/nursery.jpg',fallback:'assets/scenes/courtyard.jpg',back:'courtyard',acts:[
     {label:'培养子女',go:'shell',key:'heirTeach'}
   ]},
-  kitchen:{name:'小厨房',keys:['小厨房','厨房','灶间'],bg:'assets/places/kitchen.jpg',fallback:'assets/places/courtyard.jpg',back:'courtyard',acts:[
+  kitchen:{name:'小厨房',keys:['小厨房','厨房','灶间'],bg:'assets/scenes/kitchen.jpg',fallback:'assets/scenes/courtyard.jpg',back:'courtyard',acts:[
     {label:'下厨',go:'shell',key:'cooking'}
   ]}
 };
@@ -10945,14 +10945,14 @@ const Game={
     const key=this.placeKeyOf(w);
     if(key)return PLACES[key].bg;
     const st=state||{},home=(st.world&&st.world.mainPalace)||((String(this.homeLocation()||st.location||'').match(/^([^殿宫阁轩堂斋楼]{1,9}[殿宫阁轩堂斋楼])/)||[])[1]||'');
-    if(home&&w.includes(home))return /正殿|主殿|中殿|殿中|正厅/.test(w)?'assets/hall.jpg':''; // 侧殿就是自己屋里
+    if(home&&w.includes(home))return /正殿|主殿|中殿|殿中|正厅/.test(w)?'assets/scenes/hall.jpg':''; // 侧殿就是自己屋里
     if(/住处|你的屋子|自己屋里/.test(w))return '';
-    if(/殿|宫|阁|轩|堂|斋|楼|暖阁|厢房|寝/.test(w))return 'assets/hall.jpg';
-    if(/园|苑|梅林|菊山|亭|池|廊|桥|石径|假山|山石|水边|院中|后院|庭院/.test(w))return 'assets/garden.jpg';
+    if(/殿|宫|阁|轩|堂|斋|楼|暖阁|厢房|寝/.test(w))return 'assets/scenes/hall.jpg';
+    if(/园|苑|梅林|菊山|亭|池|廊|桥|石径|假山|山石|水边|院中|后院|庭院/.test(w))return 'assets/scenes/garden.jpg';
     return '';
   },
   sceneBgFile(where){ // 事发简报压在主界面时用：比对话更宽，认不出的仍回本宫住处
-    return this.placeBgOf(where)||'assets/room.jpg';
+    return this.placeBgOf(where)||'assets/rooms/suju.jpg';
   },
   applySceneBg(where){
     if(this._place){ // 人在场景里：简报就压在这张景上；剧情确已换到别处才跟着换
