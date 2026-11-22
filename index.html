@@ -10032,6 +10032,7 @@ const PLACE_BY_NAME=Object.keys(PLACES).reduce((o,k)=>{o[PLACES[k].name]=k;retur
 /* ============================================================ 游戏流程 */
 const Game={
   _place:null, // 当前所处的场景页（PLACES 的键）；为空即已回住处
+  _placeCloseAfterResult:false, // 场景里的行动已结算：结果弹窗先压在景上，关闭弹窗再收场景页
   /* 开局 */
   continueGame(){
     const cur=loadCurrent();
@@ -10199,7 +10200,7 @@ const Game={
     $('#chatview').classList.remove('on');
     $('#chatBg').classList.remove('on');
     $('#mapview').classList.remove('on');
-    $('#placeview').classList.remove('on');this._place=null;
+    $('#placeview').classList.remove('on');this._place=null;this._placeCloseAfterResult=false;
     $('#scrim').classList.remove('on');
     $('#sheet').classList.remove('on');
     const cb=$('#chatBody');if(cb)cb.innerHTML='';
@@ -10430,6 +10431,7 @@ const Game={
     $('#mapview').classList.add('on');
   },
   leavePlace(){ // 事毕回住处：收起场景页；场景中触发的剧情、结果弹窗不再压在这张景上
+    this._placeCloseAfterResult=false;
     if(!this._place)return;
     this._place=null;
     $('#placeview').classList.remove('on');
@@ -10769,6 +10771,7 @@ const Game={
   dismissRest(){UI.hideRestTip();this.wake()},
   closeActResult(){
     $('#actModal').classList.remove('on');
+    if(this._placeCloseAfterResult)this.leavePlace(); // 出门行动的结果看完了，这才回住处
     if((state.energy??0)<=0){this.collapse();return}
     phase='FOCUS_SELECT'; // 本旬结果看完即回到可自由安排的状态（原先漏了复位，主界面会整片点不动）
     UI.goHome();
@@ -10856,7 +10859,7 @@ const Game={
       if(p.hasEvent&&(p.scene||(Array.isArray(p.options)&&p.options.length))){if(adj.fest)p._fest=adj.fest;this.showIncident(p)} // 先弹"事发"简报，确认后进剧情对话
       else{ // 无事发生：本旬结果原地弹窗呈现，不再经纪事中转
         this.backHome(); // 散步、赴宴等一过性外出到此收束：地点归回本宫住处
-        this.leavePlace(); // 场景页收起：结果弹窗回到住处，不压在外出的景上
+        this._placeCloseAfterResult=!!this._place; // 场景页留到结果弹窗关闭：别让结果压回住处
         const todo=(p.todo&&p.todo.length)?['待续：'+p.todo.join('；')]:[];
         const itl=Game._lastInterlude;
         UI.actResult(focus+(itl?` · 插曲「${itl.card.title}」`:''),filterText(p.narrative),todo);
@@ -11742,7 +11745,7 @@ const Game={
     $('#chatview').classList.remove('on');
     $('#chatBg').classList.remove('on');
     $('#mapview').classList.remove('on');
-    $('#placeview').classList.remove('on');this._place=null;
+    $('#placeview').classList.remove('on');this._place=null;this._placeCloseAfterResult=false;
     $('#dim').classList.remove('on');
     $('#hotspots').classList.remove('sleeping');
     $('#scrim').classList.remove('on');
