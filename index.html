@@ -48,6 +48,7 @@
   --sans:"Zhuque Fangsong","STFangsong","FangSong","仿宋","Songti SC","STSong","宋体","SimSun",serif;
   --serif:"Zhuque Fangsong","STFangsong","FangSong","仿宋","Songti SC","STSong","宋体","SimSun",serif;
   --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
+  --gbar-h:calc(54px + var(--sat)); /* 常驻顶栏实际高度：同步脚本会按实测值覆盖 */
   --sail:env(safe-area-inset-left,0px); --sair:env(safe-area-inset-right,0px);
 }
 @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
@@ -372,7 +373,7 @@ button.itemrow .cnt{flex:none;max-width:48%;overflow:hidden;text-overflow:ellips
 .toast.on{opacity:.92;transform:translateX(-50%) translateY(0)}
 
 /* 全局设置入口：压在加载/弹窗之上，对话与铺排中也能打开 */
-.global-set{position:fixed;right:0;top:calc(var(--sat) + 58px);z-index:67;display:none;flex-direction:column;align-items:center;justify-content:center;width:30px;padding:8px 0;border:1px solid rgba(245,239,227,.26);border-right:0;border-radius:2px 0 0 2px;background:rgba(45,40,33,.7);color:#f5efe3;font-family:var(--serif);font-size:12px;line-height:1.35;letter-spacing:.08em;backdrop-filter:blur(3px);box-shadow:-1px 1px 0 rgba(0,0,0,.18)}
+.global-set{position:fixed;right:0;top:calc(var(--gbar-h) + 2px);z-index:67;display:none;flex-direction:column;align-items:center;justify-content:center;width:30px;padding:8px 0;border:1px solid rgba(245,239,227,.26);border-right:0;border-radius:2px 0 0 2px;background:rgba(45,40,33,.7);color:#f5efe3;font-family:var(--serif);font-size:12px;line-height:1.35;letter-spacing:.08em;backdrop-filter:blur(3px);box-shadow:-1px 1px 0 rgba(0,0,0,.18)}
 .global-set.on{display:flex}
 .global-set:active{background:var(--cinnabar)}
 
@@ -385,13 +386,18 @@ button.itemrow .cnt{flex:none;max-width:48%;overflow:hidden;text-overflow:ellips
 .homebg{position:absolute;inset:0;z-index:0;background:url(assets/rooms/suju.jpg) center bottom/cover no-repeat #d8cdb8}
 .homebg::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(30,25,18,.10),rgba(30,25,18,0) 18%,rgba(30,25,18,0) 72%,rgba(30,25,18,.22))}
 /* 顶栏：时间盒 + 位份/银两/积分 */
-.topbar{position:absolute;top:0;left:0;right:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--indigo);color:#f5efe3;padding:calc(var(--sat) + 10px) 14px 10px;box-shadow:0 1px 0 rgba(30,25,18,.3)}
-.tb-time{flex:none;border:1px solid rgba(245,239,227,.75);outline:1px solid rgba(245,239,227,.35);outline-offset:2px;border-radius:2px;padding:6px 12px;color:#f5efe3;font-size:14px;letter-spacing:.12em;display:flex;gap:10px;align-items:baseline;background:transparent}
-.tb-stats{flex:1;display:flex;justify-content:space-around;gap:6px;text-align:center}
-.tstat{display:flex;flex-direction:column;line-height:1.3;min-width:52px}
+/* 常驻顶栏：所在、位份、精力、银两、积分（住处／宫城图／场景页／对话共用） */
+#globalbar{position:fixed;top:0;left:0;right:0;z-index:66;display:none;align-items:center;gap:8px;background:var(--indigo);color:#f5efe3;padding:calc(var(--sat) + 8px) 12px 8px;box-shadow:0 1px 0 rgba(30,25,18,.3)}
+#globalbar.on{display:flex}
+.gb-time{flex:none;display:flex;flex-direction:column;align-items:flex-start;gap:1px;border:1px solid rgba(245,239,227,.5);border-radius:2px;padding:3px 7px;color:#f5efe3;font-size:10.5px;letter-spacing:.04em;line-height:1.25;max-width:88px}
+.gb-time span{white-space:nowrap}
+.gb-stats{flex:1;display:flex;align-items:stretch;gap:2px;min-width:0}
+.tstat{display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.25;min-width:0}
 button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:center;font-size:inherit;font-family:inherit;color:inherit;cursor:pointer;appearance:none;-webkit-appearance:none}
-.tstat label{font-size:11px;color:rgba(245,239,227,.75)}
-.tstat b{font-size:17px;font-weight:600}
+#globalbar .tstat{flex:1 1 0}
+#globalbar .tstat label{font-size:9.5px;letter-spacing:.08em;color:rgba(245,239,227,.72);white-space:nowrap}
+#globalbar .tstat b{font-size:13px;font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-variant-numeric:tabular-nums}
+#globalbar .tstat.rank b{font-size:11.5px;letter-spacing:.04em;color:rgba(245,239,227,.92)}
 /* 热区 */
 .hotspots{position:absolute;inset:0;z-index:4}
 .hotspots.sleeping{pointer-events:none}
@@ -417,12 +423,6 @@ button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:cente
 .hs:active>span:not(.hs-badge)::before{border-color:rgba(166,58,46,.6)}
 /* 朱边小徽标（角标提示）：纸底朱边，如一方小印 */
 .hs-badge{margin-top:1px;display:inline-flex;align-items:center;justify-content:center;min-height:22px;padding:0 9px;background:#fdfbf5;border:1.5px solid #b0442f;border-radius:999px;color:#b0442f;font-size:11px;font-weight:700;letter-spacing:.06em;white-space:nowrap;box-shadow:0 1px 3px rgba(46,36,24,.3)}
-/* 精力条（三色，底部横条） */
-.energyrow{position:absolute;left:0;right:0;bottom:calc(66px + var(--sab));z-index:5;display:flex;align-items:center;gap:12px;padding:12px 18px;background:transparent;border-top:none}
-.energyrow .elabel{font-size:15px;color:#33302A;flex:none;text-shadow:0 1px 3px rgba(245,239,227,.9),0 0 6px rgba(245,239,227,.7)}
-.etrack{flex:1;height:12px;border-radius:999px;background:#e6dccb;border:1px solid rgba(43,38,32,.18);overflow:hidden}
-.etrack>i{display:block;height:100%;border-radius:999px;transition:width .35s,background .35s}
-.energyrow b{flex:none;font-size:14px;color:#33302A;min-width:64px;text-align:right;text-shadow:0 1px 3px rgba(245,239,227,.9),0 0 6px rgba(245,239,227,.7)}
 #screen-main .tabbar{position:absolute;top:auto;left:0;right:0;bottom:0}
 /* 底部胶囊按钮（弹窗/旬末用） */
 /* 才艺修习面板（v2 圆角卡片网格） */
@@ -500,18 +500,18 @@ button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:cente
 @keyframes poemIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 
 /* 剧情对话：全屏聊天气泡界面 */
-.chatview{position:fixed;inset:0;z-index:40;display:none;flex-direction:column;background:var(--paper)}
+.chatview{position:fixed;inset:0;z-index:40;display:none;flex-direction:column;background:var(--paper);padding-top:var(--gbar-h)}
 .chatview.on{display:flex}
 /* 场景底图：淡在纸下，只作氛围；没有对应场景图时保持留白 */
 .chat-bg{position:absolute;inset:0;z-index:0;pointer-events:none}
 .chat-bg::before{content:'';position:absolute;inset:0;background-image:var(--bg);background-position:center bottom;background-size:cover;background-repeat:no-repeat;opacity:0;transition:opacity .4s}
 .chat-bg.on::before{opacity:.26}
 .chat-head,.chat-body,.chat-opts{position:relative;z-index:1}
-.chat-head{flex:none;display:flex;align-items:center;gap:10px;padding:calc(var(--sat) + 10px) 14px 10px;background:var(--indigo);color:#f5efe3}
-.chat-head button{color:#f5efe3;font-size:15px;min-height:34px;padding:0 4px}
+.chat-head{flex:none;display:flex;align-items:center;gap:8px;height:38px;padding:0 10px;background:rgba(47,72,88,.88);color:#f5efe3}
+.chat-head button{color:#f5efe3;font-size:13px;min-height:30px;padding:0 4px;white-space:nowrap}
 .chat-head .ch-ava{display:flex;flex:none}
-.chat-head .ch-ava .av{width:30px;height:30px;border-color:rgba(245,239,227,.4)}
-.chat-head .ch-title{flex:1;font-size:16px;letter-spacing:.15em;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chat-head .ch-ava .av{width:24px;height:24px;border-color:rgba(245,239,227,.4)}
+.chat-head .ch-title{flex:1;font-size:13px;letter-spacing:.1em;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .chat-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px 12px 10px;display:flex;flex-direction:column;gap:14px}
 @keyframes bin{from{opacity:0;transform:translateY(6px)}to{opacity:1}}
 .msg{display:flex;gap:9px;max-width:88%;align-self:flex-start;align-items:flex-start;animation:bin .22s}
@@ -571,22 +571,20 @@ button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:cente
 .pc-btns{display:flex;gap:8px;margin-top:8px}
 .pc-btns .btn{flex:1;min-height:38px;font-size:13px;padding:0 8px}
 /* 宫城图：全屏目的地选择 */
-.mapview{position:fixed;inset:0;z-index:30;display:none;flex-direction:column;background:var(--paper)}
+.mapview{position:fixed;inset:0;z-index:30;display:none;flex-direction:column;background:var(--paper);padding-top:var(--gbar-h)}
 .mapview.on{display:flex}
-.map-head{flex:none;display:flex;align-items:center;gap:12px;padding:calc(var(--sat) + 10px) 14px 10px;background:var(--indigo);color:#f5efe3}
-.map-head button{color:#f5efe3;font-size:15px;min-height:34px;padding:0 4px}
-.map-head span{flex:1;font-size:16px;letter-spacing:.2em;text-align:center}
+.map-head{flex:none;display:flex;align-items:center;gap:10px;height:38px;padding:0 12px;background:rgba(47,72,88,.88);color:#f5efe3}
+.map-head button{color:#f5efe3;font-size:13px;min-height:30px;padding:0 4px;white-space:nowrap}
+.map-head span{flex:1;font-size:14px;letter-spacing:.16em;text-align:center}
 .map-bg{flex:1;position:relative;background:url(assets/ui/map.jpg) center/cover no-repeat #d8cdb8}
 /* 场景页：进了门先看景，再择行事；底图按 PLACES 换，缺图时退到御花园 */
-.placeview{position:fixed;inset:0;z-index:30;display:none;flex-direction:column;background:#221d16}
+.placeview{position:fixed;inset:0;z-index:30;display:none;flex-direction:column;background:#221d16;padding-top:var(--gbar-h)}
 .placeview.on{display:flex}
 .place-bg{position:absolute;inset:0;background-position:center bottom;background-size:cover;background-repeat:no-repeat;background-color:#d8cdb8}
 .place-bg::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(26,21,15,.38),rgba(26,21,15,.03) 26%,rgba(26,21,15,.05) 52%,rgba(26,21,15,.66) 100%)}
-.place-head{position:relative;z-index:2;flex:none;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;padding:calc(var(--sat) + 10px) 14px 10px;background:rgba(45,40,33,.74);color:#f5efe3;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
-.place-head button{justify-self:start;color:#f5efe3;font-size:15px;min-height:34px;padding:0 4px;white-space:nowrap}
-.place-head span{font-size:16px;letter-spacing:.2em;text-align:center;white-space:nowrap}
-.place-head .fh-time{justify-self:end;font-size:13px;letter-spacing:.04em}
-.map-head .fh-time{white-space:nowrap}
+.place-head{position:relative;z-index:2;flex:none;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;height:38px;padding:0 12px;background:rgba(47,72,88,.88);color:#f5efe3}
+.place-head button{justify-self:start;color:#f5efe3;font-size:13px;min-height:30px;padding:0 4px;white-space:nowrap}
+.place-head span{font-size:14px;letter-spacing:.16em;text-align:center;white-space:nowrap}
 .place-panel{position:relative;z-index:2;margin-top:auto;padding:0 16px calc(20px + var(--sab));display:flex;flex-direction:column;align-items:flex-start}
 .place-acts{display:flex;flex-direction:column;gap:8px;width:clamp(160px,52vw,210px)}
 .place-act{position:relative;display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;min-height:44px;padding:8px 15px 9px;border:1px solid rgba(43,38,32,.55);border-radius:2px;background:var(--grain),linear-gradient(165deg,rgba(246,237,216,.96),rgba(233,220,189,.94));-webkit-backdrop-filter:blur(1.5px);backdrop-filter:blur(1.5px);font-size:14px;font-weight:600;letter-spacing:.18em;text-indent:.18em;line-height:1;color:#33302A;text-align:left;text-shadow:0 1px 0 rgba(250,246,234,.6);box-shadow:0 1px 2px rgba(46,36,24,.2),0 6px 18px rgba(46,36,24,.24)}
@@ -625,6 +623,17 @@ button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:cente
   </div>
 </section>
 
+<!-- 常驻顶栏：对局内所有界面共用（住处／宫城图／场景页／剧情对话） -->
+<div class="gbar num" id="globalbar">
+  <button class="gb-time" onclick="UI.openSheet('局面')" title="局面"><span id="tbEra">—</span><span id="tbXun">—</span></button>
+  <div class="gb-stats">
+    <div class="tstat rank"><label>位份</label><b id="tbRank">—</b></div>
+    <div class="tstat"><label>精力</label><b id="tbEnergy">—</b></div>
+    <button class="tstat" onclick="Game.openMarket()" title="宫中采买"><label>银两</label><b id="tbSilver">—</b></button>
+    <button class="tstat" onclick="Game.openShop()" title="打开商城"><label>积分</label><b id="tbPoints">—</b></button>
+  </div>
+</div>
+
 <!-- ② 主界面（住处 · 整屏交互；房间图占满全屏，锚定底部，顶部可裁） -->
 <section id="screen-main" class="screen">
   <div class="homebg"></div>
@@ -636,16 +645,7 @@ button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:cente
     <button class="hs" data-x="0.90" data-y="0.60" onclick="Game.openSkills()"><i></i><span>才艺修习</span></button>
     <button class="hs" data-x="0.93" data-y="0.80" onclick="Game.openMeal()"><i></i><span>传膳</span></button>
   </div>
-  <div class="topbar num">
-    <button class="tb-time" onclick="UI.openSheet('局面')"><span id="tbEra">—</span><span id="tbXun">—</span></button>
-    <div class="tb-stats">
-      <div class="tstat"><label>位份</label><b id="tbRank">—</b></div>
-      <button class="tstat" onclick="Game.openMarket()" title="宫中采买"><label>银两</label><b id="tbSilver">—</b></button>
-      <button class="tstat" onclick="Game.openShop()" title="打开商城"><label>积分</label><b id="tbPoints">—</b></button>
-    </div>
-  </div>
   <div id="dim"></div>
-  <div class="energyrow num"><span class="elabel">精力</span><div class="etrack"><i id="eFill" style="width:100%;background:#33302A"></i></div><b id="eNum">100/100</b></div>
   <nav class="tabbar">
     <i class="nav-corners"></i>
     <button class="tab" data-tab="状态" onclick="UI.openSheet('状态',this)" aria-label="状态">
@@ -685,7 +685,7 @@ button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:cente
 <!-- 剧情对话：全屏聊天气泡 -->
 <div class="chatview" id="chatview">
   <div class="chat-bg" id="chatBg"></div>
-  <div class="chat-head num"><button onclick="Game.closeChat()">◀ 返回</button><span class="ch-ava" id="chatAva"></span><span class="ch-title" id="chatTitle">剧情对话</span><span class="fh-time" id="chatClock"></span></div>
+  <div class="chat-head num"><button onclick="Game.closeChat()">◀ 返回</button><span class="ch-ava" id="chatAva"></span><span class="ch-title" id="chatTitle">剧情对话</span></div>
   <div class="chat-body" id="chatBody"></div>
   <div class="chat-opts" id="chatOpts"></div>
   <nav class="tabbar chat-tabbar" id="chatTabbar">
@@ -710,7 +710,7 @@ button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:cente
 </div>
 <!-- 宫城图：出门选目的地 -->
 <div class="mapview" id="mapview">
-  <div class="map-head num"><button onclick="Game.mapBack()">◀ 住处</button><span>宫城图</span><span class="fh-time" id="mapClock"></span></div>
+  <div class="map-head num"><button onclick="Game.mapBack()">◀ 住处</button><span>宫城图</span></div>
   <div class="map-bg">
     <button class="hs" style="left:50%;top:47%" onclick="Game.mapGo('养心殿')"><i></i><span>养心殿</span></button>
     <button class="hs" style="left:23%;top:42%" onclick="Game.mapGo('六宫')"><i></i><span>六宫</span></button>
@@ -725,7 +725,7 @@ button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:cente
 <!-- 场景页：点目的地先进景，再择行事 -->
 <div class="placeview" id="placeview">
   <div class="place-bg" id="placeBg"></div>
-  <div class="place-head num"><button id="placeBackBtn" onclick="Game.placeBack()">◀ 宫城图</button><span id="placeTitle">—</span><span class="fh-time" id="placeClock"></span></div>
+  <div class="place-head num"><button id="placeBackBtn" onclick="Game.placeBack()">◀ 宫城图</button><span id="placeTitle">—</span></div>
   <div class="place-panel">
     <div class="place-acts" id="placeActs"></div>
   </div>
@@ -6829,14 +6829,20 @@ function finalize(payload,meta){
 /* ============================================================ UI */
 const UI={
   show(id){document.querySelectorAll('.screen').forEach(e=>e.classList.remove('active'));$(id).classList.add('active');window.scrollTo(0,0);this.syncGlobalSet()},
-  syncGlobalSet(){ // 全局设置入口：只在对局内的主界面上显示（对话/地图/弹窗层叠其上）
-    const el=$('#globalSet');if(!el)return;
+  syncGlobalSet(){ // 常驻顶栏与设置入口：对局内所有界面共用顶栏；设置只在没有全屏界面时浮出
+    const bar=$('#globalbar');
     const main=$('#screen-main');
     const on=!!(state&&main&&main.classList.contains('active')&&phase!=='PROFILE');
-    el.classList.toggle('on',on);
+    if(bar){
+      bar.classList.toggle('on',on);
+      if(on){const h=Math.round(bar.getBoundingClientRect().height);if(h)document.documentElement.style.setProperty('--gbar-h',h+'px')}
+    }
+    const el=$('#globalSet');if(!el)return;
+    const overlay=$('#chatview').classList.contains('on')||$('#mapview').classList.contains('on')||$('#placeview').classList.contains('on');
+    el.classList.toggle('on',on&&!overlay);
   },
-  updateStatusbar(){this.updateHomebar()}, // 状态统一由住处顶栏呈现
-  updateHomebar(){ // 住处顶栏 + 精力条（updateStatusbar 一并驱动）
+  updateStatusbar(){this.updateHomebar()}, // 状态统一由常驻顶栏呈现
+  updateHomebar(){ // 常驻顶栏：时间、位份、精力、银两、积分
     this.syncGlobalSet();
     if(!state||!state.protagonist)return;
     const p=state.protagonist;
@@ -6848,8 +6854,7 @@ const UI={
     $('#tbSilver').textContent=p.silver??'—';
     $('#tbPoints').textContent=p.points??'—';
     const e=Math.round(state.energy??ENERGY_MAX);
-    const ef=$('#eFill');if(ef){ef.style.width=clamp01_100(e)+'%';ef.style.background=e>50?'#33302A':(e>20?'#C08A3E':'#B0442F')}
-    const en=$('#eNum');if(en)en.textContent=e+'/'+ENERGY_MAX;
+    const en=$('#tbEnergy');if(en){en.textContent=e+'/'+ENERGY_MAX;en.style.color=e>50?'#f5efe3':(e>20?'#e8c98d':'#f2b8a8')}
     const now=xunSerial(state.time);
     const dueNow=(state.plots||[]).some(p=>p.stage==='进行中'&&p.latest!=null&&now>=p.latest&&(p.earliest==null||now>=p.earliest));
     const staleNow=(state.plots||[]).some(p=>p.stage==='进行中'&&p.latest==null&&(p.earliest==null||now>=p.earliest)&&now-(p.touch??now)>=STALE_PLOT_XUN);
@@ -6860,13 +6865,15 @@ const UI={
     const cw=box.clientWidth,ch=box.clientHeight;if(!cw||!ch)return;
     const s=Math.max(cw/804,ch/1748),dw=804*s,dh=1748*s;
     const ox=(cw-dw)/2,oy=ch-dh; // 锚定底部
-    const tb=document.querySelector('.topbar');const minY=(tb?tb.offsetHeight:72)+16;
-    const er=document.querySelector('#screen-main .energyrow');
-    const erTop=er?er.getBoundingClientRect().top:ch-118; // 精力条实际顶边：随底部安全区浮动，不能写死
+    const tb=document.querySelector('#globalbar');
+    if(tb&&tb.classList.contains('on')){const h=Math.round(tb.getBoundingClientRect().height);if(h)document.documentElement.style.setProperty('--gbar-h',h+'px')}
+    const minY=(tb?tb.offsetHeight:54)+16;
+    const nav=document.querySelector('#screen-main .tabbar');
+    const navTop=nav?nav.getBoundingClientRect().top:ch-66; // 页签实际顶边：随底部安全区浮动
     document.querySelectorAll('#hotspots .hs').forEach(el=>{
       const px=Math.min(Math.max(ox+parseFloat(el.dataset.x)*dw,58),cw-58);
       const halfH=(el.offsetHeight||54)/2;
-      const floor=el.classList.contains('hs-up')?erTop-16-halfH:ch-158; // 标签在上的键须整体停在精力条上方
+      const floor=el.classList.contains('hs-up')?navTop-16-halfH:ch-158; // 标签在上的键须整体停在页签上方
       const py=Math.min(Math.max(oy+parseFloat(el.dataset.y)*dh,minY),floor);
       el.style.left=px+'px';
       el.style.top=py+'px';
@@ -10332,12 +10339,11 @@ const Game={
       this.renderSceneOpts(sceneCtx.lastOptions);
     }
     $('#chatTitle').textContent='承宠 · 帝';
-    $('#chatClock').textContent=r.time||fmtTime(); // 本旬末的夜，不写成次日晨
     Game._chamberReport=null;
   },
-  hsGoOut(){if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}$('#mapClock').textContent=fmtTime();$('#mapview').classList.add('on')}, // 出门＝宫城图选目的地
+  hsGoOut(){if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}$('#mapview').classList.add('on');UI.syncGlobalSet()}, // 出门＝宫城图选目的地
   hsCourtyard(){if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}this.enterPlace('courtyard')}, // 住处门口的小院：子女房与小厨房都从这里进
-  mapBack(){$('#mapview').classList.remove('on')},
+  mapBack(){$('#mapview').classList.remove('on');UI.syncGlobalSet()},
   _gardenMeetPick(){ // 御花园偶遇人选：帝单独按恩宠掷骰，不与known人物挤同一个池子（池子越大越撞不见帝）；其余为太后与已认识的宫中人物
     const dg=disguiseActive(state); // 易容中：撞见被冒名者本人会当场穿帮，先从名册里摘掉
     if(state&&state.gardenMeetWhom){
@@ -10382,11 +10388,11 @@ const Game={
     this._place=key;
     $('#mapview').classList.remove('on');
     $('#placeTitle').textContent=p.name;
-    $('#placeClock').textContent=fmtTime();
     $('#placeBackBtn').textContent=p.back==='home'?'◀ 住处':(p.back&&PLACES[p.back]?'◀ '+PLACES[p.back].name:'◀ 宫城图');
     $('#placeBg').style.backgroundImage=this.bgLayers(key);
     this.renderPlaceActs();
     $('#placeview').classList.add('on');
+    UI.syncGlobalSet();
   },
   placeKeyOf(where){ // 只认确有其名的地方：用于挑场景图
     const w=String(where||'').trim();if(!w)return '';
@@ -10429,12 +10435,14 @@ const Game={
     $('#placeview').classList.remove('on');
     this._place=null;
     $('#mapview').classList.add('on');
+    UI.syncGlobalSet();
   },
   leavePlace(){ // 事毕回住处：收起场景页；场景中触发的剧情、结果弹窗不再压在这张景上
     this._placeCloseAfterResult=false;
     if(!this._place)return;
     this._place=null;
     $('#placeview').classList.remove('on');
+    UI.syncGlobalSet();
   },
   gardenWalk(){ // 御花园闲逛：风物、偶遇与康健
     if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
@@ -11217,6 +11225,7 @@ const Game={
     if(phase==='RESOLVING'){toast('正在结算本旬，稍候');return}
     if(phase==='EVENT_CHOICE'){toast('剧情未了，请先应对');return}
     $('#chatview').classList.remove('on');
+    UI.syncGlobalSet();
   },
   sceneMeta(sc){ // 场景地点/时辰标注：同一场里只在地点或时辰真正变化时显示，避免每轮重复
     if(!sceneCtx||!sc)return;
@@ -11263,13 +11272,13 @@ const Game={
     $('#chatTitle').textContent=sceneCtx.banquet?('宴席 · '+sceneCtx.banquet.name):('剧情对话 · '+dispName(sceneCtx.who));
     this.setChatBg(sc.where||(state&&state.location)); // 场景淡底图：本场有去处就铺，自行行事的对话仍留白
     $('#chatAva').innerHTML=avatarHtml(sceneCtx.who);
-    $('#chatClock').textContent=fmtTime();
     const body=$('#chatBody');body.innerHTML='';
     this.sceneMeta(sc);
     if(p.narrative){this.sayNarrative(p.narrative,!!parts);p._narrShown=true} // 有 parts 时 narrative 整段当旁白，不再按引号猜
     if(parts){this.sayParts(parts);p._narrShown=true} // 新协议：API 已按语义分好旁白与台词，直接渲染
     else{const opening=sc.line?filterText(sc.line):this.chatLead(p);this.sayLine(opening)} // 旧输出兜底：按引号拆
     $('#chatview').classList.add('on');
+    UI.syncGlobalSet();
     this.renderSceneOpts(sceneCtx.lastOptions); // 不再因模型写了 resolve 就开场即收场：聊不聊由玩家决定
   },
   renderSceneOpts(options){
@@ -11614,6 +11623,7 @@ const Game={
     sceneCtx=null;currentEvent=null;Game._pendingScheme=null;
     $('#chatview').classList.remove('on');
     $('#chatBg').classList.remove('on');
+    UI.syncGlobalSet();
     UI.goHome();toast(wasChamber?'天光渐亮，你回到住处':'本旬事了');
     const pendingDawn=!!Game._dawnPending;
     Game._dawnPending=false;
