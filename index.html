@@ -4894,7 +4894,7 @@ function personaLine(traits,tail){ // 由同一组性情生成 hidden 层的真�
   return s?s+'。':'';
 }
 /* ============================================================ 头像系统
-   「深宫群像 · 古风头像集」assets/avatars/1—33.jpg。
+   「深宫群像 · 古风头像集」assets/avatars/1—43.jpg（34—43 为后补的九张妃嫔像，40 出图有瑕未登记）。
    AVATAR_META 是人工逐张看图后的登记：身份池、性别、适龄区间、适配／相斥性情、外观注记。
    不是按文件名猜的，也不是按性情随机撒的——换图、加图必须先看原图再改这张表。
    发像规则：身份/性别/年龄先过关，再按性情选最合气质的一张；全档不重复。
@@ -4933,13 +4933,22 @@ const AVATAR_META={
   30:{cat:'eunuch',sex:'m',age:[22,32],persona:['圆滑','机敏'],avoid:[],note:'执拂尘的内侍'},
   31:{cat:'physician',sex:'m',age:[34,50],persona:['谨慎','圆滑'],avoid:[],note:'官帽长须，老太医'},
   32:{cat:'guard',sex:'m',age:[21,30],persona:['果决','坚忍','爽直'],avoid:[],note:'武冠甲胄，年轻侍卫'},
-  33:{cat:'dowager',sex:'f',age:[48,64],persona:['淡泊','谨慎','坚忍'],avoid:[],note:'素髻深衣，年长妇人'}
+  33:{cat:'dowager',sex:'f',age:[48,64],persona:['淡泊','谨慎','坚忍'],avoid:[],note:'素髻深衣，年长妇人'},
+  34:{cat:'consortHi',sex:'f',age:[38,46],persona:['温厚','大气','爽直','谨慎'],avoid:['怯懦','柔婉','清傲','骄矜'],note:'福相含笑，赤金点翠，绛紫团花'},
+  35:{cat:'consortHi',sex:'f',age:[25,33],persona:['柔婉','温厚','细腻','隐忍','谨慎'],avoid:['爽直','骄矜','果决','好胜'],note:'银珠冠白花，藕荷宫装，温软'},
+  36:{cat:'consortHi',sex:'f',age:[30,40],persona:['淡泊','孤傲','清傲','坚忍','谨慎'],avoid:['风趣','爽直','骄矜','好胜'],note:'素银冠青玉簪，墨绿立领，清冷'},
+  37:{cat:'consortHi',sex:'f',age:[23,31],persona:['骄矜','好胜','果决','多疑'],avoid:['怯懦','柔婉','温厚','淡泊','风趣'],note:'金凤衔珠，紫红织金，矜贵'},
+  38:{cat:'consort',sex:'f',age:[19,26],persona:['机敏','多疑','执拗','隐忍'],avoid:['温厚','爽直','大气','风趣','怯懦'],note:'鸦青素缎，偏髻斜簪，眼风冷'},
+  39:{cat:'consort',sex:'f',age:[20,27],persona:['爽直','果决','好胜','坚忍'],avoid:['柔婉','怯懦','温厚','淡泊','细腻'],note:'枣红窄袖，红绳圆髻，飒爽'},
+  41:{cat:'consort',sex:'f',age:[21,28],persona:['温厚','隐忍','谨慎','细腻'],avoid:['爽直','骄矜','好胜','果决'],note:'青蓝叠领，素簪低髻，带倦意'},
+  42:{cat:'consort',sex:'f',age:[15,20],persona:['柔婉','怯懦','细腻','温厚'],avoid:['爽直','果决','骄矜','好胜','大气'],note:'双髻粉花，圆眼怯生'},
+  43:{cat:'consort',sex:'f',age:[25,34],persona:['坚忍','执拗','淡泊','孤傲'],avoid:['风趣','柔婉','怯懦','骄矜','爽直'],note:'藏青素衣，辫髻银簪，目光倔'}
 };
 const AVATAR_POOLS={
   emperor:[1],
   prince:[2],
-  consortHi:[4,5,6,8,10,11,21],
-  consort:[7,9,13,15,17,19,20,23],
+  consortHi:[4,5,6,8,10,11,21,34,35,36,37],
+  consort:[7,9,13,15,17,19,20,23,38,39,41,42,43],
   dowager:[3,33],
   matron:[18,22,24,27],
   maid:[14,17,26],
@@ -4948,7 +4957,7 @@ const AVATAR_POOLS={
   physician:[31],
   princess:[12,16,25]
 };
-const AVATAR_FALLBACK={emperor:[1],prince:[2],consortHi:[4,5,6,8,10,11,21],consort:[7,9,13,15,17,19,20,23],maid:[14,17,26],matron:[18,22,24,27],princess:[12,16,25],eunuch:[29,30],guard:[32],physician:[31],dowager:[3,33]};
+const AVATAR_FALLBACK={emperor:[1],prince:[2],consortHi:[4,5,6,8,10,11,21,34,35,36,37],consort:[7,9,13,15,17,19,20,23,38,39,41,42,43],maid:[14,17,26],matron:[18,22,24,27],princess:[12,16,25],eunuch:[29,30],guard:[32],physician:[31],dowager:[3,33]};
 /* 头像只在本类池内分发；池子不够时，宁可在同类里重复一张脸，也不跨身份借图。
    单向放宽：低位可借高位图（consort→consortHi）、宫女可借掌事图（maid→matron）；反过来不行，高位不穿低位妆。 */
 const AVATAR_GROUPS={consort:['consort','consortHi'],consortHi:['consortHi'],maid:['maid','matron'],matron:['matron']};
