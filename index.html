@@ -10860,9 +10860,8 @@ const Game={
       else{ // 无事发生：本旬结果原地弹窗呈现，不再经纪事中转
         this.backHome(); // 散步、赴宴等一过性外出到此收束：地点归回本宫住处
         this._placeCloseAfterResult=!!this._place; // 场景页留到结果弹窗关闭：别让结果压回住处
-        const todo=(p.todo&&p.todo.length)?['待续：'+p.todo.join('；')]:[];
         const itl=Game._lastInterlude;
-        UI.actResult(focus+(itl?` · 插曲「${itl.card.title}」`:''),filterText(p.narrative),todo);
+        UI.actResult(focus+(itl?` · 插曲「${itl.card.title}」`:''),filterText(p.narrative),[]); // 结果弹窗只讲本旬做了什么：待续归局面页，不在弹窗末尾重复
       }
     };
     callModel(msg).then(raw=>{
