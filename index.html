@@ -500,8 +500,13 @@ button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:cente
 @keyframes poemIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 
 /* 剧情对话：全屏聊天气泡界面 */
-.chatview{position:fixed;inset:0;z-index:30;display:none;flex-direction:column;background:var(--paper)}
+.chatview{position:fixed;inset:0;z-index:40;display:none;flex-direction:column;background:var(--paper)}
 .chatview.on{display:flex}
+/* 场景底图：淡在纸下，只作氛围；没有对应场景图时保持留白 */
+.chat-bg{position:absolute;inset:0;z-index:0;pointer-events:none;background:var(--paper);opacity:0;transition:opacity .4s}
+.chat-bg.on{opacity:1}
+.chat-bg::before{content:'';position:absolute;inset:0;background-image:var(--bg);background-position:center bottom;background-size:cover;background-repeat:no-repeat;opacity:.26}
+.chat-head,.chat-body,.chat-opts{position:relative;z-index:1}
 .chat-head{flex:none;display:flex;align-items:center;gap:10px;padding:calc(var(--sat) + 10px) 14px 10px;background:var(--indigo);color:#f5efe3}
 .chat-head button{color:#f5efe3;font-size:15px;min-height:34px;padding:0 4px}
 .chat-head .ch-ava{display:flex;flex:none}
@@ -572,6 +577,24 @@ button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:cente
 .map-head button{color:#f5efe3;font-size:15px;min-height:34px;padding:0 4px}
 .map-head span{flex:1;font-size:16px;letter-spacing:.2em;text-align:center}
 .map-bg{flex:1;position:relative;background:url(assets/map.jpg) center/cover no-repeat #d8cdb8}
+/* 场景页：进了门先看景，再择行事；底图按 PLACES 换，缺图时退到御花园 */
+.placeview{position:fixed;inset:0;z-index:30;display:none;flex-direction:column;background:#221d16}
+.placeview.on{display:flex}
+.place-bg{position:absolute;inset:0;background-position:center bottom;background-size:cover;background-repeat:no-repeat;background-color:#d8cdb8}
+.place-bg::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(26,21,15,.38),rgba(26,21,15,.04) 26%,rgba(26,21,15,.05) 46%,rgba(26,21,15,.6) 100%)}
+.place-head{position:relative;z-index:2;flex:none;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;padding:calc(var(--sat) + 10px) 14px 10px;background:rgba(45,40,33,.74);color:#f5efe3;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.place-head button{justify-self:start;color:#f5efe3;font-size:15px;min-height:34px;padding:0 4px;white-space:nowrap}
+.place-head span{font-size:16px;letter-spacing:.2em;text-align:center;white-space:nowrap}
+.place-head .fh-time{justify-self:end;font-size:13px;letter-spacing:.04em}
+.map-head .fh-time{white-space:nowrap}
+.place-panel{position:relative;z-index:2;margin-top:auto;padding:34px 18px calc(20px + var(--sab));background:linear-gradient(180deg,rgba(245,239,227,0),rgba(245,239,227,.88) 15%,var(--paper) 38%)}
+.place-name{font-size:19px;letter-spacing:.28em;text-indent:.28em;text-align:center;color:var(--ink)}
+.place-name::before{content:'';display:inline-block;width:7px;height:7px;background:var(--cinnabar);margin-right:10px;vertical-align:2px}
+.place-acts{display:flex;flex-direction:column;gap:10px;max-width:360px;margin:16px auto 0}
+.place-act{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:54px;padding:0 16px;background:var(--grain),var(--card);border:1px solid var(--line-strong);border-radius:2px;font-size:16px;letter-spacing:.14em;text-indent:.14em;color:var(--ink);text-align:left}
+.place-act:active{border-color:var(--cinnabar);color:var(--cinnabar)}
+.place-act:disabled{opacity:.45}
+.place-act .pa-cost{flex:none;font-family:var(--sans);font-size:12px;letter-spacing:0;text-indent:0;color:var(--ink-soft)}
 </style>
 </head>
 <body>
@@ -660,6 +683,7 @@ button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:cente
 
 <!-- 剧情对话：全屏聊天气泡 -->
 <div class="chatview" id="chatview">
+  <div class="chat-bg" id="chatBg"></div>
   <div class="chat-head num"><button onclick="Game.closeChat()">◀ 返回</button><span class="ch-ava" id="chatAva"></span><span class="ch-title" id="chatTitle">剧情对话</span><span class="fh-time" id="chatClock"></span></div>
   <div class="chat-body" id="chatBody"></div>
   <div class="chat-opts" id="chatOpts"></div>
@@ -695,6 +719,15 @@ button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:cente
     <button class="hs" style="left:30%;top:71%" onclick="Game.mapGo('御花园')"><i></i><span>御花园</span></button>
     <button class="hs" style="left:70%;top:70%" onclick="Game.mapGo('马球场')"><i></i><span>马球场</span></button>
     <button class="hs" style="left:50%;top:88%" onclick="Game.mapGo('出宫')"><i></i><span>出宫</span></button>
+  </div>
+</div>
+<!-- 场景页：点目的地先进景，再择行事 -->
+<div class="placeview" id="placeview">
+  <div class="place-bg" id="placeBg"></div>
+  <div class="place-head num"><button onclick="Game.placeBack()">◀ 宫城图</button><span id="placeTitle">—</span><span class="fh-time" id="placeClock"></span></div>
+  <div class="place-panel">
+    <div class="place-name" id="placeName">—</div>
+    <div class="place-acts" id="placeActs"></div>
   </div>
 </div>
 <div class="restmodal" id="restModal">
@@ -8163,7 +8196,7 @@ const UI={
             <span class="nr-main"><span class="nr-name">囊中无易容膏</span><span class="nr-role">商城常备有售</span></span>
             <span class="nr-rel">去商城 ›</span></button>`}</div>`;
     }
-    const row=k=>{const o=OUTINGS[k];return `<button class="npcrow" onclick="Game.outing('${k}')">
+    const row=k=>{const o=OUTINGS[k];return `<button class="npcrow" onclick="Game.enterPlace('${k}')">
       <span class="nr-main"><span class="nr-name">${esc(o.label)}</span><span class="nr-role">${esc(o.desc)}</span></span>
       <span class="nr-rel num">精力 ${o.cost}</span></button>`};
     const frame=d?`<div class="sec"><div class="sec-cap">借脸行事</div>
@@ -9915,8 +9948,49 @@ const FRAME_ACTS={
   incense:{label:'寺观留名帖',desc:'上香时把她的名帖留在香案',
     body:d=>`往寺观上香，在香案或功德簿上留「${d.name}」的名帖，或替她捐一笔香火。写清庙里谁看见、记在何处；日后可被查证。`}
 };
+/* 宫城图各处的场景页：进门先看景，再择行事。底图在 assets/places/，缺图时退到御花园 */
+const PLACE_BG_FALLBACK='assets/garden.jpg';
+const PLACES={
+  yangxin:{name:'养心殿',keys:['养心殿','御案','御书房'],bg:'assets/places/yangxin.jpg',acts:[
+    {label:'求见',go:'visitNpc',arg:'皇帝',cost:20},
+    {label:'求出宫腰牌',go:'askPalacePass',cost:20,show:()=>chamberFavor()>50&&!hasPalacePass()}
+  ]},
+  liugong:{name:'六宫',keys:['六宫','宫道','宫墙','长街','夹道'],bg:'assets/places/liugong.jpg',acts:[
+    {label:'往各宫拜访',go:'openPlaceSheet',arg:'六宫'}
+  ]},
+  library:{name:'藏书阁',keys:['藏书阁','书阁'],bg:'assets/places/library.jpg',acts:[
+    {label:'寻书借阅',go:'openPlaceSheet',arg:'藏书阁'}
+  ]},
+  studio:{name:'墨妙斋',keys:['墨妙斋'],bg:'assets/places/studio.jpg',acts:[
+    {label:'写字作画',go:'openPlaceSheet',arg:'墨妙斋'}
+  ]},
+  hospital:{name:'太医院',keys:['太医院','太医署','药房'],bg:'assets/places/hospital.jpg',acts:[
+    {label:'问医求药',go:'openPlaceSheet',arg:'太医院'}
+  ]},
+  garden:{name:'御花园',keys:['御花园','花园','御苑','梅林','菊山'],bg:'assets/garden.jpg',acts:[
+    {label:'闲逛',go:'gardenWalk',cost:10}
+  ]},
+  polo:{name:'马球场',keys:['马球场','球场','马场'],bg:'assets/places/polo.jpg',acts:[
+    {label:'场边观赛',go:'horseWatch',cost:10},
+    {label:'下场学骑射',go:'horseTrain',cost:20}
+  ]},
+  market:{name:'东市西市',keys:['东市','西市','市集','街市','市井'],bg:'assets/places/market.jpg',acts:[
+    {label:'逛市',go:'outing',arg:'market',cost:10}
+  ]},
+  teahouse:{name:'茶楼',keys:['茶楼','茶馆','茶肆'],bg:'assets/places/teahouse.jpg',acts:[
+    {label:'听书',go:'outing',arg:'teahouse',cost:10}
+  ]},
+  temple:{name:'寺观',keys:['寺观','寺庙','道观','佛寺','山门','香火'],bg:'assets/places/temple.jpg',acts:[
+    {label:'上香',go:'outing',arg:'temple',cost:10}
+  ]},
+  family:{name:'回府',keys:['回府','娘家','府中','家宅','祖宅'],bg:'assets/places/family.jpg',acts:[
+    {label:'回府探亲',go:'outing',arg:'family',cost:20}
+  ]}
+};
+const PLACE_BY_NAME=Object.keys(PLACES).reduce((o,k)=>{o[PLACES[k].name]=k;return o},{});
 /* ============================================================ 游戏流程 */
 const Game={
+  _place:null, // 当前所处的场景页（PLACES 的键）；为空即已回住处
   /* 开局 */
   continueGame(){
     const cur=loadCurrent();
@@ -10082,7 +10156,9 @@ const Game={
       const el=document.getElementById(id);if(el)el.classList.remove('on');
     });
     $('#chatview').classList.remove('on');
+    $('#chatBg').classList.remove('on');
     $('#mapview').classList.remove('on');
+    $('#placeview').classList.remove('on');this._place=null;
     $('#scrim').classList.remove('on');
     $('#sheet').classList.remove('on');
     const cb=$('#chatBody');if(cb)cb.innerHTML='';
@@ -10249,42 +10325,76 @@ const Game={
       for(let i=0;i<w;i++)deck.push(id)}
     return deck[Math.floor(Math.random()*deck.length)];
   },
-  mapGo(place){ // 宫城图目的地：养心殿见驾、六宫访妃嫔、太医院问医、藏书阁寻书、墨妙斋写字作画、御花园散步闲逛、出宫（须腰牌或易容）
+  mapGo(place){ // 宫城图目的地：先进该处场景，再在里面择行事
     if(place==='出宫'){UI.openSheet('出宫');return} // 门禁与去处都在面板里：无腰牌时给出求牌／易容两条路
-    if(place==='养心殿'){this.visitNpc('皇帝');return}
-    if(place==='六宫'){UI.openSheet('六宫');return}       // 不关宫城图：面板浮在图上，拜访落定由 settle 收图
-    if(place==='太医院'){UI.openSheet('太医院');return}
-    if(place==='马球场'){UI.openSheet('马球场');return}   // 观赛、下场学骑射；骑射逢二十点根基+1
-    if(place==='藏书阁'){UI.openSheet('藏书阁');return}   // 面板浮在图上：借阅、寻书、研读都在阁内办
-    if(place==='墨妙斋'){ // 面板浮在图上：纸墨、写字、作画都在斋内办
-      if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
-      studioResult=null;UI.openSheet('墨妙斋');return
-    }
-    if(place==='御花园'){
-      if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
-      if((state.energy??0)<=0){$('#mapview').classList.remove('on');this.collapse();return}
-      const hits=matchLeads(['御花园','花园','散步']);
-      const phits=matchPending(['御花园','花园','散步']);
-      const leadHint=hits.length?`\n【呼应引线】园中散步与在途引线相关（按要紧程度排序）：${hits.map(p=>`「${p.title}」（${p.line}）`).join('；')}。可同场一并带出：挑与本旬情境真相关的演（撞见、听闻、想起要办的事），能兑现的当旬兑现并回写台账；不必每条都塞进对话，无新进展的不提也罢。每条引线散步/拜访最多被提示 ${ECHO_LEAD_TOTAL} 次，到顶后交回旬首处置，勿为凑交集硬编。`:'';
-      const pendHint=phits.length?`\n【呼应待续】园中散步与待续琐事相关：${phits.map(x=>pendText(x)).join('；')}。请顺势办理或想起此事，办妥的从 statePatch.pending 移除，未办妥的更新现状。`:'';
-      const walkNo=(Number(state.walkCount)||0)+1;state.walkCount=walkNo; // 康健收益每旬至多结算一次
-      const ti=Number(state.protagonist&&state.protagonist.attributes&&state.protagonist.attributes['体质'])||0;
-      const tb=Number(state.protagonist&&state.protagonist.constitutionBase)||0;
-      const gainNote=(walkNo>1)?'本旬康健收益已结算过，此次只演见闻、体质不再提升。'
-        :(tb>0&&ti>=tb)?'气血已达根基，散步只作维持、不再提升。'
-        :'体质正常且无疾病时，本次散步体质+1（恢复气血）——请写入 changes 与 statePatch。';
-      const meetWho=this._gardenMeetPick();
-      const forcedMeet=!!(meetWho&&state.gardenMeetWhom===meetWho); // 邂逅笺指认的人：不走概率，必遇
-      const meetHit=!!meetWho&&(forcedMeet||Math.random()<GARDEN_MEET_CHANCE); // 偶遇由前端代码掷骰硬约束，不交给提示词"随缘"
-      const forcedNote=forcedMeet?'此行是一次有意的“巧合”：正文不得提及道具、系统或“安排”，照常写成自然相遇；若对方本有避嫌、病中或久不召见，只作一次短暂照面，不必长谈。':'';
-      const meetNote=meetHit
-        ?`本轮偶遇骰已命中（概率 ${Math.round(GARDEN_MEET_CHANCE*100)}%）：玩家须在园中偶遇「${meetWho}」，用剧情对话 scene 结构呈现（scene.who 填「${meetWho}」，地点写园中所在）；顶层 narrative 先交代园中何处、如何照面、在场还有什么人（这段是开场旁白，不得留空，也不得塞进 parts 的 act），随后 parts 才进对方的第一句动作与台词；偶遇内容须与在途引线、双方关系或主控当前处境自然相关，给 2—4 个接话选项后停止，不结算应对后果；本轮 hasEvent 必须为 true。若主控与此人尚未照面（如帝、太后），按初见演绎：问安避让、自报家门、留下第一印象，事后经 dossier 建档。${forcedNote}`
-        :`本轮偶遇骰未命中（概率 ${Math.round(GARDEN_MEET_CHANCE*100)}%）：只演物候风景、宫人闲话等轻量见闻，不安排与具体人物的撞见剧情。`;
-      const msg=`第${xunNo()}旬第一轮：玩家往御花园散步闲逛（本旬第 ${walkNo} 次，耗精力 ${focusEnergyCost('散步')}）。演绎一路物候风景与园中见闻。${meetNote}${gainNote}（同一旬高强度活动与康健收益不兼得。）${leadHint}${pendHint}散步只是本旬中的一段外出：scene.where 可写园中所在，但 statePatch.location 仍写本宫住处，不要把 location 改成御花园。`;
-      this.round1(msg,'外出·御花园散步',focusEnergyCost('散步'),{skipDice:meetHit,meetWho:meetHit?meetWho:null,leadIds:hits.map(p=>p.id),pendTexts:phits.map(pendText),whoHint:meetHit?meetWho:undefined,mode:{kind:'act',text:'御花园散步',who:meetHit?meetWho:null,ctx:['御花园','花园'],ids:hits.map(p=>p.id)}}); // 偶遇命中即本轮剧情额度；宫城图不关：加载与结果都叠在图上，避免背景弹回房间
-      return
-    }
+    const key=PLACE_BY_NAME[place];
+    if(key){this.enterPlace(key);return}
     toast(place+' · 暂未开放，敬请期待');
+  },
+  enterPlace(key){ // 进场景：换底图、顶栏时间与行动单；宫城图收起，改由场景页压着
+    const p=PLACES[key];if(!p)return;
+    if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
+    if(!state||!state.protagonist){toast('尚未开局');return}
+    UI.closeSheet(); // 从出宫、六宫等面板点进来：面板让位给场景
+    this._place=key;
+    $('#mapview').classList.remove('on');
+    $('#placeTitle').textContent=p.name;
+    $('#placeName').textContent=p.name;
+    $('#placeClock').textContent=fmtTime();
+    $('#placeBg').style.backgroundImage=`url("${p.bg}"),url("${PLACE_BG_FALLBACK}")`;
+    this.renderPlaceActs();
+    $('#placeview').classList.add('on');
+  },
+  renderPlaceActs(){
+    const p=PLACES[this._place];if(!p)return;
+    const energy=Math.round(state&&state.energy!=null?state.energy:ENERGY_MAX);
+    $('#placeActs').innerHTML=p.acts.map((a,i)=>{
+      if(a.show&&!a.show())return '';
+      const short=a.cost!=null&&energy<a.cost;
+      return `<button class="place-act" ${short?'disabled':''} onclick="Game.placeAct(${i})"><span>${esc(a.label)}</span>${a.cost!=null?`<span class="pa-cost">精力 ${a.cost}</span>`:''}</button>`;
+    }).join('');
+  },
+  placeAct(i){
+    const p=PLACES[this._place];if(!p)return;
+    const a=p.acts[i];if(!a||(a.show&&!a.show()))return;
+    if(a.cost!=null&&(state.energy??0)<a.cost){toast(`精力不足：${a.label}要耗 ${a.cost} 精力`);return}
+    if(a.go==='openPlaceSheet'){UI.openSheet(a.arg);return}
+    if(a.go==='outing'){this.outing(a.arg);return}
+    if(a.go==='visitNpc'){this.visitNpc(a.arg);return}
+    if(typeof this[a.go]==='function')this[a.go]();
+  },
+  placeBack(){ // 从场景退回宫城图（未办事，不耗精力）
+    $('#placeview').classList.remove('on');
+    this._place=null;
+    $('#mapview').classList.add('on');
+  },
+  leavePlace(){ // 事毕回住处：收起场景页；场景中触发的剧情、结果弹窗不再压在这张景上
+    if(!this._place)return;
+    this._place=null;
+    $('#placeview').classList.remove('on');
+  },
+  gardenWalk(){ // 御花园闲逛：风物、偶遇与康健
+    if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
+    if((state.energy??0)<=0){this.leavePlace();this.collapse();return}
+    const hits=matchLeads(['御花园','花园','散步']);
+    const phits=matchPending(['御花园','花园','散步']);
+    const leadHint=hits.length?`\n【呼应引线】园中散步与在途引线相关（按要紧程度排序）：${hits.map(p=>`「${p.title}」（${p.line}）`).join('；')}。可同场一并带出：挑与本旬情境真相关的演（撞见、听闻、想起要办的事），能兑现的当旬兑现并回写台账；不必每条都塞进对话，无新进展的不提也罢。每条引线散步/拜访最多被提示 ${ECHO_LEAD_TOTAL} 次，到顶后交回旬首处置，勿为凑交集硬编。`:'';
+    const pendHint=phits.length?`\n【呼应待续】园中散步与待续琐事相关：${phits.map(x=>pendText(x)).join('；')}。请顺势办理或想起此事，办妥的从 statePatch.pending 移除，未办妥的更新现状。`:'';
+    const walkNo=(Number(state.walkCount)||0)+1;state.walkCount=walkNo; // 康健收益每旬至多结算一次
+    const ti=Number(state.protagonist&&state.protagonist.attributes&&state.protagonist.attributes['体质'])||0;
+    const tb=Number(state.protagonist&&state.protagonist.constitutionBase)||0;
+    const gainNote=(walkNo>1)?'本旬康健收益已结算过，此次只演见闻、体质不再提升。'
+      :(tb>0&&ti>=tb)?'气血已达根基，散步只作维持、不再提升。'
+      :'体质正常且无疾病时，本次散步体质+1（恢复气血）——请写入 changes 与 statePatch。';
+    const meetWho=this._gardenMeetPick();
+    const forcedMeet=!!(meetWho&&state.gardenMeetWhom===meetWho); // 邂逅笺指认的人：不走概率，必遇
+    const meetHit=!!meetWho&&(forcedMeet||Math.random()<GARDEN_MEET_CHANCE); // 偶遇由前端代码掷骰硬约束，不交给提示词"随缘"
+    const forcedNote=forcedMeet?'此行是一次有意的“巧合”：正文不得提及道具、系统或“安排”，照常写成自然相遇；若对方本有避嫌、病中或久不召见，只作一次短暂照面，不必长谈。':'';
+    const meetNote=meetHit
+      ?`本轮偶遇骰已命中（概率 ${Math.round(GARDEN_MEET_CHANCE*100)}%）：玩家须在园中偶遇「${meetWho}」，用剧情对话 scene 结构呈现（scene.who 填「${meetWho}」，地点写园中所在）；顶层 narrative 先交代园中何处、如何照面、在场还有什么人（这段是开场旁白，不得留空，也不得塞进 parts 的 act），随后 parts 才进对方的第一句动作与台词；偶遇内容须与在途引线、双方关系或主控当前处境自然相关，给 2—4 个接话选项后停止，不结算应对后果；本轮 hasEvent 必须为 true。若主控与此人尚未照面（如帝、太后），按初见演绎：问安避让、自报家门、留下第一印象，事后经 dossier 建档。${forcedNote}`
+      :`本轮偶遇骰未命中（概率 ${Math.round(GARDEN_MEET_CHANCE*100)}%）：只演物候风景、宫人闲话等轻量见闻，不安排与具体人物的撞见剧情。`;
+    const msg=`第${xunNo()}旬第一轮：玩家往御花园散步闲逛（本旬第 ${walkNo} 次，耗精力 ${focusEnergyCost('散步')}）。演绎一路物候风景与园中见闻。${meetNote}${gainNote}（同一旬高强度活动与康健收益不兼得。）${leadHint}${pendHint}散步只是本旬中的一段外出：scene.where 可写园中所在，但 statePatch.location 仍写本宫住处，不要把 location 改成御花园。`;
+    this.round1(msg,'外出·御花园散步',focusEnergyCost('散步'),{skipDice:meetHit,meetWho:meetHit?meetWho:null,leadIds:hits.map(p=>p.id),pendTexts:phits.map(pendText),whoHint:meetHit?meetWho:undefined,mode:{kind:'act',text:'御花园散步',who:meetHit?meetWho:null,ctx:['御花园','花园'],ids:hits.map(p=>p.id)}}); // 偶遇命中即本轮剧情额度；场景页不关：加载与结果都叠在景上，避免背景弹回房间
   },
   horseWatch(){ // 马球场观赛：走模型演场面与场边闲话，不本地加数值
     if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
@@ -10438,6 +10548,7 @@ const Game={
     }
   },
   nextTurn(){ // 休息，进入下一旬：旬数+1，精力回满，日历按两旬制推进
+    this.leavePlace();
     const prevTime=Object.assign({},state.time);
     const prevTurn=state.turn||0;
     if(state.disguise){delete state.disguise;toast('易容药力已散，镜中人又是你自己',3000)} // 易容只保一旬
@@ -10546,6 +10657,7 @@ const Game={
     this.round1(msg,focusLabel,0,{skipDice:true,_xunPop:true,_mainPubPop:!!mainMiss,_schemePop:schemeHit,whoHint:visitHit?'皇帝':(npcVisit?npcVisit.id:undefined),mode:fest?{kind:'fest'}:null}); // 强制处置与来客不占精力
   },
   collapse(){ // 精力归零：当场昏迷，扣体质，弹窗确认后强制进入下一旬
+    this.leavePlace();
     $('#mapview').classList.remove('on'); // 从宫城图直接触发时也兜底收起
     const at=state.protagonist.attributes||(state.protagonist.attributes={});
     at.体质=clamp01_100((Number(at.体质)||50)-COLLAPSE_PENALTY);
@@ -10683,6 +10795,7 @@ const Game={
       if(p.hasEvent&&(p.scene||(Array.isArray(p.options)&&p.options.length))){if(adj.fest)p._fest=adj.fest;this.showIncident(p)} // 先弹"事发"简报，确认后进剧情对话
       else{ // 无事发生：本旬结果原地弹窗呈现，不再经纪事中转
         this.backHome(); // 散步、赴宴等一过性外出到此收束：地点归回本宫住处
+        this.leavePlace(); // 场景页收起：结果弹窗回到住处，不压在外出的景上
         const todo=(p.todo&&p.todo.length)?['待续：'+p.todo.join('；')]:[];
         const itl=Game._lastInterlude;
         UI.actResult(focus+(itl?` · 插曲「${itl.card.title}」`:''),filterText(p.narrative),todo);
@@ -10763,21 +10876,36 @@ const Game={
     const home=this.homeLocation();
     if(home&&state.location!==home){state.location=home;persistCurrent();markSafe()}
   },
-  /* 事发弹窗底图：室外用御花园，他宫用宫室，本宫住处仍用 room.jpg */
-  sceneBgKey(where){
-    const w=String(where||'').trim();if(!w)return null;
-    if(/御花园|花园|园中|园里|御苑|苑|梅林|菊山|亭|池|廊|桥|墙|石径|小径|阶|假山|山石|水边|宫道|殿外|宫外|门外|院中|后院|庭院/.test(w))return 'garden';
+  /* 场景底图：先认点得到的去处，再按宫室／园子兜底。本宫住处不单独出图 */
+  placeBgOf(where){ // 只认确有其图的地方：宫城图各处、御花园、他宫殿堂
+    const w=String(where||'').trim();if(!w)return '';
+    const key=Object.keys(PLACES).find(k=>PLACES[k].keys.some(x=>w.includes(x)));
+    if(key)return PLACES[key].bg;
     const st=state||{},home=(st.world&&st.world.mainPalace)||((String(this.homeLocation()||st.location||'').match(/^([^殿宫阁轩堂斋楼]{1,9}[殿宫阁轩堂斋楼])/)||[])[1]||'');
-    if(home&&w.includes(home))return /正殿|主殿|中殿|殿中|正厅/.test(w)?'hall':'room'; // 同宫主位正殿算他宫，侧殿才是自己的屋子
-    if(/住处|你的屋子|自己屋里/.test(w))return 'room';
-    if(/出宫/.test(w))return null; // 宫外暂无专属底图，沿用住处
-    if(/殿|宫|阁|轩|堂|斋|楼|暖阁|厢房|寝/.test(w))return 'hall';
-    return null;
+    if(home&&w.includes(home))return /正殿|主殿|中殿|殿中|正厅/.test(w)?'assets/hall.jpg':''; // 侧殿就是自己屋里
+    if(/住处|你的屋子|自己屋里/.test(w))return '';
+    if(/殿|宫|阁|轩|堂|斋|楼|暖阁|厢房|寝/.test(w))return 'assets/hall.jpg';
+    if(/园|苑|梅林|菊山|亭|池|廊|桥|石径|假山|山石|水边|院中|后院|庭院/.test(w))return 'assets/garden.jpg';
+    return '';
+  },
+  sceneBgFile(where){ // 事发简报压在主界面时用：比对话更宽，认不出的仍回本宫住处
+    return this.placeBgOf(where)||'assets/room.jpg';
   },
   applySceneBg(where){
+    if(this._place){ // 人在场景里：简报就压在这张景上；剧情确已换到别处才跟着换
+      const file=this.placeBgOf(where);
+      if(file&&file!==PLACES[this._place].bg)$('#placeBg').style.backgroundImage=`url("${file}"),url("${PLACE_BG_FALLBACK}")`;
+      return;
+    }
     const el=document.querySelector('.homebg');if(!el)return;
-    const key=this.sceneBgKey(where)||'room';
-    el.style.backgroundImage=`url(assets/${key}.jpg)`;
+    el.style.backgroundImage=`url(${this.sceneBgFile(where)})`;
+  },
+  setChatBg(where){ // 剧情对话的淡底图：有景就铺，没景就留白
+    const el=$('#chatBg');if(!el)return;
+    const file=this.placeBgOf(where)||(this._place?PLACES[this._place].bg:'');
+    if(!file){el.classList.remove('on');el.style.removeProperty('--bg');return}
+    el.style.setProperty('--bg',`url("${file}"),url("${PLACE_BG_FALLBACK}")`);
+    el.classList.add('on');
   },
   showIncident(p){ // 事发简报：说明发生了什么事，确认后进全屏对话应对
     const adj=Game._lastAdj||{due:[],overdue:[],target:null,hit:false};
@@ -10807,14 +10935,14 @@ const Game={
     $('#incidentModal').classList.remove('on');
     this.applySceneBg();
     const p=Game._pendingEvent;Game._pendingEvent=null;
-    if(!p){phase='FOCUS_SELECT';UI.goHome();return}
+    if(!p){phase='FOCUS_SELECT';this.leavePlace();UI.goHome();return}
     if(p.scene){this.openScene(p);return}
     if(Array.isArray(p.options)&&p.options.length){ // 模型没给 scene：也走多轮对话，别一句应答就把人送走
       const who=sceneSpeaker(p,{});
       this.openScene(Object.assign({},p,{narrative:'',scene:{line:this.chatLead(p),who,state:'ongoing',when:fmtTime(),where:state&&state.location}}));
       return;
     }
-    phase='FOCUS_SELECT';UI.goHome(); // 事发却没有可应对内容：退回主界面，别把玩家留在死状态
+    phase='FOCUS_SELECT';this.leavePlace();UI.goHome(); // 事发却没有可应对内容：退回主界面，别把玩家留在死状态
   },
   chatLead(p){ // 截取 narrative 末段当开场白
     const t=filterText(p.narrative||'');
@@ -11070,6 +11198,7 @@ const Game={
     const ho=applySceneHandoff(parts,p.narrative,sceneCtx.who); // 开场就是引见/通传：正主已开口就当场交人
     if(ho){sceneCtx.who=canonicalSceneWho(ho)||ho;sceneCtx.pinned=sceneCtx.who}
     $('#chatTitle').textContent=sceneCtx.banquet?('宴席 · '+sceneCtx.banquet.name):('剧情对话 · '+dispName(sceneCtx.who));
+    this.setChatBg(sc.where||(state&&state.location)); // 场景淡底图：本场有去处就铺，自行行事的对话仍留白
     $('#chatAva').innerHTML=avatarHtml(sceneCtx.who);
     $('#chatClock').textContent=fmtTime();
     const body=$('#chatBody');body.innerHTML='';
@@ -11418,8 +11547,10 @@ const Game={
     phase='FOCUS_SELECT'; // 剧情收尾后必须复位，否则主界面所有行动都会被"请先结束当前旬务"挡下
     const wasChamber=!!(sceneCtx&&sceneCtx.chamber);
     this.backHome(); // 戏散了人就回殿：别让本场地名留在存档里
+    this.leavePlace(); // 场景页也收起：下一场从住处重新出门
     sceneCtx=null;currentEvent=null;Game._pendingScheme=null;
     $('#chatview').classList.remove('on');
+    $('#chatBg').classList.remove('on');
     UI.goHome();toast(wasChamber?'天光渐亮，你回到住处':'本旬事了');
     const pendingDawn=!!Game._dawnPending;
     Game._dawnPending=false;
@@ -11512,6 +11643,7 @@ const Game={
     const where=this.homeLocation()||'本宫住处';
     const errand=v.reasonKind==='errand';
     const msg=`第${xunNo()}旬旬中：主控本旬行事至此，精力剩下 ${energy}，人回到${where}。${who}忽然登门（由头：${v.reason}）。用剧情对话 scene 结构开场（scene.state="ongoing"，scene.who 填「${isEmp?'皇帝':v.id}」，scene.where 写「${where}」，narrative 只交代你在何处、此人如何进来或被引进，scene.parts 写对方第一句话与动作），给 2—4 个接话选项后停下，不结算应对后果，等玩家点「结束对话」再统一结算。${isEmp?'这是帝主动来：须写出他为什么此刻来、记得什么或破什么例，收场经 statePatch["emperor.contact"] 记一句相处注记。':(errand?'她只是来送点东西、认认门，说几句场面话；不托事、不打听底细，也不必留出什么大用。':'她是主动登门，须有实际来意（消息、请托、试探、赔礼或结盟），不得写成恰好路过；肯不肯说、说到几分，按交情与性情来。')}来客不占精力，也不要写成主控另行出门。`;
+    this.leavePlace(); // 人在住处被登门：场景页收起，别让来客的戏压在外出的景上
     this.round1(msg,isEmp?'来访·帝':`来访·${who}`,0,{skipDice:true,_xunPop:true,whoHint:isEmp?'皇帝':v.id});
     return true;
   },
@@ -11547,7 +11679,9 @@ const Game={
       const el=document.getElementById(id);if(el)el.classList.remove('on');
     });
     $('#chatview').classList.remove('on');
+    $('#chatBg').classList.remove('on');
     $('#mapview').classList.remove('on');
+    $('#placeview').classList.remove('on');this._place=null;
     $('#dim').classList.remove('on');
     $('#hotspots').classList.remove('sleeping');
     $('#scrim').classList.remove('on');
