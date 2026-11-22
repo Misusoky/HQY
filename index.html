@@ -632,6 +632,7 @@ button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:cente
     <button class="hs hs-up" data-x="0.20" data-y="0.92" onclick="Game.restFlow()"><i></i><span>歇下一旬</span></button>
     <button class="hs" data-x="0.33" data-y="0.70" onclick="Game.openCraft()"><i></i><span>手作</span></button>
     <button class="hs" data-x="0.52" data-y="0.40" onclick="Game.hsGoOut()"><i></i><span>出门</span></button>
+    <button class="hs" data-x="0.64" data-y="0.53" onclick="Game.hsCourtyard()"><i></i><span>庭院</span></button>
     <button class="hs" data-x="0.90" data-y="0.60" onclick="Game.openSkills()"><i></i><span>才艺修习</span></button>
     <button class="hs" data-x="0.93" data-y="0.80" onclick="Game.openMeal()"><i></i><span>传膳</span></button>
   </div>
@@ -724,7 +725,7 @@ button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:cente
 <!-- 场景页：点目的地先进景，再择行事 -->
 <div class="placeview" id="placeview">
   <div class="place-bg" id="placeBg"></div>
-  <div class="place-head num"><button onclick="Game.placeBack()">◀ 宫城图</button><span id="placeTitle">—</span><span class="fh-time" id="placeClock"></span></div>
+  <div class="place-head num"><button id="placeBackBtn" onclick="Game.placeBack()">◀ 宫城图</button><span id="placeTitle">—</span><span class="fh-time" id="placeClock"></span></div>
   <div class="place-panel">
     <div class="place-name" id="placeName">—</div>
     <div class="place-acts" id="placeActs"></div>
@@ -4103,7 +4104,7 @@ const PRESENCE_MODULE = [
 const PLAY_UI_MODULE = [
 '## 二十二、玩家界面（正文只能指这里有的东西）',
 '玩家点得到的入口只有这些，别的一律不存在：',
-'- 住处：宫务（分三栏：行事——自己安排本旬要做的事，查账、领料、写家书、抄经、打点宫人、递帖相邀，以及承宠打算；装潢——换住处背景；吩咐——召配属宫人问话、交代差事、打听消息）、手作、才艺修习、传膳、出门。',
+'- 住处：宫务（分三栏：行事——自己安排本旬要做的事，查账、领料、写家书、抄经、打点宫人、递帖相邀，以及承宠打算；装潢——换住处背景；吩咐——召配属宫人问话、交代差事、打听消息）、手作、才艺修习、传膳、出门、庭院（子女的房间、小厨房）。',
 '- 宫城图（点「出门」后）：养心殿（求见帝）、六宫（拜访后妃、太后、皇后）、藏书阁（寻书、借阅、研读）、墨妙斋（写字作画）、太医院（问医、抄书）、御花园（散步、偶遇）、马球场（观赛、学骑射）、出宫（须御赐腰牌或本旬易容；东市西市、茶楼、寺观、回府探亲）。',
 '- 顶栏：状态（局面、剧情账、命途）、行囊（使用／典卖／赠礼）、人物、时间、银两（遣人出宫采买）、积分（商城换道具）。',
 '规则：',
@@ -9985,6 +9986,16 @@ const PLACES={
   ]},
   family:{name:'回府',keys:['回府','娘家','府中','家宅','祖宅'],bg:'assets/places/family.jpg',acts:[
     {label:'回府探亲',go:'outing',arg:'family',cost:20}
+  ]},
+  courtyard:{name:'庭院',keys:['庭院','院中','天井'],bg:'assets/places/courtyard.jpg',back:'home',acts:[
+    {label:'子女',go:'enterPlace',arg:'nursery'},
+    {label:'小厨房',go:'enterPlace',arg:'kitchen'}
+  ]},
+  nursery:{name:'子女的房间',keys:['子女的房间','儿女房','皇嗣房'],bg:'assets/places/nursery.jpg',fallback:'assets/places/courtyard.jpg',back:'courtyard',acts:[
+    {label:'培养子女',go:'shell',key:'heirTeach'}
+  ]},
+  kitchen:{name:'小厨房',keys:['小厨房','厨房','灶间'],bg:'assets/places/kitchen.jpg',fallback:'assets/places/courtyard.jpg',back:'courtyard',acts:[
+    {label:'下厨',go:'shell',key:'cooking'}
   ]}
 };
 const PLACE_BY_NAME=Object.keys(PLACES).reduce((o,k)=>{o[PLACES[k].name]=k;return o},{});
@@ -10294,6 +10305,7 @@ const Game={
     Game._chamberReport=null;
   },
   hsGoOut(){if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}$('#mapClock').textContent=fmtTime();$('#mapview').classList.add('on')}, // 出门＝宫城图选目的地
+  hsCourtyard(){if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}this.enterPlace('courtyard')}, // 住处门口的小院：子女房与小厨房都从这里进
   mapBack(){$('#mapview').classList.remove('on')},
   _gardenMeetPick(){ // 御花园偶遇人选：帝单独按恩宠掷骰，不与known人物挤同一个池子（池子越大越撞不见帝）；其余为太后与已认识的宫中人物
     const dg=disguiseActive(state); // 易容中：撞见被冒名者本人会当场穿帮，先从名册里摘掉
@@ -10341,9 +10353,20 @@ const Game={
     $('#placeTitle').textContent=p.name;
     $('#placeName').textContent=p.name;
     $('#placeClock').textContent=fmtTime();
-    $('#placeBg').style.backgroundImage=`url("${p.bg}"),url("${PLACE_BG_FALLBACK}")`;
+    $('#placeBackBtn').textContent=p.back==='home'?'◀ 住处':(p.back&&PLACES[p.back]?'◀ '+PLACES[p.back].name:'◀ 宫城图');
+    $('#placeBg').style.backgroundImage=this.bgLayers(key);
     this.renderPlaceActs();
     $('#placeview').classList.add('on');
+  },
+  placeKeyOf(where){ // 只认确有其名的地方：用于挑场景图
+    const w=String(where||'').trim();if(!w)return '';
+    return Object.keys(PLACES).find(k=>PLACES[k].keys.some(x=>w.includes(x)))||'';
+  },
+  bgLayers(key){ // 场景页底图：本处 → 该处兜底 → 御花园，缺图时逐层落下
+    const p=PLACES[key];
+    if(!p)return `url("${PLACE_BG_FALLBACK}")`;
+    const mid=p.fallback&&p.fallback!==p.bg?`,url("${p.fallback}")`:'';
+    return `url("${p.bg}")${mid},url("${PLACE_BG_FALLBACK}")`;
   },
   renderPlaceActs(){
     const p=PLACES[this._place];if(!p)return;
@@ -10358,12 +10381,21 @@ const Game={
     const p=PLACES[this._place];if(!p)return;
     const a=p.acts[i];if(!a||(a.show&&!a.show()))return;
     if(a.cost!=null&&(state.energy??0)<a.cost){toast(`精力不足：${a.label}要耗 ${a.cost} 精力`);return}
+    if(a.go==='enterPlace'){this.enterPlace(a.arg);return}
     if(a.go==='openPlaceSheet'){UI.openSheet(a.arg);return}
     if(a.go==='outing'){this.outing(a.arg);return}
     if(a.go==='visitNpc'){this.visitNpc(a.arg);return}
+    if(a.go==='shell'){ // 占位：内容未做，只留一句
+      if(a.key==='heirTeach')toast((state.heirs&&state.heirs.length)?'子女教养尚未细做':'尚无子女',2600);
+      else toast('小厨房尚未细做',2400);
+      return;
+    }
     if(typeof this[a.go]==='function')this[a.go]();
   },
-  placeBack(){ // 从场景退回宫城图（未办事，不耗精力）
+  placeBack(){ // 退回上一层：庭院回住处，子女房／小厨房回庭院，其余回宫城图
+    const p=PLACES[this._place]||{};
+    if(p.back==='home'){this.leavePlace();UI.goHome();return}
+    if(p.back&&PLACES[p.back]){this.enterPlace(p.back);return}
     $('#placeview').classList.remove('on');
     this._place=null;
     $('#mapview').classList.add('on');
@@ -10877,9 +10909,9 @@ const Game={
     if(home&&state.location!==home){state.location=home;persistCurrent();markSafe()}
   },
   /* 场景底图：先认点得到的去处，再按宫室／园子兜底。本宫住处不单独出图 */
-  placeBgOf(where){ // 只认确有其图的地方：宫城图各处、御花园、他宫殿堂
+  placeBgOf(where){ // 只认确有其图的地方：宫城图各处、庭院、御花园、他宫殿堂
     const w=String(where||'').trim();if(!w)return '';
-    const key=Object.keys(PLACES).find(k=>PLACES[k].keys.some(x=>w.includes(x)));
+    const key=this.placeKeyOf(w);
     if(key)return PLACES[key].bg;
     const st=state||{},home=(st.world&&st.world.mainPalace)||((String(this.homeLocation()||st.location||'').match(/^([^殿宫阁轩堂斋楼]{1,9}[殿宫阁轩堂斋楼])/)||[])[1]||'');
     if(home&&w.includes(home))return /正殿|主殿|中殿|殿中|正厅/.test(w)?'assets/hall.jpg':''; // 侧殿就是自己屋里
@@ -10893,8 +10925,8 @@ const Game={
   },
   applySceneBg(where){
     if(this._place){ // 人在场景里：简报就压在这张景上；剧情确已换到别处才跟着换
-      const file=this.placeBgOf(where);
-      if(file&&file!==PLACES[this._place].bg)$('#placeBg').style.backgroundImage=`url("${file}"),url("${PLACE_BG_FALLBACK}")`;
+      const key=this.placeKeyOf(where);
+      if(key&&key!==this._place)$('#placeBg').style.backgroundImage=this.bgLayers(key);
       return;
     }
     const el=document.querySelector('.homebg');if(!el)return;
@@ -10902,9 +10934,9 @@ const Game={
   },
   setChatBg(where){ // 剧情对话的淡底图：有景就铺，没景就留白
     const el=$('#chatBg');if(!el)return;
-    const file=this.placeBgOf(where)||(this._place?PLACES[this._place].bg:'');
-    if(!file){el.classList.remove('on');el.style.removeProperty('--bg');return}
-    el.style.setProperty('--bg',`url("${file}"),url("${PLACE_BG_FALLBACK}")`);
+    const key=this.placeKeyOf(where)||this._place;
+    if(!key){el.classList.remove('on');el.style.removeProperty('--bg');return}
+    el.style.setProperty('--bg',this.bgLayers(key));
     el.classList.add('on');
   },
   showIncident(p){ // 事发简报：说明发生了什么事，确认后进全屏对话应对
