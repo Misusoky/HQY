@@ -215,6 +215,7 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
 .sheet-snav .snav-n{font-size:11px;opacity:.6;font-family:var(--sans)}
 .sheet-snav button.on .snav-n{opacity:.9}
 .sheet-spane{flex:1;min-width:0}
+.sheet-split.steady .sheet-spane{height:clamp(320px,52dvh,560px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding-right:2px}
 .sheet-pane{display:none}
 .sheet-pane.on{display:block}
 .sec-cap{display:flex;align-items:center;gap:8px;font-size:14px;letter-spacing:.15em;color:var(--ink);margin-bottom:8px}
@@ -6985,7 +6986,7 @@ const UI={
   sheetGongwu(){
     const tab=(k,label)=>`<button class="${gongPane===k?'on':''}" onclick="Game.setGongPane('${k}')">${label}</button>`;
     const body=gongPane==='装潢'?this.gongDecorHtml():(gongPane==='吩咐'?this.gongMaidHtml():this.sheetFocus());
-    return `<div class="sheet-split"><div class="sheet-snav">${tab('行事','行事')}${tab('装潢','装潢')}${tab('吩咐','吩咐')}</div><div class="sheet-spane">${body}</div></div>`;
+    return `<div class="sheet-split steady"><div class="sheet-snav">${tab('行事','行事')}${tab('装潢','装潢')}${tab('吩咐','吩咐')}</div><div class="sheet-spane">${body}</div></div>`;
   },
   nightIntentHtml(){ // 承宠：本旬争/候/避；结果在旬末结算，点结束本旬后弹出夜账
     const turn=state.turn||0;
@@ -7746,13 +7747,14 @@ const UI={
     const sel=(this._paneSel||{})[key];
     const act=panes.some(p=>p.k===sel)?sel:panes[0].k;
     (this._paneSel=this._paneSel||{})[key]=act;
-    return `<div class="sheet-split" data-split="${esc(key)}"><div class="sheet-snav">${panes.map(p=>`<button class="${p.k===act?'on':''}" data-pane="${esc(p.k)}" onclick="UI.paneTo(this)">${esc(p.k)}${p.n!=null?`<span class="snav-n">${esc(p.n)}</span>`:''}</button>`).join('')}</div><div class="sheet-spane">${panes.map(p=>`<div class="sheet-pane${p.k===act?' on':''}" data-pane="${esc(p.k)}">${p.html}</div>`).join('')}</div></div>`;
+    return `<div class="sheet-split steady" data-split="${esc(key)}"><div class="sheet-snav">${panes.map(p=>`<button class="${p.k===act?'on':''}" data-pane="${esc(p.k)}" onclick="UI.paneTo(this)">${esc(p.k)}${p.n!=null?`<span class="snav-n">${esc(p.n)}</span>`:''}</button>`).join('')}</div><div class="sheet-spane">${panes.map(p=>`<div class="sheet-pane${p.k===act?' on':''}" data-pane="${esc(p.k)}">${p.html}</div>`).join('')}</div></div>`;
   },
   paneTo(btn){ // 点左栏子菜单：右侧切换对应内容（不整页重渲染）
     const wrap=btn.closest('.sheet-split');if(!wrap)return;
     const key=wrap.dataset.split;if(key)(this._paneSel=this._paneSel||{})[key]=btn.dataset.pane;
     wrap.querySelectorAll('.sheet-snav button').forEach(b=>b.classList.toggle('on',b===btn));
     wrap.querySelectorAll(':scope > .sheet-spane > .sheet-pane').forEach(p=>p.classList.toggle('on',p.dataset.pane===btn.dataset.pane));
+    const sp=wrap.querySelector(':scope > .sheet-spane');if(sp)sp.scrollTop=0; // 换页回到顶部：三页共用同一块高度，别把上一页的滚动位置带过来
   },
   meter(nm,v,cls){return `<div class="meter ${cls}"><span class="meter-nm">${esc(nm)}</span><span class="meter-track"><span class="meter-fill" style="width:${clamp01_100(Number(v)||0)}%"></span></span><span class="meter-v num">${esc(v)}</span></div>`},
   sheetStatus(){
@@ -7923,7 +7925,7 @@ const UI={
       const count=(bagPane==='work'||it.durable)?'':(Number(it.count)>0?'×'+esc(it.count):'已典出');
       return `<button class="npcrow" onclick="UI.goSheet('物品详情',${i})"><span class="nr-main"><span class="nr-name">${esc(it.name)}</span>${sub?`<span class="nr-role">${esc(sub)}</span>`:''}</span>${qtag}${ctag}${ftag}${stag}${ttag}<span class="nr-rel num">${count}</span></button>`;
     }).join('');
-    return h+`<div class="sheet-split"><div class="sheet-snav">${tabs}</div><div class="sheet-spane">
+    return h+`<div class="sheet-split steady"><div class="sheet-snav">${tabs}</div><div class="sheet-spane">
       <div class="sheet-note" style="margin:16px 0 6px">${esc(notes[bagPane])}</div>`
       +(list||`<div class="sec"><div class="sheet-note">${esc(empties[bagPane])}</div></div>`)+`</div></div>`;
   },
