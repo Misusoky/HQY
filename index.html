@@ -247,6 +247,7 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
 .libgroup>summary::-webkit-details-marker{display:none}
 .libgroup>summary::before{content:'▸';flex:none;width:14px;color:var(--ink-soft);font-size:12px}
 .libgroup[open]>summary::before{content:'▾'}
+.libgroup .piececard{margin-top:8px}
 .lg-name{flex:none}
 .lg-count{flex:none;font-size:12px;color:var(--ink-soft);font-family:var(--sans)}
 .lg-meta{margin-left:auto;font-size:11px;color:var(--gold);letter-spacing:.04em}
@@ -4195,6 +4196,7 @@ function monthlySalaryFor(rank){ // 位份 → 每月俸银；先认品级，缺
 }
 /* 精力系统 */
 const ENERGY_MAX=100;        // 每旬精力上限
+const FOOD_ENERGY_GAIN=5;    // 行囊吃食：吃用不耗精力，演一场后精力略复（传膳另算，见 MEAL_MENUS）
 const MEAL_LIMIT_PER_XUN=3; // 每旬最多传膳次数
 /* 传膳菜单：预制六单，每三旬轮换一单；银两不同、回精力不同；每单最贵一味另加属性 1 点 */
 const MEAL_MENUS=[
@@ -5719,7 +5721,7 @@ function parseLegacyItem(x,src){ // 旧档条目解析：剥离「×N」与（�
   if(!s)return null;
   return itemFlags({name:s,count,note,pawnable:null,usable:null,src});
 }
-const USABLE_RE=/药|丸|散|膏|丹|汤|茶|香|露|酒|糖|羹|粥|饼|果|符|珠|笺|玉容|益气|静心|驻颜|子嗣|免罪|藏锋|传声/;
+const USABLE_RE=/药|丸|散|膏|丹|汤|茶|香|露|酒|糖|羹|粥|饼|酥|糕|点心|蜜饯|果脯|藕粉|月饼|元宵|粽|汤圆|馄饨|饺|包子|馒头|汤面|面条|酪|果|符|珠|笺|玉容|益气|静心|驻颜|子嗣|免罪|藏锋|传声/;
 function guessUsable(name,note){ // 只有能实际消耗/生效的东西才可"使用"；信物、文书、衣饰、摆件只能收藏或转赠
   return USABLE_RE.test(String(name||'')+String(note||''));
 }
@@ -7287,9 +7289,9 @@ const UI={
       </div>`:`<button class="btn btn-primary" style="letter-spacing:.12em;font-size:14px" disabled>先在上头择一门技艺</button>`;
     const pieceHtml=(selSkill&&!isRide&&!isCook&&PIECE_SKILLS[selSkill])?this.pieceListHtml(selSkill,cost):'';
     return `<div class="skillgrid">${cells}</div>
+      ${modeHtml}
       ${workHtml}
       ${pieceHtml}
-      ${modeHtml}
       <div class="sheet-note">未解锁的技艺，先打听谁会，再当面求师；骑射在马球场，烹饪待细做。</div>
       <div class="setbtns"><button class="btn btn-line" ${inScene?'disabled style="opacity:.45"':''} onclick="Game.openCraft()">手作 · 用材料做一件东西</button></div>`;
   },
@@ -7320,9 +7322,9 @@ const UI={
         ${hint?`<div class="sheet-note" style="margin:6px 0 0">${esc(hint)}</div>`:''}
       </div>`;
     }).join('');
-    return `<div class="sec"><div class="sec-cap">手上的${label}（${list.length}）</div>
+    return `<details class="libgroup piecegroup"><summary>手上的${label}（${list.length}）</summary>
       ${rows||`<div class="sheet-note" style="margin:0">修习三次成一件。</div>`}
-      <div class="sheet-note">温习只精熟这一件。</div></div>`;
+      <div class="sheet-note">温习只精熟这一件。</div></details>`;
   },
   sheetPiecePick(){ // 才艺修习的第四个入口：择一件已会的成品温习
     const k=selSkill;
@@ -7372,7 +7374,7 @@ const UI={
     let body='';
     if(PIECE_SKILLS[k]){
       const list=piecesOfSkill(k);
-      body=list.length?`<div class="sec"><div class="sec-cap">已会的${PIECE_LABELS[k]}（${list.length}）</div>${list.map(pc=>{
+      body=list.length?`<details class="libgroup piecegroup" open><summary>已会的${PIECE_LABELS[k]}（${list.length}）</summary>${list.map(pc=>{
         const mt=Math.max(0,Math.min(100,Number(pc.mastery)||0));
         const traitText=Array.isArray(pc.traits)&&pc.traits.length?`<div class="pc-meta">${pc.traits.map(t=>esc(t)).join('、')}</div>`:'';
         return `<div class="piececard">
@@ -7381,13 +7383,13 @@ const UI={
           <div class="pc-meta">熟练 ${mt}／100（${this.masteryText(mt)}）</div>
           <div style="height:4px;background:var(--paper-deep);border-radius:2px;overflow:hidden;margin-top:6px"><span style="display:block;height:100%;width:${mt}%;background:var(--gold)"></span></div>
         </div>`;
-      }).join('')}</div>`:'<div class="sec"><div class="sheet-note">修习三次成一件。</div></div>';
+      }).join('')}</details>`:'<div class="sec"><div class="sheet-note">修习三次成一件。</div></div>';
     }else{
       const items=(state.inventory||[]).filter(it=>it&&it.src==='功课'&&String(it.note||'').indexOf(name)>-1);
-      body=items.length?`<div class="sec"><div class="sec-cap">已成的功课（${items.length}）</div>${items.map(it=>`<div class="piececard">
+      body=items.length?`<details class="libgroup piecegroup" open><summary>已成的功课（${items.length}）</summary>${items.map(it=>`<div class="piececard">
           <div class="piece-top"><span class="pc-name">${esc(it.name)}</span><span class="qbadge ${this.qualityClass(it.quality)}">${esc(it.quality||'—')}</span></div>
           <div class="pc-meta">${esc(it.category||'功课')}${it.displayed?' · 已陈设在住处':''}${Array.isArray(it.traits)&&it.traits.length?' · '+it.traits.map(t=>esc(t)).join('、'):''}</div>
-        </div>`).join('')}<div class="sheet-note">成品入行囊。</div></div>`
+        </div>`).join('')}<div class="sheet-note">成品入行囊。</div></details>`
         :'<div class="sec"><div class="sheet-note">成品入行囊。</div></div>';
     }
     return `<button class="backbtn" onclick="UI.sheetBack()">◀ 返回状态</button>
@@ -7951,7 +7953,7 @@ const UI={
     const notes={
       work:'修习功课、手作与书画所得，可赠、可献、可陈设。',
       story:'信物、文书、御赐与查案线索，多半不可典卖。',
-      food:'吃食点心，点开可吃用。',
+      food:'吃食点心，吃用不耗精力，演一场后精力略复。',
       tool:'药物、香露、长期之物与手作材料。'
     };
     const empties={
@@ -8053,13 +8055,14 @@ const UI={
     const it=(state.inventory||[])[i];
     if(!it)return '<div class="sheet-note">此物已不在囊中。</div>';
     itemFlags(it);
+    const isFood=itemKindOf(it)==='food';
     const cat=SHOP_CATALOG[it.name]||{};
     const pawn=it.pawnable?`<button class="btn btn-primary" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.pawnItem(${i})">典卖 · 约得银 ${pawnPrice(it)} 两</button>`
       :`<button class="btn" disabled style="opacity:.45;letter-spacing:.1em;text-indent:.1em">不可典卖</button>`;
     const displayBtn=it.src==='功课'?`<button class="btn btn-line" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.toggleDisplay(${i})">${it.displayed?'收起陈设':'陈设在住处'}</button>`:'';
     const act=it.durable
       ?`<button class="btn btn-primary" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.toggleEquip(${i})">${it.equipped!==false?'收存（停用效用）':'启用（随身佩戴）'}</button>`
-      :(it.usable!==false?`<button class="btn btn-primary" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.useItem(${i})">${it.name==='移性符'?'使用 · 重撰帝设':(it.name==='邂逅笺'?'使用 · 择一人':(it.name==='易容膏'?'使用 · 择人易容':(SHOP_INSTANT.has(it.name)?'使用 · 即刻生效（不占本旬）':'使用 · 演一场（耗精力 5）')))}</button>`:`<button class="btn" disabled style="opacity:.45;letter-spacing:.1em;text-indent:.1em">不可使用</button>`);
+      :(it.usable!==false?`<button class="btn btn-primary" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.useItem(${i})">${it.name==='移性符'?'使用 · 重撰帝设':(it.name==='邂逅笺'?'使用 · 择一人':(it.name==='易容膏'?'使用 · 择人易容':(SHOP_INSTANT.has(it.name)?'使用 · 即刻生效（不占本旬）':(isFood?`吃用 · 演一场（精力 +${FOOD_ENERGY_GAIN}）`:'使用 · 演一场（耗精力 5）'))))}</button>`:`<button class="btn" disabled style="opacity:.45;letter-spacing:.1em;text-indent:.1em">不可使用</button>`);
     const wide=(k,v)=>`<div class="rowline" style="align-items:flex-start"><span style="flex:none">${k}</span><span class="cnt" style="white-space:normal;text-align:right;max-width:70%">${esc(v)}</span></div>`;
     const crafted=!!it.crafted;
     const matKindLabel={绣:'绣作',香:'合香',药:'丸散',花:'花作',杂:'杂件'};
@@ -8076,6 +8079,7 @@ const UI={
       ${it.inspiration?wide('灵感',it.inspiration):''}`:'';
     return `<div class="sec"><div class="sec-cap">${esc(it.name)}</div>
       ${matRow}
+      ${isFood?`<div class="itemrow"><span>吃用</span><span class="cnt num">不耗精力 · 精力 +${FOOD_ENERGY_GAIN}</span></div>`:''}
       ${cat.kind?`<div class="itemrow"><span>类别</span><span class="cnt">${cat.kind==='durable'?'长期之物 · 随身为用':'消耗品 · 用毕即无'}</span></div>`:''}
       ${craftedBlock}
       ${it.durable?'':`<div class="itemrow"><span>件数</span><span class="cnt num">×${esc(it.count)}</span></div>`}
@@ -8339,13 +8343,20 @@ const UI={
     const npcs=state.npcs||{};
     const ids=Object.keys(npcs).filter(id=>npcs[id].known);
     const rels=Object.keys(state.relationships||{});
-    const metOnly=rels.filter(who=>!ids.includes(who));
-    if(!ids.length&&!metOnly.length)return seg+'<div class="sec"><div class="sheet-note">尚无相识之人。</div></div>';
+    const all=[...ids,...rels.filter(who=>!ids.includes(who))];
+    if(!all.length)return seg+'<div class="sec"><div class="sheet-note">尚无相识之人。</div></div>';
     const row=who=>this.npcRowHtml(who,`UI.goSheet('NPC详情','${esc(who)}')`);
-    return seg+`<div class="sec"><div class="sec-cap">人物谱（${ids.length+metOnly.length}）</div>`+
-      ids.map(row).join('')+
-      metOnly.map(row).join('')+
-      `</div>`;
+    const cls=who=>avatarClassOf(this.isEmperorId(who)?'皇帝':who,(npcs[who]&&npcs[who].rank)||'');
+    const G={top:[],consort:[],maid:[],eunuch:[],misc:[]};
+    all.forEach(who=>{
+      const c=cls(who);
+      const g=(c==='emperor'||c==='dowager')?'top':((c==='consort'||c==='consortHi')?'consort':((c==='maid'||c==='matron')?'maid':(c==='eunuch'?'eunuch':'misc')));
+      G[g].push(who);
+    });
+    const block=(label,list,open)=>list.length?`<details class="libgroup npcgroup"${open?' open':''}><summary>${label}（${list.length}）</summary>${list.map(row).join('')}</details>`:'';
+    const topLabel=!G.top.length?'':(G.top.every(who=>cls(who)==='dowager')?'太后':(G.top.every(who=>cls(who)==='emperor')?'帝':'帝与太后'));
+    return seg+(G.top.length?`<div class="sec"><div class="sec-cap">${topLabel}</div>${G.top.map(row).join('')}</div>`:'')
+      +block('妃嫔',G.consort,true)+block('宫女',G.maid)+block('太监',G.eunuch)+block('其他',G.misc);
   },
   sheetFactions(){ // 宫中派系：只列主控可知的部分，暗中图谋仍在暗流账
     const fs=(state.factions||[]).slice();
@@ -8893,6 +8904,7 @@ function craftInferMat(name,note){ // 按名字辨认别人送的净材料：明
   const n=String(note||'');
   if(!s||CRAFT_MATERIALS[s])return null;
   if(/御赐|御前|先皇后|太后|不当|不裁|禁物|信物|已完工|私藏|密|旧函|手串|抄本|谱|帖|帕$|油$|手膏/.test(s+n))return null;
+  if(ITEM_FOOD_RE.test(s))return null; // 吃食不认作材料：桂花糕、玫瑰酥别被当成花材香料
   if(/香末|香屑|香粉|香料|香饼|香块|线香|盘香|熏香|安息香|苏合香|沉香|檀香|龙脑|麝香|乳香|松香|合香/.test(s))return{kind:'香',tier:/沉香|龙脑|麝香|苏合|安息/.test(s)?3:2,tags:['香']};
   if(/绢|缎|绫|绸|帛|纱|素罗|轻罗|罗缎|绣线|彩线|金线|丝线|绒线|衣料/.test(s))return{kind:'绣',tier:/金线|锦/.test(s)?2:1,tags:['布帛']};
   if(/药材|药粉|药末|药露|黄芪|当归|茯苓|甘草|白芍|川芎|川贝|三七|酸枣仁|枸杞|人参|阿胶|燕窝/.test(s))return{kind:'药',tier:/人参|阿胶|燕窝|三七/.test(s)?2:1,tags:['药']};
@@ -10870,6 +10882,12 @@ const Game={
       if(isMajorTurn(p.statePatch,p))meta.lastBigTurn=state.turn;
       if(adj.hit){meta.rollHit=false;meta.rollTargetId=null} // 本旬骰子已用毕，同旬后续行动不再重复强制
       state.energy=Math.max(0,Math.min(ENERGY_MAX,Math.round((typeof state.energy==='number'?state.energy:ENERGY_MAX)-(typeof cost==='number'?cost:focusEnergyCost(focus)))));
+      if(opts&&opts.foodGain){ // 吃食：不耗精力，吃完略复
+        const before=Math.round(state.energy);
+        state.energy=Math.min(ENERGY_MAX,before+Math.round(opts.foodGain));
+        if(state.energy>before)toast(`吃用之后，精力 +${state.energy-before}`);
+      }
+      state.inventory=(state.inventory||[]).filter(x=>x&&(!Number.isFinite(Number(x.count))||Number(x.count)>0)); // 用尽即从行囊除名，别留一行「已典出」
       persistCurrent();markSafe();UI.updateStatusbar();
       if(state.energy<=0){this.collapse();return}
       checkRestWarn();
@@ -12609,13 +12627,19 @@ const Game={
     if(it.name==='易容膏'){this.openDisguisePick(i,'行囊');return} // 先择人、写一句形容；不占本旬，代价是气血 -10
     if(it.name==='移性符'){this.openShiftCharm(i);return} // 系统道具：本地改写帝设，不占回合、不耗精力、不走模型
     if(it.name==='邂逅笺'){this.openMeetPick(i);return} // 指定下次园中偶遇：择人后才耗笺，不占回合、不耗精力
+    const food=itemKindOf(it)==='food';
+    if(food&&(state.energy??0)>=ENERGY_MAX){toast('精力已满，这口吃食先留着');return}
     it.count-=1;const gone=it.count<=0;lastUseIdx=i;
-    const label=`使用「${it.name}」`;
-    const cost=focusEnergyCost('使用道具');
+    const label=food?`吃用「${it.name}」`:`使用「${it.name}」`;
+    const cost=food?0:focusEnergyCost('使用道具');
     const cat=SHOP_CATALOG[it.name];
     const fxNote=cat?`此物效用：${cat.fx}`:(it.effect?`此物效用：${it.effect}${Array.isArray(it.traits)&&it.traits.length?`（特质：${it.traits.join('、')}；品质：${it.quality||'—'}）`:''}`:'');
     UI.closeSheet();
-    this.round1(`第${xunNo()}旬第一轮：玩家消耗精力 ${cost} ${label}（${gone?'已用尽':'尚余 '+it.count+' 件'}${it.note?'；'+it.note:''}）。${fxNote}演绎使用此物的具体过程与其效果，然后决定是否触发剧情（hasEvent）。`,label,cost,{mode:{kind:'act',text:label}});
+    const tail=`（${gone?'已用尽':'尚余 '+it.count+' 件'}${it.note?'；'+it.note:''}）。${fxNote}`;
+    const msg=food
+      ? `第${xunNo()}旬第一轮：玩家${label}，不耗精力${tail}演绎吃用的具体过程——怎么取来、就着什么茶、与谁分食，吃罢神色如何松快；精力回补由前端结算，不必写数值。然后决定是否触发剧情（hasEvent）。`
+      : `第${xunNo()}旬第一轮：玩家消耗精力 ${cost} ${label}${tail}演绎使用此物的具体过程与其效果，然后决定是否触发剧情（hasEvent）。`;
+    this.round1(msg,label,cost,{mode:{kind:'act',text:label},foodGain:food?FOOD_ENERGY_GAIN:0});
   },
   useInstant(i){ // 即时之物：本地结算，不占本旬、不耗精力（每旬限一件，防刷属性）
     if(phase!=='FOCUS_SELECT'){toast('请先结束本旬应对');return}
