@@ -10538,7 +10538,7 @@ function sceneHandoffTarget(parts,narr,cur){ // 该不该把对话人交回正�
   if(strayEmp)return emperorSceneId();
   if(!isServantWho(curW))return '';
   const scene=String(narr||'')+' '+narrs+' '+acts;
-  const presence=/御案|御笔|御前|御览|御座|御书|御膳|龙颜|龙袍|上首|天子/.test(scene)||/(^|[。！？；\s])(陛下|皇上|圣上)[，,]/.test(says);
+  const presence=/御案|御笔|御前|御览|御座|龙颜|龙袍|天子/.test(scene)||/(^|[。！？；\s])(陛下|皇上|圣上)[，,]/.test(says); // 「上首」是座次、「御书房／御膳房」是地方：都不等于帝在场
   return presence?emperorSceneId():'';
 }
 function applySceneHandoff(parts,narr,cur){ // 交人：未标 who 的台词归正主，交人后的动作也归正主，宫人的陪衬动作仍归宫人
@@ -12034,6 +12034,20 @@ const Game={
     b.appendChild(tag);b.appendChild(t);wrap.appendChild(b);body.appendChild(wrap);
     body.scrollTop=body.scrollHeight;
   },
+  noteCast(whos,intro){ // 记本场在场的人：开口的人 + 开场旁白里点到名的人；旁白里“说到谁”不算到场
+    if(!sceneCtx)return;
+    const cast=Array.isArray(sceneCtx.cast)?sceneCtx.cast:(sceneCtx.cast=[]);
+    const add=id=>{const c=canonicalSceneWho(id)||String(id||'').trim();if(c&&!cast.includes(c))cast.push(c)};
+    if(sceneCtx.who)add(sceneCtx.who);
+    for(const w of (Array.isArray(whos)?whos:[]))if(!isPlaceholderWho(w))add(w);
+    const t=String(intro||''); // 只有开场那一段旁白用来认人：后文里的名字多半只是被谈起
+    if(t)for(const id in (state.npcs||{})){
+      const n=state.npcs[id]||{};
+      const names=[id,n.name,n.realName].filter(Boolean).map(String).filter(s=>s.length>=2);
+      if(names.some(nm=>t.includes(nm)))add(id);
+    }
+    if(cast.length>24)sceneCtx.cast=cast.slice(-24);
+  },
   sayParts(parts,who){ // 按 API 给的语义段渲染：act 与 say 并入同一只对方气泡，quote 走转述，narr 走完全旁白
     const fallback=who||(sceneCtx?sceneCtx.who:'');
     const proto=String((state&&state.protagonist&&state.protagonist.name)||'');
@@ -12160,7 +12174,7 @@ const Game={
     phase='EVENT_CHOICE';
     const sc=p.scene||{};
     const who0=sceneSpeaker(p,sc);
-    sceneCtx={who:canonicalSceneWho(who0)||(isPlaceholderWho(who0)?'':who0)||'宫中来人',round:1,lastOptions:Array.isArray(p.options)?p.options:(Array.isArray(sc.options)?sc.options:[]),offered:[],lines:[],ledger:[],meta:{when:'',where:''},resolveRetried:false,
+    sceneCtx={who:canonicalSceneWho(who0)||(isPlaceholderWho(who0)?'':who0)||'宫中来人',round:1,lastOptions:Array.isArray(p.options)?p.options:(Array.isArray(sc.options)?sc.options:[]),offered:[],lines:[],ledger:[],meta:{when:'',where:''},resolveRetried:false,cast:[],
       scheme:Game._pendingScheme||null,schemeDone:false};
     Game._pendingScheme=null; // 只认本场：下一场不继承
     const adj0=Game._lastAdj||{};
@@ -12187,6 +12201,7 @@ const Game={
     const parts=this.sceneParts(sc);
     const ho=applySceneHandoff(parts,p.narrative,sceneCtx.who); // 开场就是引见/通传：正主已开口就当场交人
     if(ho)sceneCtx.who=canonicalSceneWho(ho)||ho;
+    this.noteCast((parts||[]).map(x=>x.who).filter(Boolean),`${p.narrative||''} ${sc.where||''}`); // 开场开口的人与旁白里点到的人，算本场在场
     $('#chatTitle').textContent=sceneCtx.banquet?('宴席 · '+sceneCtx.banquet.name):('剧情对话 · '+dispName(sceneCtx.who));
     this.setChatBg(sc.where||(state&&state.location)); // 场景淡底图：本场有去处就铺，自行行事的对话仍留白
     $('#chatAva').innerHTML=avatarHtml(sceneCtx.who);
@@ -12392,6 +12407,7 @@ const Game={
       }
       phase='EVENT_CHOICE';
       this.mergeLedger(sc); // 本场已确认事项入账：下一轮连同对话记录一并回灌
+      this.noteCast((Array.isArray(sc.parts)?sc.parts:[]).filter(x=>x&&!/^(quote|quoted|cite|citation|refer|references|引用|转述|引述)$/i.test(String((x.type||x.t||x.role)||''))).map(x=>x.who).filter(Boolean)); // 这一轮真正开口的人：下一轮判断玩家叫的人在不在用
       let nw=canonicalSceneWho(sc.who); // 对话对象当场换手（被传入阁面圣、正主登场）：认下新说话人，改标题与头像
       if(sceneCtx&&(!nw||nw===sceneCtx.who)){ // 模型忘改 scene.who 时，看 parts 上有没有标出新说话人（转述里的 who 不算）
         const pws=[...new Set((Array.isArray(sc.parts)?sc.parts:[]).filter(x=>x&&!/^(quote|quoted|cite|citation|refer|references|引用|转述|引述)$/i.test(String(x.type||x.t||x.role||''))).map(x=>canonicalSceneWho(x&&x.who)).filter(Boolean))];
@@ -12415,13 +12431,14 @@ const Game={
           const mention=!!curNow&&(narrAll.includes(curNow)||(curName&&narrAll.includes(curName)));
           const curHere=unlabeled||spk.some(w=>(canonicalSceneWho(w)||w)===curNow)||(mention&&!left);
           const want=String(sceneCtx.wantWho||'');
-          const wantOk=!!want&&(canonicalSceneWho(want)||want)===nw;
+          const wantSpoke=!!want&&spk.some(w=>(canonicalSceneWho(w)||w)===(canonicalSceneWho(want)||want)); // 被当面叫到的人这一轮真的应了声
+          const wantOk=wantSpoke&&(canonicalSceneWho(want)||want)===nw;
           const newNpc=(state.npcs||{})[nw]||{};
           const newNames=[nw,newNpc.name,newNpc.realName,dispName(nw)].filter(Boolean).map(String).filter(s=>s.length>=2);
           const newIntro=newNames.some(nm=>narrAll.includes(nm)); // 旁白里把新人引到场：算整场换手，不是插话
           if(curHere&&!wantOk&&!newIntro)nw=curNow; // 玩家没当面叫别人、原对象还在场，也没交代换人：不换
         }
-        if(nw&&String(sceneCtx.wantWho||'')&&(canonicalSceneWho(sceneCtx.wantWho)||sceneCtx.wantWho)===nw)sceneCtx.wantWho=null; // 点名已兑现
+        if(sceneCtx)sceneCtx.wantWho=null; // 点名只认这一轮：下一轮由玩家重新叫
       }
       if(nw&&sceneCtx&&nw!==sceneCtx.who){sceneCtx.who=nw;if(!sceneCtx.banquet)$('#chatTitle').textContent='剧情对话 · '+dispName(nw);$('#chatAva').innerHTML=avatarHtml(nw)}
       this.sceneMeta(sc);
@@ -12489,7 +12506,7 @@ const Game={
     const parseNote=plainChoice?'这一条没有用括号标出动作、也没标明哪句是说出口的原话：按她此刻的言行演绎，NPC 只回应她实际做了、说了的，不得把她心里的打算当作已说出口的承诺来复述。':'';
     const whoNote='一轮里两人以上开口时，每段 act/say 都要标 who（含当前说话人的段），换人先写一句 narr 过场；没标 who 的台词按上一位说话人算。';
     const addressee=(function(){ // 只有当面称呼（开口叫名、转向/看向某人）才算冲另一个人说话；话里提到谁不等于跟谁说
-      const t=String(choice||'');if(!t||!state)return '';
+      const t=String(choice||'');if(!t||!state)return null;
       const cur=String(sceneCtx.who||'');
       const proto=String((state.protagonist||{}).name||'');
       const esc=s=>String(s).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
@@ -12508,14 +12525,18 @@ const Game={
       }
       const emp=emperorSceneId();
       if(emp&&emp!==cur&&/(^|[\s（(【])(陛下|皇上|圣上)\s*[，,、：:！!]/.test(t)&&!hits.includes(emp))hits.push(emp); // 「陛下，」是当面称呼
-      return hits.length===1?hits[0]:'';
+      if(hits.length!==1)return null;
+      const id=hits[0],cast=Array.isArray(sceneCtx.cast)?sceneCtx.cast:[];
+      return {id,present:!cast.length||cast.includes(canonicalSceneWho(id)||id)}; // 老档没有在场账：按在场处理，交给模型判断
     })();
-    const addrNote=addressee?`这一轮玩家是当面叫「${addressee}」说话：由${addressee}本人回应（台词标 who，并把 scene.who 改为「${addressee}」），当前对话人${sceneCtx.who}只作陪衬，不得代他作答。`:'';
+    const addrNote=!addressee?'':(addressee.present
+      ?`这一轮玩家是当面叫「${addressee.id}」说话：由${addressee.id}本人回应（台词标 who，并把 scene.who 改为「${addressee.id}」），当前对话人${sceneCtx.who}只作陪衬，不得代他作答。`
+      :`这一轮玩家当面叫「${addressee.id}」，但这一场她还没出过场：她若就在近处（廊下、外间、同院、随行），可写她应声进来，由本人回应并把 scene.who 改为她；她若不在这一处（别宫、宫外、已回去），由当前对话人${sceneCtx.who}如实回一句不在、已回去或改日再请，不得让「${addressee.id}」凭空开口，也不得改 scene.who。`);
     const personaCue=npcActCue(sceneCtx.who);
     const relNote=relCue(sceneCtx.who);
     let msg=`第${xunNo()}旬剧情对话第${r}轮：玩家应对「${choice}」（括号内是主控的动作/神情，括号外是当场说出口的话；未加括号的叙述按她此刻要说/要做的事理解，其中离开之后的安排不是她当众说出的台词）。${parseNote}演绎场上人物的当即反应与场面变化：scene.parts 总长 ≤120 字，另给 scene.ledger（逐条累积已确认的事）与 2—3 个接话选项（按【选项写法】）；scene.state 只写 "ongoing"，不结算数值。${addrNote?addrNote:banquet?'':`${sceneCtx.who}本人必须回应玩家这一轮的言行，不能不作答就走；话里提到别的人、旁人插话都可以，但不得替她作答，也不得把 scene.who 换成玩家没有当面叫的人（引见交人除外）。`}${handoffNote}${briefNote}${banquetNote}${optNote}${askedNote}${paceNote}${maidNote}${chamberNote}${whoNote?'\n【换人】'+whoNote:''}${personaCue?'\n【性情】'+personaCue:''}${relNote?'\n【分寸】'+relNote:''}`+this.sceneContextBlock();
     if(sceneCtx.chamber)msg=msg.replace(/她/g,'帝');
-    if(sceneCtx)sceneCtx.wantWho=addressee||null; // 玩家当面点了谁：这一轮允许把对话人换过去
+    if(sceneCtx)sceneCtx.wantWho=addressee?addressee.id:null; // 玩家当面叫到谁：这一轮若那人应了声，就把对话人换过去
     this.requestScene(msg,choice,MAX_OUTPUT_TOKENS,true,true); // 正常接话轮永不结算：聊多久由玩家决定，点「结束对话」才收场
   },
   sceneEnd(){ // 玩家主动结束：对方应声简短收尾，统一结算（不耗精力）；本地开场且一言未发则不调 API、不结算
