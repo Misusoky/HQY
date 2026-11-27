@@ -258,6 +258,16 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
 .segline .seg.on{border-color:var(--cinnabar);color:var(--cinnabar)}
 /* 宫谱内容区：固定高度，展开／收起分组与切换人物／派系都不改面板高度，只在框内滚动 */
 .gongpu-body{height:clamp(320px,52dvh,560px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding-right:2px}
+/* NPC 详情：整页定高、栏内滚动；各栏可折叠，开合不改面板高度 */
+.npcbody{height:clamp(320px,52dvh,560px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding-right:8px}
+.npcbody details.sec{margin-top:14px}
+.npcbody details.sec>summary{list-style:none;cursor:pointer;user-select:none}
+.npcbody details.sec>summary::-webkit-details-marker{display:none}
+.npcbody details.sec>summary.sec-cap{margin-bottom:0}
+.npcbody details[open]>summary.sec-cap{margin-bottom:8px}
+.npcbody .fold{flex:none;order:1;font-size:13px;color:var(--ink-soft);line-height:1;margin-left:8px;opacity:.85}
+.npcbody details:not([open]) .fold::before{content:"▸"}
+.npcbody details[open] .fold::before{content:"▾"}
 /* 藏书阁：按才艺折叠，一本书一行 */
 .libgroup{border-bottom:1px dashed var(--line)}
 .libgroup>summary{display:flex;align-items:center;gap:8px;min-height:44px;list-style:none;cursor:pointer;font-size:15px;letter-spacing:.04em}
@@ -4659,21 +4669,14 @@ const EMPEROR_PERSONA_MODULE = [
 ].join('\n');
 
 const PLOTS_MODULE = [
-'## 八、剧情台账（plots；本条覆盖"待兑现事项"的既有写法）',
-'存档 plots 为结构化剧情账，是剧情触发与兑现的唯一依据；pending 只留非剧情琐事（当票、节令预备、回礼等），不再记剧情引线。',
-'条目字段：id（唯一，长期沿用；不要把一条旧条目改写成另一件事，新事用新 id）、line（主线/支线/引线/敌对/目标）、title（一句具体的实事，如「德妃要你让出山茶绣样」；不得写「旧事」「心意」「某人的打算」这类虚题）、stage（进行中/已兑现/已作废）、goal（谁要什么、卡在哪、怎样算成，80字内，新建时必写）、next（下一步：一次见面或一次行动内能办完的具体动作，如「去针工局调那日的领料簿」；每场戏让这一步办成、办砸或被拒，然后换上新的一步）、tie（所系：这件事挂在哪条长期线上——命途本阶／位份／子嗣／母族／派系／与某人的旧怨／眼前实事）、dueText（人类可读期限，如「九月内」「三旬内」；没有期限就不写）、note（一句话现状，随推进更新）。earliest/latest 是前端按 dueText 换算的内部旬号，模型不要输出这两个字段。',
-'每条支线都要有主心骨：新建时写清 tie（挂在哪条长期线上）与 next（下一步）。挂不上任何长期线、也说不清下一步的，不立账——当场演完就算。同一件事里主控要知道自己在做什么、做完这一步会得到或失去什么；只有「又多知道一点」而没有得失的，不是剧情。',
-'在途支线／引线／敌对合计最多 5 条（裁决块会报数）：账满时只许兑现、并账、作废，不许新立。新线头先问能不能并进现有条目（改它的 next），能并就不新立。',
-'查证类（查旧案、查账、翻旧事、找经手人、追密信底档）全档同时只许一条在途：已有则新线索并进它的 next，不得另立第二条。查证线每场必须交付一件实测——可入行囊的实物、一个能找的人与去处、或对得上的实证（日期、笔迹、药味、经手人）；不得用「又听说」「又查到半页」「线索指向某处」原地打转。旧事本身不是戏：除非有人此刻正拿它换什么、压什么、抢什么。',
-'每旬第一轮请求附有【剧情裁决】块：是否触发剧情由前端掷骰并写明（剧情骰命中/未命中、命中哪条线），到期/超期条目必须当旬兑现，模型不再自行决定是否触发。每旬至多一条主要剧情（世界书既有纪律仍有效）。',
-'裁决块有时直接给一张【本旬引子·某牌】：那是前端抽定的开头，只定“发生了什么、谁被牵连、你被逼到哪一步”，不定真凶与结局。照它开场，不要另起炉灶，也不要把牌面里没写的人硬塞成幕后；后续由主控的选择与在场诸人往下演。',
-'每旬裁决块附【自查·在途账目】：列出全部在途条目并附客观线索（近期手作记录、行囊相关之物、相关人面板数值）。主持人须逐条对照截至本旬已真实发生的剧情事实：条件其实已经满足的，当轮必须兑现（stage 改"已兑现"，附积分与任务进度），不得继续挂账；线索仅供对照、不作裁决，以剧情事实为准，不得无中生有地兑现。',
-'主线不是配额：进行中的主线兑现或作废后可以空着，空的旬数不设上限。裁决块顶多以【发布·新主线（可选）】提示一次，确有从当前处境与既有伏笔自然长出的线头才发；没有就不发，不得为了补槽位硬编名字、硬挂期限，也不得把不相干的支线改个标题充主线。存档已有 state.mainLine（三途命途）时，不再另发 line="主线" 的新条目——主线由命途接手，你只演，不立。标题必须与 goal 说同一件事（写中秋就管中秋，写某处线索就管那条线索），dueText 只写这件事真实的期限（如「九月内」「三旬内」），没有期限就不写；earliest/latest 由前端按 dueText 换算，模型不要写数字。发布时经 statePatch.plots 新增一条 line="主线" 条目（id 用 "p-" 加短标题），正文埋入落账亦可，不强求单独成戏。',
-'无期限（缓图）条目并非永久挂账：悬置超过 4 旬未推进即"发酵"，会在裁决块以【须处理·搁置发酵】列出，当旬必须择一处理——兑现为剧情（旬首直接弹出，hasEvent=true）、改写期限（note 说明理由并给新 dueText）或作废（注明发酵后果）；连续 3 旬不回写前端自动作废。',
-'每轮结算（第一、二轮皆然）只经 statePatch.plots 回写【发生变化的条目】（新增、更新、兑现、作废）；只回写发生变化的条目，前端按 id 合并，漏写视为不变。',
-'兑现与"改备注"是两回事：条目条件已满足——所托之事办成、所求之物送到并被收下、当众献艺达成等——必须把该条目 stage 改为"已兑现"，积分由前端按兑现条目发放（不必写 protagonist.points），只在"本旬变化"里写任务进度；只改写 note 而 stage 留在"进行中"，一律视为未办结，任务继续挂账。任务兑现不拘形式：亲手做的成品相赠、拜托旁人代办、旧约当面履行皆可；手作成品对应任务时的兑现规则另见手作模块。',
-'玩家主动拜访某人、或往御花园散步时，请求可能附【呼应引线】块：所列在途引线与该人/该地相关，须借此次行动实质推进（兑现、或产生新信息/态度变化并经 statePatch.plots 更新 note）；已条件满足的条目直接兑现（stage 改"已兑现"），不要只写进展。只演绎不回写不算推进——同一引线连续两次被呼应却无回写、或呼应总次数达 3 次，前端不再主动提示它，并交回旬首"发酵"强制处置；多条引线同场命中时可一并带出，挑真相关的演，不必每条都塞进对话。若此番确无新进展，照实写一两句无获即可，不要为凑交集硬编事件。',
-'pending（待续琐事）与引线同生命周期：挂账超 4 旬未办即"发酵"，旬首以【须处理·琐事发酵】列入裁决块，须当旬择一处理——本旬办掉（从 statePatch.pending 移除）、升级为剧情引线（移入 statePatch.plots）或改写文本说明现状（回写即重置计旬）；连续 3 旬不理前端自动清除。'
+'## 八、剧情台账（plots）',
+'存档 plots 是剧情账；pending 只留非剧情琐事（当票、节令预备、回礼）。触发权在前端：每旬请求附【剧情裁决】，出不出戏、出哪条线由它写明，你不自行决定，也不因"该有戏了"另起一桩。',
+'字段：id（沿用旧 id，新事用新 id）、line（主线/支线/引线/敌对/目标）、title（一句具体的实事，不写「旧事」「心意」这类虚题）、stage（进行中/已兑现/已作废）、goal（谁要什么、卡在哪、怎样算成）、next（一次见面内能办完的下一步）、tie（所系：命途本阶／位份／子嗣／母族／派系／旧怨／眼前实事）、dueText（如「九月内」「三旬内」，没有就不写）、note（一句现状）。earliest/latest 由前端换算，不要写数字。',
+'立账标准：写得出 tie 与 next 才立；一句话能了结的当场演完，不立。在途合计上限 5 条（裁决块报数），账满只许兑现、并账或作废。查证类（旧案、账目、密信底档）全档只许一条在途，每场必须交付实物、人名去处或实证，不许「又听说」打转。',
+'回写只写发生变化的条目（statePatch.plots），前端按 id 合并，漏写视为不变。条件已满足就必须把 stage 改为「已兑现」，并在「本旬变化」里写进度（积分由前端发，不写 points）；只改 note 不算办结。',
+'裁决块列【须处理·搁置发酵】【须处理·琐事发酵】时，当旬必须处理完：办掉、改期限并说明理由、或作废并写后果。连续数旬不理，前端会自动作废。',
+'主线不是配额：命途（state.mainLine）在档时不再发 line="主线" 的新条目；没有从当前处境自然长出的线头就不发，不为补槽位硬编标题与期限。',
+'请求附【呼应引线】时，借这次行动实质推进（兑现，或经 statePatch.plots 更新 note）；只演不回写不算推进，前端会停掉这条提示。确无进展就照实写一两句无获。'
 ].join('\n');
 
 /* 暗流账：前端按关系与位份排期，模型只演；胜败由前端判定，不靠模型自觉 */
@@ -4745,42 +4748,45 @@ const SCENE_PARTS_RULES = [
 ].join('\n');
 
 /* 剧情对话（scene）骨架协议：触发剧情时优先用 scene 结构输出；对话轮次不结算，玩家点「结束对话」后才由前端发收尾请求结算 */
+/* 开场契约：旬首/自拟行动里要开一场戏时才用。持续对话的规矩在 SCENE_ONGOING_RULES（赠礼／献艺轮），
+   逐轮对谈的规矩在 SCENE_RULES（buildSceneSystem），收尾在 SCENE_SETTLE_RULES（buildSettleSystem）。 */
 const SCENE_MODULE = [
-'## 九、剧情对话（scene）',
-'触发剧情（hasEvent=true）时优先输出 scene 结构，进入对话式剧情：',
+'## 九、开场戏（scene）',
+'剧情要当场对人说话（hasEvent=true）时，用 scene 开场，把话交给玩家接：',
 '```json',
-'{"hasEvent":true,',
-' "eventSource":"素心",',
+'{"hasEvent":true,"eventSource":"素心",',
 ' "narrative":"你把话在心里过了一遍：……只让人回了句",',
-' "scene":{"state":"ongoing","who":"素心",',
-'  "parts":[{"type":"act","text":"她把茶盏搁下，声音放轻"},{"type":"say","text":"知道了"}],',
-'  "when":"腊月廿三 申时","where":"御花园梅林"},',
-' "options":[{"id":"a","text":"接话选项，可带姿态标签如【敛衽福身】"},{"id":"b","text":"另一方向，机会或代价可见"}],',
+' "scene":{"state":"ongoing","who":"素心","when":"腊月廿三 申时","where":"御花园梅林",',
+'  "parts":[{"type":"act","text":"她把茶盏搁下，声音放轻"},{"type":"say","text":"知道了"}]},',
+' "options":[{"id":"a","text":"（垂眼）……"},{"id":"b","text":"（起身）……"}],',
 ' "statePatch":{}}',
 '```',
-'- scene.who 必填，写清对方是谁：用存档中的人物称谓或姓名（如"太后""韦昭仪""春韶"），顶层 eventSource 写同一人；界面据此显示姓名与头像。不得写「…」「⋯」「某人」「宫人」这类占位——写成占位，前端就查不到她的位份、性情与交情，人物会当场走形。',
+'- 一场戏只回答一个核心问题：主控要得到或保住什么、谁在阻止、失败失去什么。答不上来就不是戏——写成日常旁白或直接结算，不写 scene。',
+'- scene.who 必填，用存档里的称谓（「太后」「韦昭仪」「春韶」），顶层 eventSource 写同一人；不得写「…」「某人」「宫人」这类占位，否则前端查不到位份、性情与交情，人物当场走形。',
 SCENE_PARTS_RULES,
-'- 触发剧情的当旬，narrative 必须先交代主控正在何处做什么、此人如何出现（迎面、传唤、偶遇、遣人请去），只写完全旁白，到"只让人回了句"这类引出语为止；第一句台词放进 scene.parts 的 say 段。界面会先显示 narrative，再按 parts 顺序渲染。开场这一轮 narrative 不得留空，也不得把这段旁白塞进 parts 的 act（act 只放对方当场的动作神态）。',
-'- narrative 只写完全旁白（主控所见、其他人物、场面与客观环节），人物台词一律放进 scene.parts；当前说话人的动作神态放进 act，不要写进 narrative，也不要在 narrative 里写引号对白。scene.line 可省略，仅作旧界面兜底。',
-'- 每轮只演绎场上人物的当即反应与场面变化（以 scene.who 为主，位份更高者在其位主事时，由其开口并换手）：scene.state 一律写 "ongoing"（继续对谈），scene.parts 总长不超过 120 字（act 写动作神态，say 写话；不写主控的动作心理、不铺环境）、2—3 个接话选项（放顶层 options）；此阶段 narrative 必须为空字符串，changes 与 statePatch 为空，不结算数值。',
-'- 对话对象可当场换手（通传后被召入阁面圣、正主闻声出来等）：后续轮把 scene.who 改写为新对象（档案在册的称谓）；过渡与场面写进 parts 的 narr 段，新对象的言行照常写 act/say；scene.where 写新所在。换手用 "ongoing" 继续对谈，不得借换手 resolve 收场。引见场景尤其注意：太监或宫人把人引到后，正主开口的那一轮必须把 scene.who 改为正主（帝写「皇帝」，不要写太监/宫女的名字），本轮只写正主的言行，引见者的话放上一轮或 parts 的 narr 段；不得让引见者一直占着对话人。',
-'- scene.where 写本场真实所在：主控在住处说话就写本宫住处（存档 location／residence），在御花园就写园中具体处所；不要照抄上一场的地点，也不要写本场并未去的地方。scene.where/when 只在场景确实移动或换时辰时写，同一处说几轮不必重复。',
-'- 结算时 statePatch.location 写主控本场散去后的所在：回殿即本宫住处；只有确实留宿他处、被禁足或扣在某地时才写别处。一过性的散步、赴宴、拜访不留在 location 里。',
-'- 玩家点「结束对话」后，前端会另发收尾请求；只有那时才写 scene.state="resolve"，并一并输出完整结算——narrative（收尾旁白，不写台词）、changes、statePatch（含 statePatch.plots 的变动条目），规则同第二轮。',
-'- 收尾只收束本场对话中已发生的事；须呼应既往前情时，只写存档剧情账与待续事项里已有记载的内容。',
-'- 召宫人问话、临时差遣等旬中插话不是本旬养成：收尾只结算这场对话本身（关系、情报、交办差事、行囊），主角才艺与基础属性留到旬末小结。',
-'- 对话长短由玩家决定，不设轮数上限：即使事情看似说尽、对方乏了或该告退，也只写一句带情绪或去意的回应（如"改日再叙""我先去当值了"），scene.state 仍为 "ongoing" 并给接话选项；不得自行收场、不得用 "wrap" 或 "resolve" 结束对话，只有玩家点「结束对话」才收尾。'
-,'- 每轮都要实质推进：对方给出实质答复、承诺或行动，或明确拒绝、反问、转移话题（人仍留在场，不得起身走人）；不得连续两轮只用客套或重复已有顾虑拖延。主控意图已明时（要办什么、问什么已说清），直接照办、照答或婉拒，不再层层请示。信息必须落地：直接问到对方知道的事，当场给出具体名目、缘由、时间、经手人或明确去处；确实不能说，也要给出具体缘由与下一步能问的人或能查之处——不得用空话吊着，不得把同一件事拆成多轮挤牙膏。不得重复盘问：问过并得到回答的事不再问、不换说法重问；每轮至少推进一项（新信息、决定、态度/关系变化、后果或新的具体行动），不要为凑对话制造盘问、试探或临时加码的审查。不得凭空发明与存档无关的禁忌或旧案；若引入新的忌讳，须同时讲清它是什么、为何犯忌、与谁相关。',
-'- 本场戏核：一场戏只回答一个核心问题——玩家要得到/保住什么，谁在阻止，失败会失去什么。开场前先自问这三件事；答不上来就不要开 scene，写成日常旁白或直接结算。每轮只能推进这个核心问题，不得另起无关的小问题；也不能只有来回问答——至少发生一件可叙述的“事”（有人来、传旨、搜检、夺物、当众发难、宴上出事、证据出现、条件变化），对话要改变事态（谁得了什么、谁失了面子、谁被迫表态），否则拆成一句日常旁白。核对簿册、传话、礼数、花色、茶点等琐事，除非直接牵连位份/恩宠/银钱/子嗣/性命/把柄/派系/任务，否则不得单独成场；生人手边的小事只作底色，不由她先开口求主控搭手。',
-'- 每轮 scene.parts 至少一段 say：对方的原话必须写在 say 的 text 里（act 只写动作神态，narr 只写场面），不得只写 act 而把台词吞掉，也不得把台词挪去 scene.line——界面会按段渲染，缺了 say 就只剩一个动作气泡。若对方确实一言不发，须在 act/narr 写明缘由并照常给接话选项。',
-'- 新冲突必须落地：谁受益、谁受损、代价是什么、为什么是现在；答不上来就不要写。',
-'- 接话选项每轮换新：不得重复上一轮的原句或同义改写，玩家已选过的方向不再作为选项；每个选项是不同的策略（答应、拒绝、拖延、反将、求助、交换条件），并写出当下可见的机会或代价，不得全是「答：……」。从第二轮起至少一个选项是把事推进的动作（递出去、去见某人、当场办、暂且搁下、起身告退）。选项一律写成现场言行：括号内是主控此刻的动作/神情/环境，括号外是当场说出口的原话，不带引号；不写转述口吻，也不写「回殿后连夜理清」「次日晨送来」这类后话——那是之后的事，不是这一轮说给对方听的内容。整轮只做动作、不开口时，整个选项放括号里。NPC 只回应主控实际说了、做了的。',
-'- 对方自己拿主意：除开场第一次请示外，不得用「你打算怎么办」「你说呢」「你怎么答」「要不要」这类话把决定推回玩家；能问的只有足以改变结果的具体事实（谁、何时、何地、何物、经手人），一轮至多一个问句，问的同时须给出自己的判断、条件或处置。禁止预演还没发生的事：旁人提醒谁要来问什么、该怎么说，只写一句提醒并给行动选项（提或不提、去或不去、见或不见），不得围着一句还没说出口的话再演一轮。',
-'- 每轮输出 scene.ledger：本场已交代清楚、已有结论的事，逐条累积（每条≤20字），前端会把它回灌给你；ledger 里的事后续不得再问，也不得换说法重提。节奏：本场第三轮起，核心问题必须落定——给结论、条件、处置或明确拒绝；第五轮后不再另起问句，只演对玩家这句话的回应与随之而来的动作、后果。',
-'- 一场对话只在同一日、同一处发生：scene.when 只写当日时辰的推移，不得跳到次日、翌日、明日。上一轮已经定下的事（说或不说、去或不去、提或不提）本轮直接推进出结果，不得换个日子、换个地方再把准备演一遍；要隔日再谈，由玩家结束这场、另开下一场。',
-'- 台词中的帝称：scene.parts 的 say/quote 里，人物提到天子一律称「陛下」，不得写「帝」；narr 与 narrative 等叙述仍称「帝」。',
-'- 玩家每轮可点选项，也可自定义输入一句话或一个动作；接话不扣精力，玩家随时可选"结束对话"，你应声简短收尾（narrative 一两句即可）。自定义内容符合世界规则即认真承接。',
-'- 若不适合对话形式（突发事态、文书、独自发现等），可不用 scene，按原有 hasEvent+options 两轮制输出。'
+'- 开场这一轮 narrative 不得留空：先交代主控正在何处做什么、此人如何出现（迎面、传唤、偶遇、遣人请去），写到「只让人回了句」这类引出语为止。narrative 只写旁白，不写动作神态、不写引号对白；对方第一句台词放进 parts 的 say。',
+'- scene.where 写本场真实所在（住处、园中具体处所），不照抄上一场，也不写没去过的地方；when 只写本场时辰，不下推次日。',
+'- 开场 options 给 2—3 个方向不同的接话，一律写成现场言行：括号内是主控的动作神情，括号外是当场说出口的原话，不带引号；不写「回殿后连夜……」这类后话。',
+'- 若不适合对话（突发事态、文书、独自发现），不用 scene，按 hasEvent+options 两轮制输出。',
+'- 进对话后由玩家逐轮接话，规矩另有交代；只有玩家点「结束对话」后前端另发的收尾请求，才写 scene.state="resolve" 并一并输出 narrative、changes、statePatch。'
+].join('\n');
+/* 持续对谈的规矩：赠礼／献艺／对弈／问诊这些轮次走完整提示词，不带这份就会丢段落与选项的写法 */
+const SCENE_ONGOING_RULES = [
+'- 每轮只演场上人物当即的反应与场面变化：scene.state 一律写 "ongoing"，parts 总长不超过 120 字（act 写动作神态，say 写话，不写主控心理、不铺环境），顶层给 2—3 个接话选项；此阶段 narrative 必须为空字符串，changes 与 statePatch 为空，不结算数值。',
+'- 每轮 scene.parts 至少一段 say：对方的原话必须写在 say 的 text 里（act 只写动作，narr 只写场面），不得只写 act 把台词吞掉，也不得挪去 scene.line。对方确实一言不发时，须在 act/narr 写明缘由，并照常给接话。',
+'- 换手：被召入阁面圣、正主登场时，后续轮把 scene.who 改成新对象，过渡写进 parts 的 narr，仍用 "ongoing"，不得借换手收场；引见者不得一直占着对话人。',
+'- 每轮必须推进一项：新信息、决定、态度变化、后果或新的具体行动。问过并得到回答的不再问、不换说法重问；问到对方知道的事，当场给具体名目、缘由、时间、经手人或去处，不能用空话吊着。对方自己拿主意，除开场请示外用「你打算怎么办」把决定推回玩家。',
+'- 选项每轮换新，不重复上轮原句或同义改写；每个选项是不同策略（答应、拒绝、拖延、反将、求助、交换条件），并写出可见的机会或代价，不得全是「答：……」。',
+'- 每轮输出 scene.ledger（本场已确认的事，每条≤20字，前端会回灌）；ledger 里的事不再重提。第三轮起核心问题必须落定，第五轮后不再另起问句。',
+'- 一场对话只在同一日、同一处发生：scene.when 只写当日时辰推移，不跳次日；已定下的事直接推进结果，不换个日子再演一遍准备。',
+'- parts 的 say/quote 里提到天子一律称「陛下」，叙述仍称「帝」。'
+].join('\n');
+/* 收尾轮专用：只收束本场，不结算本旬养成 */
+const SCENE_SETTLE_RULES = [
+'- 收尾轮才写 scene.state="resolve"，并一并输出 narrative（收尾旁白，不写台词）、changes、statePatch（含 plots 变动条目）。',
+'- 收尾只收束本场对话里已经发生的事；呼应前情时只写存档剧情账与待续事项里已有的内容，不临时补出新事。',
+'- statePatch.location 写主控散去后的所在：回殿即本宫住处，只有确实留宿他处、被禁足或扣在某地时才写别处。',
+'- 召宫人问话、临时差遣等旬中插话不是本旬养成：只结算这场对话本身（关系、情报、交办差事、行囊），才艺与基础属性留到旬末小结。'
 ].join('\n');
 
 /* 才艺解锁：开局配点、知情边界与求师门槛（前端已实现侍女打听、求师与藏书阁书册） */
@@ -4947,7 +4953,7 @@ function presenceNote(p){ // 面板「属性」里的一行说明
 /* ============================================================ 工具 */
 const $=s=>document.querySelector(s);
 const MONTHS=['','正月','二月','三月','四月','五月','六月','七月','八月','九月','十月','冬月','腊月'];
-const BUILD='2026-11-28·提示词按回合裁剪（无戏旬不带场景契约）＋无戏旬锁死自加剧情'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
+const BUILD='2026-11-28·开场契约与逐轮规矩拆开＋剧情账模块瘦身＋人物详情可折叠定高'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
 /* 月俸：按位份每月下旬末由前端自动入账（单位：两） */
 const SALARY_BY_GRADE={'正一品':220,'从一品':150,'正二品':110,'从二品':80,'正三品':60,'从三品':45,'正四品':36,'从四品':28,'正五品':20,'从五品':15,'正六品':12,'从六品':10,'正七品':8,'从七品':6,'正八品':5,'从八品':4,'正九品':3,'从九品':2};
 const SALARY_TITLES=[[/皇后/,220],[/皇贵妃/,150],[/贵妃/,110],[/贤妃|良妃|淑妃|德妃/,80],[/昭仪|昭容|昭媛|修仪|修容|修媛|充仪|充容|充媛/,45],[/贵嫔/,36],[/嫔/,28],[/贵人/,20],[/才人/,15],[/美人/,12],[/宝林/,10],[/常在/,8],[/答应/,6],[/选侍/,5],[/更衣/,4],[/采女/,3],[/官女子/,2],[/妃/,60]];
@@ -6812,6 +6818,13 @@ let abortCtrl=null;
 let lastUseIdx=null;          // 使用道具的件数回滚索引（调用失败时恢复）
 let sceneCtx=null;            // 剧情场景状态：{who,round,lastOptions,lines}
 let sceneWhoHint=null;        // 本轮剧情的说话人兜底：模型漏写 scene.who 时用拜访对象补上
+let npcFold={};               // NPC 详情各栏的开合状态：面板重绘后仍按玩家上次动过的留着
+/* NPC 详情的一栏：可折叠，页高由 .npcbody 定住，开合只影响栏内滚动 */
+function npcFoldSec(id,key,cap,body){
+  const k=String(id)+'|'+key;
+  return `<details class="sec" ${npcFold[k]===false?'':'open'} ontoggle="UI.npcFoldToggle(this,'${esc(k)}')">`
+    +`<summary class="sec-cap">${cap}<span class="fold"></span></summary>${body}</details>`;
+}
 const CARD_CAP=20;let cardCount=0;
 const MAX_OUTPUT_TOKENS=4096;   // 单次输出上限：正文 + JSON 结算；取主流模型的通用上限，留足余量避免 JSON 被截断
 const JSON_RETRY_EMPTY=2;       // JSON 模式偶发返回空白（DeepSeek 等接口会吞掉非 JSON 内容）：自动重试次数
@@ -7039,7 +7052,7 @@ function compactState(s,focusMsg){ // 只压缩送入模型的那一份，localS
    event  —— 旬首／自拟行动里可能演到场景的一轮
    routine—— 前端已裁定无戏：只写养成与日常，连 scene 字段都不许写（减少自由度，也省掉最大的一块规则） */
 const PROMPT_MODULES={
-  full:['NPC_MODULE','SECRETS_MODULE','ENERGY_MODULE','PLOTS_MODULE','MAIN_LINE_MODULE','SCHEME_MODULE','FACTION_MODULE','FESTIVAL_MODULE','EMPEROR_MODULE','EMPEROR_PERSONA_MODULE','CHAMBER_MODULE','SCENE_MODULE','SKILL_MODULE','CRAFT_MODULE','COOKING_MODULE','STUDIO_MODULE','GIFT_MODULE','PERFORM_MODULE','PERSONA_MODULE','PERSONA_ACT_MODULE','LENGTH_MODULE','PRESENCE_MODULE','PLAY_UI_MODULE'],
+  full:['NPC_MODULE','SECRETS_MODULE','ENERGY_MODULE','PLOTS_MODULE','MAIN_LINE_MODULE','SCHEME_MODULE','FACTION_MODULE','FESTIVAL_MODULE','EMPEROR_MODULE','EMPEROR_PERSONA_MODULE','CHAMBER_MODULE','SCENE_MODULE','SCENE_ONGOING_RULES','SKILL_MODULE','CRAFT_MODULE','COOKING_MODULE','STUDIO_MODULE','GIFT_MODULE','PERFORM_MODULE','PERSONA_MODULE','PERSONA_ACT_MODULE','LENGTH_MODULE','PRESENCE_MODULE','PLAY_UI_MODULE'],
   event:['NPC_MODULE','SECRETS_MODULE','ENERGY_MODULE','PLOTS_MODULE','MAIN_LINE_MODULE','SCHEME_MODULE','FACTION_MODULE','FESTIVAL_MODULE','EMPEROR_MODULE','EMPEROR_PERSONA_MODULE','SCENE_MODULE','SKILL_MODULE','COOKING_MODULE','PERSONA_MODULE','PERSONA_ACT_MODULE','LENGTH_MODULE','PRESENCE_MODULE','PLAY_UI_MODULE'], // 侍寝、手作、书画、赠礼、互动各有自己的请求：这些模块只在那边出现
   routine:['NPC_MODULE','SECRETS_MODULE','ENERGY_MODULE','PLOTS_MODULE','SKILL_MODULE','PERSONA_MODULE','PERSONA_ACT_MODULE','LENGTH_MODULE','PRESENCE_MODULE','PLAY_UI_MODULE']
 };
@@ -7047,7 +7060,7 @@ const ROUTINE_LOCK='\n\n【本轮无戏】前端已裁定本旬没有剧情：�
 let _staticCache={}; // 每套静态提示词各拼一次：同类回合逐字节一致，前缀缓存才命中
 let _modMap=null;
 function promptModules(){
-  if(!_modMap)_modMap={NPC_MODULE,SECRETS_MODULE,ENERGY_MODULE,PLOTS_MODULE,MAIN_LINE_MODULE,SCHEME_MODULE,FACTION_MODULE,FESTIVAL_MODULE,EMPEROR_MODULE,EMPEROR_PERSONA_MODULE,CHAMBER_MODULE,SCENE_MODULE,SKILL_MODULE,CRAFT_MODULE,COOKING_MODULE,STUDIO_MODULE,GIFT_MODULE,PERFORM_MODULE,PERSONA_MODULE,PERSONA_ACT_MODULE,LENGTH_MODULE,PRESENCE_MODULE,PLAY_UI_MODULE};
+  if(!_modMap)_modMap={NPC_MODULE,SECRETS_MODULE,ENERGY_MODULE,PLOTS_MODULE,MAIN_LINE_MODULE,SCHEME_MODULE,FACTION_MODULE,FESTIVAL_MODULE,EMPEROR_MODULE,EMPEROR_PERSONA_MODULE,CHAMBER_MODULE,SCENE_MODULE,SCENE_ONGOING_RULES,SCENE_SETTLE_RULES,SKILL_MODULE,CRAFT_MODULE,COOKING_MODULE,STUDIO_MODULE,GIFT_MODULE,PERFORM_MODULE,PERSONA_MODULE,PERSONA_ACT_MODULE,LENGTH_MODULE,PRESENCE_MODULE,PLAY_UI_MODULE};
   return _modMap;
 }
 function buildStaticSystem(kind){
@@ -7117,7 +7130,7 @@ function buildSettleSystem(){
       .replace('{{叙事文风全文：03-叙事文风.md}}',STYLE_GUIDE)
       .replace('{{当前存档 JSON：04-当前存档-v36.json 或玩家当前档}}','（见本提示词末尾「当前存档」段）')
       +'\n\n'+NPC_MODULE+'\n\n'+ENERGY_MODULE+'\n\n'+PLOTS_MODULE+'\n\n'+EMPEROR_MODULE+'\n\n'+FACTION_MODULE
-      +'\n\n'+SCENE_MODULE+'\n\n'+SCENE_PARTS_RULES+'\n\n'+SKILL_MODULE+'\n\n'+PRESENCE_MODULE+'\n\n'+LENGTH_MODULE+'\n\n'+SECRETS_MODULE;
+      +'\n\n'+SCENE_MODULE+'\n\n'+SCENE_SETTLE_RULES+'\n\n'+SCENE_PARTS_RULES+'\n\n'+SKILL_MODULE+'\n\n'+PRESENCE_MODULE+'\n\n'+LENGTH_MODULE+'\n\n'+SECRETS_MODULE;
   }
   return _settleSystem+(sceneCtx&&sceneCtx.chamber?'\n\n'+CHAMBER_MODULE:''); // 侍寝夜话只收场：补一条夜话口径
 }
@@ -9065,7 +9078,8 @@ const UI={
     if(!this.isEmperorId(who)||!state.emperor)return '';
     return `<span class="relpill p-good">${esc(emperorStage(state.emperor.intimacy))}</span>`;
   },
-  empSection(){ // 知心专页：双轨概况＋共同经历账＋久未召见的原因（数字不外露）
+  empSection(id){ // 知心专页：双轨概况＋共同经历账＋久未召见的原因（数字不外露）
+    id=id||'皇帝';
     const e=state.emperor;if(!e)return '';
     const stage=emperorStage(e.intimacy);
     const favor=(state.relationships||{})['皇帝'];
@@ -9082,9 +9096,9 @@ const UI={
     ].join('');
     const list=mems.slice(0,10).map(m=>`<div class="tl-item"><div class="tl-time">${esc(m.xun||'')} <span class="tag">${esc(m.type||'共历')}</span>${m.open?' <span class="tag t-rumor">未了</span>':''}</div>${esc(m.text)}</div>`).join('');
     const more=mems.length>10?`<div class="sheet-note">更早还有 ${mems.length-10} 条，往后正文里自会提起。</div>`:'';
-    return `<div class="sec"><div class="sec-cap">知心</div>${rows}
-      ${list?`<div class="tl" style="margin-top:8px">${list}</div>${more}`:'<div class="sheet-note">尚无共同经历。</div>'}</div>
-      ${persona?`<div class="sec"><div class="sec-cap">帝设（你所撰）</div><div class="sheet-note" style="white-space:pre-wrap;line-height:1.8">${esc(persona)}</div><div class="sheet-note">「移性符」每件可改一次。</div></div>`:''}`;
+    return npcFoldSec(id,'知心','知心',rows
+      +(list?`<div class="tl" style="margin-top:8px">${list}</div>${more}`:'<div class="sheet-note">尚无共同经历。</div>'))
+      +(persona?npcFoldSec(id,'帝设','帝设（你所撰）',`<div class="sheet-note" style="white-space:pre-wrap;line-height:1.8">${esc(persona)}</div><div class="sheet-note">「移性符」每件可改一次。</div>`):'');
   },
   npcRowHtml(who,onclick){
     const c=this.npcCard(who);
@@ -9650,12 +9664,12 @@ const UI={
     const n=(state.npcs||{})[id];
     if(!n){ // 只知名讳：暂无双层档案，先给关系概况
       return `<button class="backbtn" onclick="UI.sheetBack()">◀ 返回人物谱</button>
-      <div class="sec"><div class="sec-cap">概况</div>
-        <div class="rowline"><span class="rk">称谓</span><span class="rv">${esc(id)}</span></div>
+      <div class="npcbody">${npcFoldSec(id,'概况','概况',
+        `<div class="rowline"><span class="rk">称谓</span><span class="rv">${esc(id)}</span></div>
         <div class="rowline"><span class="rk">关系</span><span class="rv">${this.relBadge(id)}</span></div>
-        <div class="rowline"><span class="rk">相识</span><span class="rv">—</span></div></div>
-      ${this.isEmperorId(id)?this.empSection():''}
-      <div class="sheet-note">尚无档案。</div>`;
+        <div class="rowline"><span class="rk">相识</span><span class="rv">—</span></div>`)}
+      ${this.isEmperorId(id)?this.empSection(id):''}
+      <div class="sheet-note">尚无档案。</div></div>`;
     }
     const prof=n.profile||{};
     const empPersonaOn=this.isEmperorId(id)&&!!(state.world&&state.world.emperor&&String(state.world.emperor.persona||'').trim()); // 帝设在档：感知性情栏退位
@@ -9681,31 +9695,36 @@ const UI={
             :`<div class="sheet-note">好感 ${bond??'—'}／${SKILL_TEACH_BOND}，尚不够。</div>`));
       return `<div class="rowline"><span class="rk">${esc(name)}</span><span class="rv num">${esc(v)} · ${SKILL_LEVEL(v)}</span></div>${act}`;
     }).join('');
-    return `<button class="backbtn" onclick="UI.sheetBack()">◀ 返回人物谱</button>
-      <div class="sec"><div class="sec-cap">概况</div>
-        <div class="nd-head">${avatarHtml(id,'nd-av')}<div><div class="nd-nm">${esc(realName)}</div><div class="nd-rk">${esc([n.rank,n.faction].filter(Boolean).join(' · ')||'宫中之人')}</div></div></div>
+    const sec=this.isEmperorId(id)?'':`<div class="rowline"><span class="rk">亲疏</span><span class="rv">${esc(relTier(id).label)}${relTier(id).value==null?'':'（'+relTier(id).value+'）'}${relTier(id).meets==null?'':' · 见过 '+relTier(id).meets+' 次'}</span></div>`;
+    return `<button class="backbtn" onclick="UI.sheetBack()">◀ 返回人物谱</button><div class="npcbody">
+      ${npcFoldSec(id,'概况','概况',
+        `<div class="nd-head">${avatarHtml(id,'nd-av')}<div><div class="nd-nm">${esc(realName)}</div><div class="nd-rk">${esc([n.rank,n.faction].filter(Boolean).join(' · ')||'宫中之人')}</div></div></div>
         <div class="rowline"><span class="rk">本名</span><span class="rv">${esc(realName)}</span></div>
         ${addr!==realName?`<div class="rowline"><span class="rk">称谓</span><span class="rv">${esc(addr)}</span></div>`:''}
         ${n.rank?`<div class="rowline"><span class="rk">位份</span><span class="rv">${esc(n.rank)}</span></div>`:''}
         ${n.faction?`<div class="rowline"><span class="rk">派系</span><span class="rv">${esc(n.faction)}</span></div>`:''}
-        <div class="rowline"><span class="rk">相识</span><span class="rv">${esc(n.metAt||'—')}</span></div>
-        ${this.isEmperorId(id)?'':`<div class="rowline"><span class="rk">亲疏</span><span class="rv">${esc(relTier(id).label)}${relTier(id).value==null?'':'（'+relTier(id).value+'）'}${relTier(id).meets==null?'':' · 见过 '+relTier(id).meets+' 次'}</span></div>`}
-        <div class="rowline"><span class="rk">解锁度</span><span class="rv">${esc(prof.depth||'初识')}</span></div></div>
-      ${this.isEmperorId(id)?this.empSection():''}
-      ${(n.favor!=null&&!this.isEmperorId(id))?`<div class="sec"><div class="sec-cap">帝前</div>
-        <div class="rowline"><span class="rk">帝宠</span><span class="rv num">${esc(n.favor)}</span></div>
+        <div class="rowline"><span class="rk">相识</span><span class="rv">${esc(n.metAt||'—')}</span></div>${sec}
+        <div class="rowline"><span class="rk">解锁度</span><span class="rv">${esc(prof.depth||'初识')}</span></div>`)}
+      ${this.isEmperorId(id)?this.empSection(id):''}
+      ${(n.favor!=null&&!this.isEmperorId(id))?npcFoldSec(id,'帝前','帝前',
+        `<div class="rowline"><span class="rk">帝宠</span><span class="rv num">${esc(n.favor)}</span></div>
         <div class="itemrow"><span>帝待她</span><span class="cnt">${esc(emperorAttitudeOf(n))}</span></div>
         ${n.emperorStory?`<div class="sheet-note" style="margin-top:6px">${esc(n.emperorStory)}</div>`:''}
-        ${n.arc?`<div class="itemrow" style="margin-top:6px"><span>她眼下的事</span><span class="cnt">${esc(n.arc)}</span></div>`:''}</div>`:''}
-      ${(this.isEmperorId(id)&&empPersonaOn)?'':`<div class="sec"><div class="sec-cap">已感知的性情</div>${normalizePersona(prof.traits).map(t=>`<span class="tag">${esc(t)}</span>`).join('')||'<div class="sheet-note">所知尚浅。</div>'}</div>`}
-      <div class="sec"><div class="sec-cap">才艺见闻</div>${intelSection||`<div class="sheet-note">尚未听说${ta}精于何艺。</div>`}</div>
-      <div class="sec"><div class="sec-cap">${ta}对你</div>${this.mindSection(id)}</div>
-      ${(secretsKnownOf(id).length)?`<div class="sec"><div class="sec-cap">掌握的把柄</div>${secretsKnownOf(id).map(s=>`<div class="itemrow"><span>${s.used?'（已抖出，成公开旧事）':''}${esc(s.text)}</span></div>`).join('')}</div>`:''}
-      ${(n.memories&&n.memories.length)?`<div class="sec"><div class="sec-cap">旧账</div><div class="tl">${[...n.memories].reverse().map(m=>`<div class="tl-item"><div class="tl-time">${esc(m.xun||'')}</div>${esc(m.text)}</div>`).join('')}</div></div>`:''}
-      <div class="sec"><div class="sec-cap">${ta}对他人（据你所知）</div>${impOther}</div>
-      <div class="sec"><div class="sec-cap">生平所知</div>${bio?`<div class="tl">${bio}</div>`:'<div class="sheet-note">还没有可记的往来。</div>'}</div>
-      ${recent?`<div class="sec"><div class="sec-cap">最近动向</div>${recent}</div>`:''}`;
+        ${n.arc?`<div class="itemrow" style="margin-top:6px"><span>她眼下的事</span><span class="cnt">${esc(n.arc)}</span></div>`:''}`):''}
+      ${(this.isEmperorId(id)&&empPersonaOn)?'':npcFoldSec(id,'性情','已感知的性情',
+        normalizePersona(prof.traits).map(t=>`<span class="tag">${esc(t)}</span>`).join('')||'<div class="sheet-note">所知尚浅。</div>')}
+      ${npcFoldSec(id,'才艺','才艺见闻',intelSection||`<div class="sheet-note">尚未听说${ta}精于何艺。</div>`)}
+      ${npcFoldSec(id,'对你',`${ta}对你`,this.mindSection(id))}
+      ${(secretsKnownOf(id).length)?npcFoldSec(id,'把柄','掌握的把柄',
+        secretsKnownOf(id).map(s=>`<div class="itemrow"><span>${s.used?'（已抖出，成公开旧事）':''}${esc(s.text)}</span></div>`).join('')):''}
+      ${(n.memories&&n.memories.length)?npcFoldSec(id,'旧账','旧账',
+        `<div class="tl">${[...n.memories].reverse().map(m=>`<div class="tl-item"><div class="tl-time">${esc(m.xun||'')}</div>${esc(m.text)}</div>`).join('')}</div>`):''}
+      ${npcFoldSec(id,'他人',`${ta}对他人（据你所知）`,impOther)}
+      ${npcFoldSec(id,'生平','生平所知',bio?`<div class="tl">${bio}</div>`:'<div class="sheet-note">还没有可记的往来。</div>')}
+      ${recent?npcFoldSec(id,'动向','最近动向',recent):''}
+    </div>`;
   },
+  npcFoldToggle(el,key){npcFold[key]=!!(el&&el.open)}, // 记住这一栏开着还是合上：重绘后照旧
   paneSaves(){
     const cur=state?`<div class="sheet-note">当前：第 ${xunNo()} 旬 · ${esc(fmtTime())}</div>`:'';
     const slotHtml=(key,label,auto)=>{
