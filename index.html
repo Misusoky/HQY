@@ -2724,7 +2724,7 @@ function rankBrief(s){
 已备 ${L.met}／${L.need} 项：${has.join('、')||'无'}${miss.length?`｜还差：${miss.join('、')}`:''}`];
   if(L.lastDenied===st.turn)lines.push(`上一版擅自改了主控位份，被前端驳回（资未足）：本轮不得再写 protagonist.rank，改写这件事没成——谁压的、卡在哪一步、你怎么知道。`);
   if(L.ok){
-    if(now-L.lastPush>=1)lines.push(`资已足：本旬必须让晋位上台面——风闻、廷议、拟名单、册文，或被人添一笔「再议」皆可；须有具体的人、文书或一道手续，并有人当场得失，不得只用一句「时机未到」带过。成了写 statePatch["protagonist.rank"]="${rankWithGrade(L.next)}"，并写 statePatch.rankPush=true。被压住就不改位份，改写阻力（谁、为什么、下一步找谁），同样写 rankPush=true 与 rankBlock。`);
+    if(now-L.lastPush>=1)lines.push(`资已足：本旬必须让晋位上台面——风闻、廷议、拟名单、册文，或被人添一笔「再议」皆可；须有具体的人、文书或一道手续，并有人当场得失，不得只用一句「时机未到」带过。晋位一露头就有人不愿意：让反对者当场露面（卡名单、放话、抢差事、抬出中宫或太后），不许顺顺当当落地。成了写 statePatch["protagonist.rank"]="${rankWithGrade(L.next)}"，并写 statePatch.rankPush=true。被压住就不改位份，改写阻力（谁、为什么、下一步找谁），同样写 rankPush=true 与 rankBlock。`);
     else lines.push(`资已足，但上一旬刚有进展：本旬可垫一层（跑手续、递话、听风声），不催着再升；若有人趁势下绊，就演这一手。`);
   }else if(now-L.lastPush>=4&&L.met>=Math.max(1,L.need-1)){
     lines.push(`距上次进展已久：本旬须给一件与晋位相关的实际进展或明确阻力（谁替你说项、谁压着、走哪道手续），落到人、物或文书上；确有进展或受阻写 statePatch.rankPush=true，受阻另写 rankBlock。`);
