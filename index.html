@@ -4490,12 +4490,15 @@ function resolveNight(prevTurn){
   report.intent=intent.mode;
   const e=state.emperor||(state.emperor={});
   if(e.absence&&e.absence.reason){
+    if(state.nightForce!=null)delete state.nightForce; // 帝不进后宫：承恩香也白点
     report.kind='none';report.reason=String(e.absence.reason).slice(0,60);
     chamberRecord({turn:state.turn,time:fmtTime(),kind:'none',who:'',note:'帝未召人：'+report.reason,intent:intent.mode,paid:!!intent.paid});
     state.xunIntent=null;
     return report;
   }
-  const pick=pickNightPartner(intent);
+  const forced=(state.nightForce!=null&&Number(state.nightForce)===Number(state.turn)&&nightSummonAllowed()); // 承恩香：今夜必得召幸
+  if(state.nightForce!=null)delete state.nightForce;
+  const pick=forced?{kind:'me'}:pickNightPartner(intent);
   if(pick.kind==='me'){
     report.kind='me';
     const rel=state.relationships[chamberFavorKey()];
@@ -4907,7 +4910,7 @@ function presenceNote(p){ // 面板「属性」里的一行说明
 /* ============================================================ 工具 */
 const $=s=>document.querySelector(s);
 const MONTHS=['','正月','二月','三月','四月','五月','六月','七月','八月','九月','十月','冬月','腊月'];
-const BUILD='2026-11-27·长台词不再误判旁白'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
+const BUILD='2026-11-27·迷魂香择人+承恩香+长台词修复'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
 /* 月俸：按位份每月下旬末由前端自动入账（单位：两） */
 const SALARY_BY_GRADE={'正一品':220,'从一品':150,'正二品':110,'从二品':80,'正三品':60,'从三品':45,'正四品':36,'从四品':28,'正五品':20,'从五品':15,'正六品':12,'从六品':10,'正七品':8,'从七品':6,'正八品':5,'从八品':4,'正九品':3,'从九品':2};
 const SALARY_TITLES=[[/皇后/,220],[/皇贵妃/,150],[/贵妃/,110],[/贤妃|良妃|淑妃|德妃/,80],[/昭仪|昭容|昭媛|修仪|修容|修媛|充仪|充容|充媛/,45],[/贵嫔/,36],[/嫔/,28],[/贵人/,20],[/才人/,15],[/美人/,12],[/宝林/,10],[/常在/,8],[/答应/,6],[/选侍/,5],[/更衣/,4],[/采女/,3],[/官女子/,2],[/妃/,60]];
@@ -6854,7 +6857,7 @@ function compactState(s,focusMsg){ // 只压缩送入模型的那一份，localS
   const out=Object.assign({},s);
   out.turn=xunNoOf(s.turn); // 对外统一 1 起旬号，与指令里的「第N旬」一致
   // 前端内部标记与展示字段不送模型
-  for(const k of ['avatarMap','plotMeta','schemeMeta','xunBook','saveVersion','plotLedgerV1','pawnFix1','itemFlagV1','readMindV1','energyWarned','mealCount','lastSalaryMonth','lastFestSerial','lastFestPerfSerial','items','skillWorks','pieceSeq','craftV1','chamberV1','xunIntent','inviteTurn','postpartumUntil','decor','factionFix1','lastConsortYear','openingWoo','longBuff','itemUseTurn','interludeMeta','seedMeta','allowance','kitchen','cookGlowTurn'])delete out[k];
+  for(const k of ['avatarMap','plotMeta','schemeMeta','xunBook','saveVersion','plotLedgerV1','pawnFix1','itemFlagV1','readMindV1','energyWarned','mealCount','lastSalaryMonth','lastFestSerial','lastFestPerfSerial','items','skillWorks','pieceSeq','craftV1','chamberV1','xunIntent','inviteTurn','postpartumUntil','decor','factionFix1','lastConsortYear','openingWoo','longBuff','itemUseTurn','interludeMeta','seedMeta','allowance','kitchen','cookGlowTurn','nightForce','rankProg'])delete out[k]; // rankProg 由 rankBrief 单给，不整块塞进存档
   // 派系账：只送模型够写的部分；排期时刻与期限由前端管，不送出去免得照抄出错位的旬号
   if(Array.isArray(s.factions)){
     out.factions=s.factions.map(f=>({
@@ -8887,6 +8890,7 @@ const UI={
     else if(name==='小厨房结果')B.innerHTML=this.sheetCookResult();
     else if(name==='物品详情')B.innerHTML=this.sheetItemDetail(param);
     else if(name==='择人')B.innerHTML=this.sheetMeetTargets();
+    else if(name==='迷香')B.innerHTML=this.sheetIncenseTargets();
     else if(name==='赠结')B.innerHTML=this.sheetKnotTargets();
     else if(name==='商城')B.innerHTML=this.sheetShop();
     else if(name==='商品详情')B.innerHTML=this.sheetShopDetail(param);
@@ -9178,9 +9182,16 @@ const UI={
     const pawn=it.pawnable?`<button class="btn btn-primary" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.pawnItem(${i})">典卖 · 约得银 ${pawnPrice(it)} 两</button>`
       :`<button class="btn" disabled style="opacity:.45;letter-spacing:.1em;text-indent:.1em">不可典卖</button>`;
     const displayBtn=it.src==='功课'?`<button class="btn btn-line" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.toggleDisplay(${i})">${it.displayed?'收起陈设':'陈设在住处'}</button>`:'';
+    const useLabel=it.name==='移性符'?'使用 · 重撰帝设'
+      :it.name==='邂逅笺'?'使用 · 择一人'
+      :it.name==='易容膏'?'使用 · 择人易容'
+      :it.name==='迷魂香'?'使用 · 择一人'
+      :SHOP_INSTANT.has(it.name)?'使用 · 即刻生效（不占本旬）'
+      :isFood?(it.dark?'吃用 · 演一场（看运气）':`吃用 · 演一场（精力 +${foodRestoreOf(it)}）`)
+      :'使用 · 演一场（耗精力 5）';
     const act=it.durable
       ?`<button class="btn btn-primary" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.toggleEquip(${i})">${it.equipped!==false?'收存（停用效用）':'启用（随身佩戴）'}</button>`
-      :(it.usable!==false?`<button class="btn btn-primary" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.useItem(${i})">${it.name==='移性符'?'使用 · 重撰帝设':(it.name==='邂逅笺'?'使用 · 择一人':(it.name==='易容膏'?'使用 · 择人易容':(SHOP_INSTANT.has(it.name)?'使用 · 即刻生效（不占本旬）':(isFood?(it.dark?'吃用 · 演一场（看运气）':`吃用 · 演一场（精力 +${foodRestoreOf(it)}）`):'使用 · 演一场（耗精力 5）'))))}</button>`:`<button class="btn" disabled style="opacity:.45;letter-spacing:.1em;text-indent:.1em">不可使用</button>`);
+      :(it.usable!==false?`<button class="btn btn-primary" style="letter-spacing:.1em;text-indent:.1em" onclick="Game.useItem(${i})">${useLabel}</button>`:`<button class="btn" disabled style="opacity:.45;letter-spacing:.1em;text-indent:.1em">不可使用</button>`);
     const wide=(k,v)=>`<div class="rowline" style="align-items:flex-start"><span style="flex:none">${k}</span><span class="cnt" style="white-space:normal;text-align:right;max-width:70%">${esc(v)}</span></div>`;
     const crafted=!!it.crafted;
     const matKindLabel={绣:'绣作',香:'合香',药:'丸散',花:'花作',杂:'杂件'};
@@ -9296,6 +9307,30 @@ const UI={
     const pending=state.gardenMeetWhom;
     return `<div class="sheet-note" style="margin-top:0">下一次往御花园，必遇此人。${pending?`<br>当前已记：<b>${esc(dispName(pending))}</b>，重择即作废。`:''}</div>
       <div class="sec"><div class="sec-cap">可选之人</div>${rows||'<div class="sheet-note">宫中尚无相识之人，暂无可遇。</div>'}</div>
+      <button class="backbtn" onclick="UI.sheetBack()">◀ 返回行囊</button>`;
+  },
+  sheetIncenseTargets(){ // 迷魂香：择定要迷的人；位份越高越难成，也越容易败露
+    const npcs=state.npcs||{};
+    const rels=state.relationships||{};
+    const empId=Object.keys(npcs).find(id=>this.isEmperorId(id))||Object.keys(rels).find(id=>this.isEmperorId(id))||'皇帝';
+    const dg=disguiseActive(state);
+    const ids=[empId];
+    for(const id of Object.keys(npcs)){
+      if(id===empId)continue;
+      if(dg&&(id===dg.who||id===dg.name))continue;
+      const n=npcs[id];if(!n)continue;
+      if(!n.known&&!/太后/.test(id+(n.rank||'')))continue;
+      ids.push(id);
+    }
+    ids.sort((a,b)=>rankScoreOf((npcs[b]||{}).rank)-rankScoreOf((npcs[a]||{}).rank)); // 高位在前：迷谁也在这里看分量
+    const rows=ids.map(id=>{
+      const c=this.npcCard(id);
+      const role=c.role==='只知名讳'?'':c.role;
+      const gap=rankGapToMe(id);
+      const risk=gap>=5?'极易败露':gap>=3?'难成':gap<=0?'较易':'不易';
+      return `<button class="npcrow" onclick="Game.pickIncenseTarget('${esc(id)}')"><span class="nr-main"><span class="nr-name">${esc(c.name)}</span>${role?`<span class="nr-role">${esc(role)}</span>`:''}</span><span class="nr-rel">${esc(risk)}</span></button>`;
+    }).join('');
+    return `<div class="sec"><div class="sec-cap">迷谁</div>${rows||'<div class="sheet-note">宫中尚无相识之人。</div>'}</div>
       <button class="backbtn" onclick="UI.sheetBack()">◀ 返回行囊</button>`;
   },
   sheetKnotTargets(){ // 同心结：择一人相赠
@@ -9835,8 +9870,12 @@ const SHOP_CATALOG = {
     fx:'医理入门：医术·药理小幅进益，兼能识毒辨药。'},
   '迷魂香': {kind:'consumable', mode:'scene', cost:55,
     desc:'甜腻香饼一块，嗅之骨软神恍。',
-    usage:'在行囊详情页点「使用」，需演一场；占本旬一轮、耗 5 精力。',
-    fx:'嗅者恍惚一盏茶工夫，问什么答什么；对高位者效力与败露风险俱增。'},
+    usage:'行囊里点「使用 · 择一人」，先选对谁下手；或在剧情对话中点「互动 → 迷魂香」，对眼前这个人用。占本旬一轮、耗 5 精力。',
+    fx:'嗅者恍惚一盏茶工夫，问什么答什么；位份越高越难成，败露则当场翻脸、记仇告状。'},
+  '承恩香': {kind:'consumable', mode:'instant', cost:60,
+    desc:'一匣暗红香末，甜暖里带一点辛，据说是前朝教坊司流出来的方子。',
+    usage:'在行囊详情页点「使用」，即刻生效；不占本旬、不耗精力。',
+    fx:'今夜敬事房必记你的名字：本旬末必得召幸。有孕、产后、气血亏虚或帝不进后宫时用不得。'},
   '壮骨膏': {kind:'consumable', mode:'scene', cost:60,
     desc:'黑亮膏药一方，药气辛辣，专治筋骨亏虚。',
     usage:'在行囊详情页点「使用」，需演一场；占本旬一轮、耗 5 精力。',
@@ -9890,14 +9929,14 @@ const SHOP_CATALOG = {
     usage:'行囊里使用，为帝重写一段人设（一千字以内，可插入 <player> 代名讳）；不占回合、不耗精力。',
     fx:'改写皇帝人设：帝自此依新设性情行事、待你。每件限改一次，用毕即焚。'}
 };
-/* 货架分组：常备即用 9 件、护身常备 7 件常驻；其余消耗品三旬轮换 4 件 */
-const SHOP_STAPLES=['读心笺','玉容散','益气丸','安神香','明目露','双鲤笺','同心结','小还丹','易容膏'];
+/* 货架分组：常备即用 10 件、护身常备 7 件常驻；其余消耗品三旬轮换 4 件 */
+const SHOP_STAPLES=['读心笺','玉容散','益气丸','安神香','明目露','双鲤笺','同心结','小还丹','承恩香','易容膏'];
 const SHOP_GUARDS=['避毒珠','玉髓杯','敛息佩','免罪金牌（小）','藏锋匣','耳报铃','子嗣缘符'];
 const SHOP_ROTATE_POOL=['驻颜膏','静心香篆','传声鹤','邂逅笺','《青囊残方》','迷魂香','壮骨膏','替身纸人','坐胎药','假孕散','移性符'];
 const SHOP_STAPLE_SET=new Set(SHOP_STAPLES), SHOP_GUARD_SET=new Set(SHOP_GUARDS);
-const SHOP_INSTANT=new Set(['玉容散','驻颜膏','益气丸','小还丹','同心结']);
+const SHOP_INSTANT=new Set(['玉容散','驻颜膏','益气丸','小还丹','同心结','承恩香']);
 const SHOP_SYSTEM=new Set(['读心笺','邂逅笺','移性符','易容膏']);
-const SHOP_VER=3; // 货架与价目改版：旧档读入时按新版本重排一次
+const SHOP_VER=4; // 货架与价目改版：旧档读入时按新版本重排一次
 const SHOP_MODE_LABEL={instant:'即时',scene:'演一场',guard:'护身',system:'系统'};
 function shopModeOf(name){const c=SHOP_CATALOG[name];return (c&&c.mode)||(SHOP_INSTANT.has(name)?'instant':(SHOP_SYSTEM.has(name)?'system':'scene'))}
 function shopCycleOf(turn){return Math.floor(((Number(turn)||1)-1)/SHOP_CYCLE)} // 第几轮货色（每 3 旬一轮）
@@ -12337,7 +12376,7 @@ const Game={
         return callModel(fixMsg).then(raw2=>settle(parsePayload(raw2)));
       }
       const newMainIn=Array.isArray(p0.statePatch&&p0.statePatch.plots)&&p0.statePatch.plots.some(x=>x&&x.line==='主线'&&(!x.stage||x.stage==='进行中')); // 新主线已借正文或与发酵处置同场埋入并落账：hasEvent=false 也算兑现，不再纠正
-      const noEvent=(((this._eventMandated(adj)||(this._lastInterlude&&this._lastInterlude.event))&&!(adj.mainPub&&newMainIn))||(opts&&opts._xunPop))&&!p0.hasEvent; // 裁决或插曲要求触发而模型没触发：仍纠正一次（旬首发酵弹出为硬强制）
+      const noEvent=(((this._eventMandated(adj)||(this._lastInterlude&&this._lastInterlude.event))&&!(adj.mainPub&&newMainIn))||(opts&&(opts._xunPop||opts.forceScene)))&&!p0.hasEvent; // 裁决或插曲要求触发而模型没触发：仍纠正一次（旬首发酵弹出为硬强制）
       if(noEvent){
         const fixMsg=msg+`\n【纠正】前端剧情裁决已裁定本旬必须触发剧情（${this._mandateText(adj,opts)}），你却输出 hasEvent=false。请重新输出完整 JSON：hasEvent=true，用剧情对话 scene 结构呈现本轮剧情（scene.state="ongoing"、scene.parts 按语义分段：act 写对方动作神态，say 写对方台词，quote 写转述他人原话，narr 只写其他人物与客观场面，台词都不带引号、不按标点硬切；顶层 options 给 2—4 个接话选项），停下等待玩家应对、不结算后果；本旬养成过程简要并入 narrative。`;
         lastRequest={type:'r1',msg:fixMsg,focus,cost,opts};
@@ -12395,6 +12434,7 @@ const Game={
     if(adj.schemeFire&&adj.schemeFire.length)names.push(adj.schemeFire.map(s=>`「${s.who}」发难须当旬应对`).join('；'));
     if(adj.fest&&!adj.festSoft)names.push(`固定节宴「${adj.fest.name}」须当旬演出`);
     if(opts&&opts._mainPubPop)names.push('主线断档须以 scene 开新主线并落账');
+    if(opts&&opts.forceScene)names.push('这一场须按剧情对话演出（对眼前之人用物，要见她的反应）');
     if(adj.stale&&adj.stale.length)names.push(`「${adj.stale.map(p=>p.title).join('」「')}」发酵须处置`);
     if(adj.pendStale&&adj.pendStale.length)names.push(`待续琐事（${adj.pendStale.map(pendText).join('；')}）发酵须处置`);
     if(adj.target)names.push(`剧情骰命中「${adj.target.title}」须在途线后续`);
@@ -12808,6 +12848,8 @@ const Game={
     const chamber=!!(sceneCtx&&sceneCtx.chamber);
     // 侍寝夜话也给互动：帷帐里唱一段、递一件东西，都是枕边话的一部分
     const interBtn=`<button class="chat-tool gift" onclick="Game.toggleInter()">互动</button>`;
+    const hasIncense=((state&&state.inventory)||[]).some(x=>x&&x.name==='迷魂香'&&(Number(x.count)||0)>0);
+    const incenseBtn=(!banquet&&!chamber&&hasIncense)?`<button class="chat-tool" onclick="Game.interAct('incense')">迷魂香</button>`:'';
     const interMenu=banquet
       ?`<div class="chat-inter" id="chatInter"><button class="chat-tool" onclick="Game.interAct('fest')">献艺</button></div>`
       :chamber
@@ -12819,7 +12861,7 @@ const Game={
         <button class="chat-tool" onclick="Game.interAct('perform')">献艺</button>
         <button class="chat-tool" onclick="Game.interAct('chess')">对弈</button>
         <button class="chat-tool" onclick="Game.interAct('consult')">问诊</button>
-        <button class="chat-tool" onclick="Game.interAct('gift')">赠礼</button>
+        <button class="chat-tool" onclick="Game.interAct('gift')">赠礼</button>${incenseBtn}
       </div>`;
     const sch=sceneCtx?sceneCtx.scheme:null;
     const warn=sch?`<div class="chat-warn">暗流当前：如何应对、后果如何，由你的选择、当场局势与她的人设决定。</div>`:'';
@@ -12863,7 +12905,7 @@ const Game={
   },
   interAct(kind){
     if(phase!=='EVENT_CHOICE'||!sceneCtx){toast('此刻不便');return}
-    if(sceneCtx.perfBusy||sceneCtx.giftBusy)return;
+    if(sceneCtx.perfBusy||sceneCtx.giftBusy||sceneCtx.incenseBusy)return;
     const m=$('#chatInter');if(m)m.classList.remove('on');
     if(sceneCtx.chamber){ // 帷帐之内：只留枕边该有的两项
       if(kind==='gift'){this.openGift();return}
@@ -12871,6 +12913,7 @@ const Game={
       toast('此刻不宜');return
     }
     if(kind==='gift'){this.openGift();return}
+    if(kind==='incense'){this.useIncenseInScene();return}
     if(kind==='fest'){UI.openSheet('节宴献艺');return} // 宴席上献艺：本地结算赏罚，席上反应由下一轮承接
     if(kind==='perform')UI.openSheet('献艺');
     else if(kind==='chess')UI.openSheet('对弈');
@@ -12898,8 +12941,26 @@ const Game={
     this.recordLine('me',`（取出一件「${it.name}」递给${who}）`);
     this.requestScene(this.giftMsg(it,who),`赠礼·${it.name}`,MAX_OUTPUT_TOKENS,true,true,false,{item:it,who});
   },
-  giftMsg(it,who){
-    const ta=npcSexOf(state,who)==='m'?'他':'她';
+  useIncenseInScene(){ // 对话中用香：对眼前这个人，成与败都由这一场演出来
+    if(phase!=='EVENT_CHOICE'||!sceneCtx){toast('此刻不便');return}
+    if(sceneCtx.perfBusy||sceneCtx.giftBusy||sceneCtx.incenseBusy)return;
+    const who=sceneCtx.who;
+    if(!who||isPlaceholderWho(who)){toast('不知眼前是谁，用不得');return}
+    if(typeof UI!=='undefined'&&UI.isEmperorId(who)){toast('御前用这种东西，是拿命去赌，不必给这个口子');return}
+    const inv=state.inventory||[];
+    const j=inv.findIndex(x=>x&&x.name==='迷魂香'&&(Number(x.count)||0)>0);
+    if(j<0){toast('囊中没有迷魂香');return}
+    const cost=focusEnergyCost('使用道具');
+    const beforeEnergy=Math.round(Number(state.energy)||0);
+    if(beforeEnergy<cost){toast(`精力不足（需 ${cost}）`);return}
+    sceneCtx.incenseBusy=true;
+    UI.closeSheet();
+    const name=dispName(who);
+    this.bubble('me','',`（不动声色地取出一小块香，投进手边的炭盆）`);
+    this.recordLine('me',`（趁人不备，把一小块迷魂香投进炭盆）`);
+    this.requestScene(this.incenseMsg(who,true),`迷魂香·${name}`,MAX_OUTPUT_TOKENS,true,true,false,null,{kind:'incense',who,beforeEnergy,cost});
+  },
+  giftMsg(it,who){    const ta=npcSexOf(state,who)==='m'?'他':'她';
     const bits=[
       it.quality?`品质：${it.quality}`:'',
       it.category?`类别：${it.category}`:'',
@@ -13052,6 +13113,7 @@ const Game={
       if(e.name==='AbortError')return; // 脱困/取消已经复位界面，晚到的失败不再改状态
       if(gift&&sceneCtx)sceneCtx.giftBusy=false; // 赠礼未成：礼物不曾扣下，原样留在囊中
       if(perf&&sceneCtx)sceneCtx.perfBusy=false; // 献艺未成：精力不曾扣下
+      if(sceneCtx)sceneCtx.incenseBusy=false; // 用香未成：香还留在囊中，精力也不扣
       phase='EVENT_CHOICE';
       this.renderSceneOpts(sceneCtx?sceneCtx.lastOptions||[]:[]);
       this.handleCallErr(e);
@@ -14026,10 +14088,16 @@ const Game={
     flushAcquired(); // 献艺／问诊当场得的赏赐与回礼当场报
     const pc=perf.piece;
     const kind=perf.kind||'perform';
-    const label=kind==='chess'?'对弈':kind==='consult'?'问诊':(pc&&pc.skill==='医术'?'施治':(pc&&pc.improv?'即席献艺':'献艺'));
+    const label=kind==='incense'?'迷魂香':(kind==='chess'?'对弈':kind==='consult'?'问诊':(pc&&pc.skill==='医术'?'施治':(pc&&pc.improv?'即席献艺':'献艺')));
     state.energy=Math.max(0,Math.round((Number(perf.beforeEnergy)||0)-(Number(perf.cost)||0))); // 精力由前端照扣，覆盖模型回写
+    if(kind==='incense'){ // 香已烧尽才扣：请求失败时东西还在囊里
+      const inv=state.inventory||[];
+      const j=inv.findIndex(x=>x&&x.name==='迷魂香'&&(Number(x.count)||0)>0);
+      if(j>=0){inv[j].count=(Number(inv[j].count)||0)-1;if(inv[j].count<=0)inv.splice(j,1)}
+    }
     if(pc&&pc.id){pc.perfCount=(Number(pc.perfCount)||0)+1;pc.lastPerfSerial=xunSerial(state.time)}
     sceneCtx.perfBusy=false;
+    sceneCtx.incenseBusy=false;
     this.sceneMeta(sc);
     if(parts){
       this.sayParts(parts);
@@ -14278,6 +14346,7 @@ const Game={
     if(it.durable){toast('长期之物无需使用：在详情页启用／收存即可');return}
     if(it.usable===false){toast('此物不能使用');return}
     if(it.name==='易容膏'){this.openDisguisePick(i,'行囊');return} // 先择人、写一句形容；不占本旬，代价是气血 -10
+    if(it.name==='迷魂香'){this.openIncensePick(i);return} // 先择人：香要对人用
     if(it.name==='移性符'){this.openShiftCharm(i);return} // 系统道具：本地改写帝设，不占回合、不耗精力、不走模型
     if(it.name==='邂逅笺'){this.openMeetPick(i);return} // 指定下次园中偶遇：择人后才耗笺，不占回合、不耗精力
     const food=itemKindOf(it)==='food';
@@ -14309,6 +14378,20 @@ const Game={
     if(!it||(Number(it.count)||0)<=0){toast('此物已不在囊中');return}
     if(Number(state.itemUseTurn)===Number(state.turn)){toast('本旬已用过一件即效之物，余下的留到下旬');return}
     if(it.name==='同心结'){this.openKnotPick(i);return}
+    if(it.name==='承恩香'){ // 今夜必得召幸：本地落定，旬末敬事房必然记名
+      if(!nightSummonAllowed()){toast('今夜不宜承宠（有孕、产后或气血太虚）');return}
+      const e0=state.emperor||{};
+      if(e0.absence&&String(e0.absence.reason||'').trim()){toast('帝这几日不进后宫');return}
+      ensureXunBook();
+      state.nightForce=state.turn;
+      it.count=(Number(it.count)||0)-1;
+      if(it.count<=0)inv.splice(i,1);
+      state.itemUseTurn=state.turn;
+      logXunAction('用物·承恩香');
+      persistCurrent();markSafe();UI.updateStatusbar();UI.closeSheet();
+      UI.actResult('用物 · 承恩香','你取一小撮香末，就着烛火点了，烟色极淡，只留一线暖香。敬事房来收牌子时，多看了你一眼。',['今夜必得召幸']);
+      return;
+    }
     const p=state.protagonist,at=p.attributes=p.attributes||{};
     const qi=clamp01_100(Number(at['体质'])||0);
     const base=Math.max(0,Number(p.constitutionBase)||qi); // 根基已不设上限：别再用 0—100 截回去
@@ -14460,6 +14543,43 @@ const Game={
     logXunAction(`使用·邂逅笺（${dispName(who)}）`);
     persistCurrent();markSafe();UI.updateStatusbar();UI.closeSheet();
     toast(`邂逅笺已化：下次往御花园，必遇「${dispName(who)}」`,3600);
+  },
+  openIncensePick(i){ // 迷魂香：先择人，择定才耗香
+    if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
+    const it=(state.inventory||[])[i];
+    if(!it||it.name!=='迷魂香'||(Number(it.count)||0)<=0){toast('囊中没有迷魂香');return}
+    Game._incenseItemIdx=i;
+    UI.goSheet('迷香');
+  },
+  pickIncenseTarget(who){
+    if(phase!=='FOCUS_SELECT'){toast('请先结束当前旬务');return}
+    const idx=Game._incenseItemIdx;
+    const inv=state.inventory||[];
+    const it=inv[idx];
+    if(!it||it.name!=='迷魂香'||(Number(it.count)||0)<=0){Game._incenseItemIdx=null;toast('此物已不在囊中');return}
+    if(!who){toast('未择人');return}
+    const cost=focusEnergyCost('使用道具');
+    if((state.energy??0)<cost){toast(`精力不足（需 ${cost}）`);return}
+    it.count=(Number(it.count)||0)-1;
+    if(it.count<=0)inv.splice(idx,1);
+    Game._incenseItemIdx=null;
+    const name=dispName(who);
+    UI.closeSheet();
+    logXunAction('用物·迷魂香（'+name+'）');
+    this.round1(this.incenseMsg(who,false),'迷魂香·'+name,cost,{mode:{kind:'act',text:'迷魂香·'+name},forceScene:true});
+  },
+  incenseMsg(who,inScene){
+    const ta=npcSexOf(state,who)==='m'?'他':'她';
+    const gap=rankGapToMe(who);
+    const risk=gap>=5?'位份高出太多、身边人多眼杂，极易被看出来':gap>=3?'位份高于你，成算不高':'位份相仿或更低，较易成事';
+    return `第${xunNo()}旬${inScene?'剧情对话中':'第一轮'}：玩家使用「迷魂香」（甜腻香饼一块，嗅之骨软神恍）， 대상是「${who}」。${risk}。`+
+      `须写清你怎么接近${ta}、香怎么递过去或点上（借奉茶、添炭、还书、请${ta}尝一碟点心、在帐中先焚一炉），${ta}何时察觉不对；`+
+      `香力只一盏茶工夫，所以这一场必须问出实质：${ta}私下在做什么、替谁办过事、手里攥着谁的把柄——落到人名、去处、文书或物件上，不能只写"${ta}说了些平日不肯说的话"。`+
+      `败露就当场翻脸：记仇、告状、反咬、装作不知再另寻机会皆可，须在 statePatch 里写关系与 pending，不许含糊过去；成事也要留下痕迹（味道、剩下一角香、她事后记起的一段空白），写进 pending 或 plots。`+
+      (inScene
+        ?`用 scene.parts 呈现（1—4 段，act/say/quote/narr 规则同前，总长 ≤120 字），给 2—3 个接话选项，scene.state 必须写 "ongoing"；本轮只结算这次用香，statePatch 只写关系、脉络、把柄与待续，不得写才艺或属性成长。`
+        :`用剧情对话 scene 结构开场（state="ongoing"，scene.who 写「${who}」，scene.parts 写对方的动作与第一句话），给 2—4 个接话选项后停下，不结算应对后果。`)+
+      this.sceneContextBlock();
   },
   openShiftCharm(i){ // 移性符：本地改写帝设（每件限改一次；不占回合、不耗精力、不走模型）
     const it=(state.inventory||[])[i];if(!it||it.count<=0)return;
