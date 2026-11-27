@@ -1889,7 +1889,10 @@ const GRACE_GUIDE=[ // 新入宫引导旬：缓冲期内每旬一项指引，借
 '立章法——借日常带过精力与作息的讲究：乏了可传膳进补，撑不住就早些歇下、一旬便过去；若主控尚未出过门，可演一回往六宫或御花园方向的认路，提点请安与位份礼数'];
 function describePlot(p){
   const head=`「${p.title}」(${p.line}，${p.dueText||(p.latest!=null?'有期限':'缓图')}${p.tie?`，所系：${p.tie}`:''})`;
-  return p.next?`${head}下一步：${p.next}`:head;
+  const next=p.next?`下一步：${p.next}`:'';
+  const note=p.note?`；前情：${String(p.note).slice(0,80)}`:'';
+  const recap=p.factionId?'（派系账：开场先用一两句把前情交到主控眼前——此前谁、在哪、做了什么，此刻来要什么；前情此前已演过则承接，不得再凭空加新桥段）':'';
+  return `${head}${next}${note}${recap}`;
 }
 function ensurePlotMeta(){return state.plotMeta=state.plotMeta||{lastEventTurn:-99,lastBigTurn:-99}}
 function pendText(x){return typeof x==='string'?x:(x&&x.t)||''} // 待续条目取文本（兼容旧档纯字符串）
@@ -3358,8 +3361,8 @@ function factionMoveBrief(adj){ // 灌进剧情裁决：本旬各派各走哪一
   const anyStep=live.some(f=>f.step);
   const busy=adj&&(adj.due.length||adj.overdue.length||adj.stale.length||adj.schemeFire.length||adj.hit||adj.mainPub||(adj.fest&&!adj.festSoft));
   const rule2=busy
-    ? (anyStep?'本旬主戏已有着落：有“当前一步”的派系只在正文或 haremNews 留一条可见痕迹（谁来了、动了什么），别另起派系戏、别逼主控当场表态——清算照旧留给该账到期那一旬。玩家若主动查问、当面应对，照常接戏并可达标兑现（statePatch.plots，stage 改“已兑现”）。':'本旬主戏已有着落，各派按兵不动：只允许在 haremNews 留一条可见痕迹，不得平地起派系冲突。')
-    : (anyStep?'本旬有“当前一步”的派系，先在正文或后宫动态里演出它的可见痕迹（谁来了、动了什么、传了什么话），让主控看见、听见、起疑；不要当旬就逼她当场表态——清算留给该账到期那一旬。玩家若主动查问、当面应对，照常接戏并可达标兑现（statePatch.plots，stage 改“已兑现”）。':'本旬各派按兵不动：只允许在 haremNews 留一条可见痕迹（谁得了差事、谁被赏、谁宫里换了人），不得平地起派系冲突。');
+    ? (anyStep?'本旬主戏已有着落：有“当前一步”的派系也必须在 haremNews 留一条这一步的可见痕迹（谁来了、动了什么、传了什么话）——一句话也算，但必须有：这是主控与玩家知道此事的唯一途径。正戏里不必展开、别逼主控当场表态，清算照旧留给该账到期那一旬。玩家若主动查问、当面应对，照常接戏并可达标兑现（statePatch.plots，stage 改“已兑现”）。':'本旬主戏已有着落，各派按兵不动：只允许在 haremNews 留一条可见痕迹，不得平地起派系冲突。')
+    : (anyStep?'本旬有“当前一步”的派系，必须先在正文或 haremNews 里演出它的可见痕迹（谁来了、动了什么、传了什么话）——一句话也算，但必须有：这是主控与玩家知道此事的唯一途径。不要当旬就逼她当场表态——清算留给该账到期那一旬。玩家若主动查问、当面应对，照常接戏并可达标兑现（statePatch.plots，stage 改“已兑现”）。':'本旬各派按兵不动：只允许在 haremNews 留一条可见痕迹（谁得了差事、谁被赏、谁宫里换了人），不得平地起派系冲突。');
   return `\n【派系动向·本旬】
 ${rows}${off}
 规矩：
@@ -12181,10 +12184,12 @@ const Game={
     const lead=sc.line?filterText(sc.line):(parts?parts.map(x=>x.type==='say'?`“${x.text}”`:x.type==='quote'?`${x.who?x.who+'说：':''}「${x.text}」`:x.text).join(''):this.chatLead(p));
     const setup=filterText(p.narrative||'');
     const setupTail=setup?setup.split(/(?<=[。！？])/).filter(Boolean).slice(-2).join('').slice(-180):''; // 先交代在何处遇上谁，避免剧情凭空开始
+    const fore=(plot&&plot.note&&!scheme)?`<div style="line-height:1.8;margin-bottom:8px;font-size:13px;color:var(--ink-soft)">前情 · ${esc(String(plot.note).slice(0,90))}</div>`:''; // 派系账的前情先说给玩家听，免得戏开场了她却摸不着头脑
     $('#incTitle').textContent=scheme?('暗流 · '+title):(title==='事发'?'事发':'事发 · '+title);
     const itl=Game._lastInterlude;
     $('#incBody').innerHTML=(meta?`<div style="font-size:12px;color:var(--ink-soft);letter-spacing:.08em;margin-bottom:8px">${esc(meta)}</div>`:'')
       +(itl?`<div style="margin-bottom:8px"><span class="itag on">本旬插曲·${esc(itl.card.title)}</span></div>`:'')
+      +fore
       +(setupTail&&setupTail!==lead?`<div style="line-height:1.9;margin-bottom:8px">${esc(setupTail)}</div>`:'')
       +`<div style="line-height:1.9">${esc(lead)}</div>`;
     Game._pendingEvent=p;
