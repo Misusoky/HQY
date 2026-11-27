@@ -3029,6 +3029,14 @@ function factionRelValue(who,s){
   const v=(r&&typeof r==='object')?Number(r.value):Number(r);
   return Number.isFinite(v)?v:null;
 }
+function factionRelLine(f){ // 派系对你的数值化交代：态度档背后的三个数——领袖好感、近期出手次数（另有实力表）
+  if(!f||f.defunct)return '';
+  const v=factionRelValue(f.leader);
+  const ev=factionHostileEvidence(f);
+  const bits=[v==null?'领袖好感未明':`领袖好感 ${Math.round(v)}`];
+  bits.push(ev.mid>0?`近十二旬对你出手 ${ev.mid} 次`:'近期未对你出手');
+  return bits.join(' · ');
+}
 function factionPowerOf(f,s){
   const npcs=(s&&s.npcs)||{};
   const lead=npcs[(f||{}).leader]||null;
@@ -3351,7 +3359,7 @@ function factionMoveBrief(adj){ // 灌进剧情裁决：本旬各派各走哪一
     const mem=(f.members||[]).filter(m=>{const n=factionNpc(m);if(!n||!n.known)return false;if(/皇帝|皇上|太后|皇后/.test(m))return false;const sc=rankScoreOf(n.rank);return !(sc>0&&ls>0&&sc>ls)}).slice(0,6);
     const pl=active.find(p=>p.factionId===f.name);
     const due=pl?(pl.latest!=null?serialTimeText(pl.latest):pl.dueText||'缓图'):'';
-    return `${f.name}｜领袖 ${f.leader||'未明'}${npc&&npc.rank?`（${npc.rank}${tr?`，${tr}`:''}）`:''}｜${f.stance}·${f.goal||'目标未明'}｜实力 ${f.power}｜对你：${f.attitude}`
+    return `${f.name}｜领袖 ${f.leader||'未明'}${npc&&npc.rank?`（${npc.rank}${tr?`，${tr}`:''}）`:''}｜${f.stance}·${f.goal||'目标未明'}｜实力 ${f.power}｜对你：${f.attitude}（${factionRelLine(f)}）`
       +`\n  成员：${mem.length?mem.join('、'):'尚无相识的成员'}`
       +`\n  当前一步：${f.step||'按兵不动'}${pl?`（已立账「${pl.title}」，限期 ${due}前，id=${pl.id}）`:''}`;
   }).join('\n');
@@ -7962,7 +7970,7 @@ const UI={
   factionWindHtml(){ // 局面里的派系风向：只写主控可知的公开态势，暗中图谋仍归暗流账
     const fs=state.factions||[];
     if(!fs.length)return '';
-    const rows=fs.map(f=>`<div class="itemrow"><span>${esc(f.name)}${f.defunct?' · 名存实亡':''}</span><span class="cnt">${esc(f.defunct?'旧人已散':f.attitude)} · ${esc(f.defunct?'渐无人提起':(f.step||'按兵不动'))}</span></div>`).join('');
+    const rows=fs.map(f=>`<div class="itemrow"><span>${esc(f.name)}${f.defunct?' · 名存实亡':''}</span><span class="cnt">${esc(f.defunct?'旧人已散':`${f.attitude}（${factionRelLine(f)}）· ${f.step||'按兵不动'}`)}</span></div>`).join('');
     return `<div class="sec"><div class="sec-cap">派系风向</div>${rows}
       <div class="setbtns"><button class="btn btn-line" onclick="UI.openFactions()">宫中派系详情</button></div></div>`;
   },
@@ -9234,12 +9242,13 @@ const UI={
         if(/皇帝|皇上|太后|皇后/.test(m))return false;
         const sc=rankScoreOf(n.rank);return !(sc>0&&ls>0&&sc>ls);
       });
-      const notes=(f.notes||[]).slice(-2).map(n=>`${n.xun?esc(n.xun)+'　':''}${esc(n.text)}`).join('<br>');
+      const notes=(f.notes||[]).slice(-1).map(n=>`${n.xun?esc(n.xun)+'　':''}${esc(n.text)}`).join('<br>'); // 最近动向只留一句
       const pill=f.defunct?'p-mid':(f.attitude==='敌对'||f.attitude==='压制')?'p-bad':(f.attitude==='盟友'||f.attitude==='拉拢')?'p-good':'p-mid';
       return `<div class="faccard${f.defunct?' off':''}">
         <div class="fac-head"><span class="fac-nm">${esc(f.name)}</span><span class="relpill ${pill}">${f.defunct?'名存实亡':esc(f.attitude)}</span></div>
         <div class="fac-meta">领袖 ${esc(f.leader||'未明')}${rk?`（${esc(rk)}${tr?`，${esc(tr)}`:''}）`:''}　·　${esc(f.stance)}${f.goal?`　·　${esc(f.goal)}`:''}</div>
         ${this.meter('实力',f.power,f.defunct?'m-ink':'m-indigo')}
+        ${f.defunct?'':`<div class="rowline"><span class="rk">对你</span><span class="rv num">${esc(f.attitude)}｜${esc(factionRelLine(f))}</span></div>`}
         <div class="rowline"><span class="rk">成员</span><span class="rv">${mem.length?mem.map(m=>esc(m)).join('、'):'尚无相识的成员'}</span></div>
         ${f.defunct?'':(f.step?`<div class="fac-step"><b>当前一步</b>：${esc(f.step)}</div>`:`<div class="fac-step" style="color:var(--ink-soft)">按兵不动</div>`)}
         ${notes?`<div class="sheet-note" style="margin-top:8px">最近动向<br>${notes}</div>`:''}
