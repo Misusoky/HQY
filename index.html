@@ -13206,7 +13206,7 @@ const Game={
       for(let i=0;i<parts.length;i++){
         const p=parts[i];
         if(!p||p.type!=='act'||p.who)continue;
-        if(!/他|帝|陛下|圣驾|御/.test(String(p.text||'')))continue;
+        if(!/他|帝|陛下|圣驾/.test(String(p.text||'')))continue;
         const nx=parts[i+1];
         if(!nx||nx.type!=='say')continue;
         const nw=String(nx.who||'').trim();
