@@ -2919,6 +2919,7 @@ function schemeTick(){ // 每旬只跑一次：结旧账、起新图谋；在旬
       if(sc){meta.lastSpawn=now;console.info('[暗流] 起念：'+sc.who+'，'+sc.aim)}
     }
   }
+  if(Array.isArray(state.factions))for(const f of state.factions)recalcFactionAttitude(f); // 这一旬真动过手（结账或发难）：派系态度当旬就翻
   return notes;
 }
 function schemeClueLine(sc){
@@ -3041,6 +3042,7 @@ function resolveSchemeByModel(sc,result){ // 暗流结果由模型按玩家选�
   }
   chronicleAdd(`暗流「${sc.who}」：${sc.methodName||sc.aim||'出手'}——${schemeOutcomeText(r)}`);
   npcMemoryAdd(sc.who,`对主控使了${sc.methodName||sc.aim||'手段'}——${schemeOutcomeText(r)}`);
+  if(Array.isArray(state.factions))for(const f of state.factions)recalcFactionAttitude(f); // 这一手已当面发作：态度当旬就翻，别留在「观望」
   try{if(sc.mainLine)mainLineOnScheme(sc,r)}catch(e){console.warn('[命途] 发难结账失败',e)}
 }
 function applySchemeOutcome(sc,result,opt){ // result: win 挫败 / draw 勉强挡下 / lose 得手 / defuse 提前化解
@@ -3209,10 +3211,14 @@ function factionRelMix(f){ // 派系对主控的关系值：首领六成、相�
   const lv=factionRelValue(f.leader);
   const mem=(f.members||[]).map(m=>factionRelValue(m)).filter(v=>v!=null);
   const avg=mem.length?mem.reduce((a,b)=>a+b,0)/mem.length:null;
+  let base=null;
   if(lv==null&&avg==null)return null;
-  if(lv==null)return Math.round(avg);
-  if(avg==null)return Math.round(lv);
-  return Math.round(lv*0.6+avg*0.4);
+  else if(lv==null)base=avg;
+  else if(avg==null)base=lv;
+  else base=lv*0.6+avg*0.4;
+  const ev=factionHostileEvidence(f); // 真动过手的关系值要见血：账面再好也压下去
+  const hit=ev.near*18+Math.max(0,ev.mid-ev.near)*4;
+  return Math.max(-100,Math.min(100,Math.round(base-hit)));
 }
 function factionPowerOf(f,s){
   const npcs=(s&&s.npcs)||{};
@@ -3424,19 +3430,31 @@ function factionAttitudeFrom(v,stance){ // 只按交情与立场排座次；真�
   if(v>=50)return '拉拢';
   return stance==='强硬'?'压制':'观望';
 }
-function factionHostileEvidence(f){ // 近期真对你下过几次手：以剧情账为准，不认口头态度
+function factionHostileEvidence(f){ // 近期真对你下过几次手：以剧情账、派系这一步与暗流账为准，不认口头态度
   const id=String((f&&f.name)||'');
   const now=xunSerial(state&&state.time)||0;
-  let near=0,mid=0,hasPlot=false;
+  const when=new Set();
+  let hasPlot=false;
   for(const p of ((state&&state.plots)||[])){
-    if(!p||p.factionId!==id||p.line!=='敌对'||p.stage==='已作废')continue;
+    if(!p||p.factionId!==id||p.stage==='已作废')continue;
+    if(p.line!=='敌对'&&!p.esc)continue; // 这一系的账只要是敌对路数（含升级发难），就算一次
     if(p.stage==='进行中')hasPlot=true;
     const t=Number(p.touch||p.earliest||0);
-    if(!t)continue;
-    if(now-t<=4)near++;
-    if(now-t<=8)mid++;
+    if(t)when.add(t);
   }
-  if(!hasPlot&&f&&f.step&&f.stepLine==='敌对')near++; // 旧档只留了这一步、没立账的，也算一次
+  if(f&&f.stepLine==='敌对'&&Number(f.lastMove))when.add(Number(f.lastMove)); // 派系记的这一步本身就是敌对动作：账结了也算
+  // 暗流：本系的人瞒着派系动手也算这一系的手脚——账上没有 factionId 时，只此一处能认出来
+  const lead=String((f&&f.leader)||''),mem=((f&&f.members)||[]).map(String);
+  for(const sc of ((state&&state.schemes)||[])){
+    if(!sc||sc.stage==='布子')continue; // 只放征兆、尚未出手的不算
+    const who=String(sc.who||'');
+    if(!who||(who!==lead&&!mem.includes(who)))continue;
+    const t=Number(sc.fireAt||0);
+    if(t)when.add(t);
+  }
+  if(!when.size&&f&&f.step&&f.stepLine==='敌对')when.add(now); // 旧档只留了这一步、没立账的，也算一次
+  let near=0,mid=0;
+  for(const t of when){if(now-t<=4)near++;if(now-t<=8)mid++;}
   return {near,mid};
 }
 function recalcFactionAttitude(f){ // 态度看领袖亲疏，也看这一系最近真做过什么；敌对不自动降，只有关系转厚才松
@@ -4715,7 +4733,7 @@ const SCENE_PARTS_RULES = [
 '【scene.parts 分段协议】按语义拆 2—5 段，每段只做一件事。动笔前先给这段定说话人：是某人的动作（act）、某人亲口说的话（say），还是与在场谁都无干的客观经过（narr）——先定类，再写内容，写完回头核对每段的 type 与 who 没有互相矛盾。',
 'narr＝完全旁白：只写其他人物的举止、客观场面、环境与事件环节，不写当前说话人（scene.who）的动作神态；事件经过、消息怎么传来的、纸条/信上写了什么、人群如何聚散，全是 narr——拿不准归属的整段经过一律 narr，绝不塞进 say/act 挂到当前说话人名下（旁白被挂到人物名下，界面会让她替场面背书）；',
 'act＝当前说话人的动作神态：只写她/他此刻做了什么、神色如何，只写这一个动作或神态（一两句），不写台词、不加引号，也不得写主控或其他人物的举动；前端会把它并入同一只对方对话气泡，以（）显示。主控的动作、多人往来、时间推移与场面变化一律写 narr（开场的这一整段写顶层 narrative）。',
-'say＝当前说话人此刻亲口说的原话：直接写说了什么，不带引号，也不带“他说”“她说”之类的提示语。凡能加引号念出来的一律是 say——问句、答句、招呼、条件、吩咐、挖苦都算；哪怕这句长、哪怕句中带「你」，也不得挪去 narr（那会让她的话变成旁白，玩家看不出是谁在说）。',
+'say＝当前说话人此刻亲口说的原话：直接写说了什么，不带引号，也不带“他说”“她说”之类的提示语。凡能加引号念出来的一律是 say——问句、答句、招呼、条件、吩咐、挖苦都算；哪怕这句长、哪怕句中带「你」，也不得挪去 narr（那会让她的话变成旁白，玩家看不出是谁在说）。以「你」起句的训斥（「你最好是真能耐得住性子」「你跪下」）同样是 say；句中带本官／本宫／臣妾／奴婢／朕等自称的整句，一律是 say。',
 'quote＝转述/引用第三方的原话：某人复述别人（贵嫔、帝、太后、宫女等）说过的话，或信里、传闻里、圣旨里的原话；who 写原话者的称谓（确无出处可省），text 仍不带引号。',
 '引语只用「」或“”：复述、纸条、信函、传闻里的原话，要么放 quote 段，要么在 narr 里用「」引住；绝不能用圆括号（）包原话——圆括号在界面里专用于渲染动作神态，用圆括号包话，原话会被切成动作、说话人归属全乱。',
 '分辨：当前说话人的动作神态→act；当前说话人亲口说→say；他转述第三个人说的话→quote；其他人物与客观场面→narr。不要把当前说话人的动作神态写成 narr 旁白。',
@@ -4928,7 +4946,7 @@ function presenceNote(p){ // 面板「属性」里的一行说明
 /* ============================================================ 工具 */
 const $=s=>document.querySelector(s);
 const MONTHS=['','正月','二月','三月','四月','五月','六月','七月','八月','九月','十月','冬月','腊月'];
-const BUILD='2026-11-27·派系底本不再当前情+请求统计'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
+const BUILD='2026-11-27·台词不再被吞进旁白+派系态度认暗流'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
 /* 月俸：按位份每月下旬末由前端自动入账（单位：两） */
 const SALARY_BY_GRADE={'正一品':220,'从一品':150,'正二品':110,'从二品':80,'正三品':60,'从三品':45,'正四品':36,'从四品':28,'正五品':20,'从五品':15,'正六品':12,'从六品':10,'正七品':8,'从七品':6,'正八品':5,'从八品':4,'正九品':3,'从九品':2};
 const SALARY_TITLES=[[/皇后/,220],[/皇贵妃/,150],[/贵妃/,110],[/贤妃|良妃|淑妃|德妃/,80],[/昭仪|昭容|昭媛|修仪|修容|修媛|充仪|充容|充媛/,45],[/贵嫔/,36],[/嫔/,28],[/贵人/,20],[/才人/,15],[/美人/,12],[/宝林/,10],[/常在/,8],[/答应/,6],[/选侍/,5],[/更衣/,4],[/采女/,3],[/官女子/,2],[/妃/,60]];
@@ -12142,7 +12160,7 @@ const Game={
     if(!state||phase!=='FOCUS_SELECT')return;
     if(Game._questOpen){Game._pendingXunPop=true;return;} // 主线弹窗未关：旬首处置等它关完再走
     if(state.openingWoo&&!state.openingWoo.done&&xunSerial(state.time)>Number(state.openingWoo.until))delete state.openingWoo; // 头一个月过去，没人来便不再补
-    const schemeNotes=schemeTick(); // 暗流账：结上旬未应对的旧账、起新图谋
+    const schemeNotes=schemeTick(); // 暗流账：结上旬未应对的旧账、起新图谋（态度已在其中按真动作校正）
     for(const n of schemeNotes){
       UI.pushCard(`<article class="turncard"><div class="card-head"><div><div class="card-focus">【宫斗系统】<b>暗流得手</b></div></div>${UI.seal()}</div><div class="card-body">上一旬你没有接住${esc(n.sc.who)}的手：${esc((SCHEME_TARGET_TEXT[n.sc.target]||n.sc.target))}受损。${esc((n.changes||[]).join('；'))}</div></article>`);
     }
@@ -12621,6 +12639,8 @@ const Game={
     };
     const out=[];
     const NARR_VERB_RE=/转身|混进|递到|递进|随人流|看见|听见|只见|忽见|走来|走去|散去|跪下|起身|抬头|低头|摆手|坐下|站起|回头|侧身|垂下眼|抬眼|开口前|说完便/; // 叙事动作：判"整段是经过"而非台词
+    const SELF_SAY_RE=/本官|本宫|本座|臣妾|妾身|奴婢|奴才|老奴|微臣|小人|朕|寡人/; // 自称：这段话只可能出自人物口中
+    const REPORT_RE=/说|道|问|答|称|听|见|传|信|纸|写|嘱咐|吩咐|告诉|回禀|来报|传闻/; // 转述口吻：话是别人带到的，不是本人在说
     const fixParenQuote=t=>String(t||'').replace(/(低声道|回道|问道|答道|叹道|笑道|说道|传的话|说是|嘱咐|叮嘱|写着|写道|言道|说|问|答|言)）([^（）]{1,40}?)（/g,'$1「$2」'); // 模型拿圆括号当引号（说是）…（）：界面把圆括号当动作渲染，先洗回「」
     for(const p of arr){
       if(p==null)continue;
@@ -12641,19 +12661,24 @@ const Game={
         const muchYou=bare.length>=60&&(bare.match(/你/g)||[]).length>=3&&NARR_VERB_RE.test(bare);
         if(fromHer||muchYou){type='narr';text=bare;who=''}
       }
-      if(type==='say'){ // 只处理明显是第二人称叙事的那种：以「你」起句，或长、三处提你、还满是叙事动作。长台词里带两个「你」不算
+      if(type==='say'){ // 只处理明显是第二人称叙事的那种：以「你」起句且带叙事动作，或长、三处提你、还满是叙事动作
         const bare=text.replace(/^[（(]\s*|\s*[）)]$/g,'').trim();
         const startsYou=/^你/.test(bare);
         const muchYou=bare.length>=60&&(bare.match(/你/g)||[]).length>=3&&NARR_VERB_RE.test(bare);
-        if(startsYou||muchYou){type='narr';text=bare;who=''}
+        // 以「你」起句的不一律当旁白：一句骂到主控脸上的话也常以「你」开头（「你最好是真能耐得住性子……本官可没工夫」）。
+        // 只要句中有自称，或通篇没有叙事动作，就是台词。
+        const narrish=startsYou&&!SELF_SAY_RE.test(bare)&&(NARR_VERB_RE.test(bare)||muchYou);
+        if(narrish){type='narr';text=bare;who=''}
       }
-      if(type==='narr'){ // 反推：带问号又直呼「你」、或短句以自称起头的，都是她对主控说的话（模型常把台词误标成 narr）
+      if(type==='narr'){ // 反推：带问号又直呼「你」、以自称起头、或整句是对主控说的带自称的话，都是她亲口说的（模型常把台词误标成 narr）
         const bare=text.replace(/^[（(]\s*|\s*[）)]$/g,'').trim();
         const toYou=bare.length>=12&&bare.length<=260&&/你/.test(bare)&&/[？?]/.test(bare)
           &&!/^你/.test(bare)&&!/[「『“"]/.test(bare)
           &&!/她问|他问|问道|问起|听说|传闻|只说|信里|纸上|写道|自问/.test(bare);
         const claim=/^(臣妾|妾身|妾|奴婢|奴才|老奴|微臣|小人)[^。！？]{0,30}[。！？!?]?$/.test(bare); // 短句、以宫中自称起头：只能是台词
-        if(toYou||claim){type='say';who=''}
+        const selfSay=SELF_SAY_RE.test(bare)&&/你/.test(bare)&&!NARR_VERB_RE.test(bare)&&!REPORT_RE.test(bare)
+          &&!/[「『“"]/.test(bare)&&bare.length>=12&&bare.length<=260; // 带自称、直呼你、又无叙事与转述口吻：是台词
+        if(toYou||claim||selfSay){type='say';who=''}
       }
       out.push({type,text,who});
     }
