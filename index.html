@@ -7552,6 +7552,8 @@ function applyPatch(patch){
       }
     }
     if(k==='protagonist.constitutionBase'&&typeof v==='number'){v=Math.max(30,Math.round(v));setPath(state,k,v);continue} // 体质根基 30 起，不设上限：锻炼/调理/伤病在此结算
+    if(/^rankProg\.(since|lastPush|denied|lastDenied|lastRank)$/.test(k))continue; // 晋位排期字段由前端管，模型只能写功绩
+    if(k==='rankProg.merit'&&typeof v==='number')v=Math.max(0,Math.min(9,Math.round(v)));
     if(/protagonist\.skills\./.test(k)&&typeof v==='number')v=Math.max(0,Math.min(SKILL_MAX,Math.round(v)));
     else if(/protagonist\.attributes\./.test(k)&&typeof v==='number')v=clamp01_100(v);
     if(k==='protagonist.attributes.体质'&&baseCap>0)v=Math.min(v,baseCap); // 气血（体质）永不高于根基
