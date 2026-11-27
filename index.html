@@ -1534,7 +1534,15 @@ const NPC_MODULE = [
 '7. npcs 中 known:false 的人物是主控尚未听说过、也未打过交道的：正文里先让主控通过传闻、偶遇、旁人提起等方式得知此人，并在 dossier 中给出 firstMet:true 建档，前端随即把 known 解锁；此后正文即可正常写到此人。',
 '8.【读心笺】前端可能随时发来专项请求（非回合推进，不推进时间、不结算、不写 statePatch、不输出 narrative）：请求中会附上某 NPC 的 hidden 层与其同主控的近期往来摘要，只要求输出 {"impression":"她此刻对主控（行文中称“你”）的真实内心印象"}。严格按所附资料生成一两句、80字以内即可，只写这一句印象。',
 '9. 每位 NPC 的 name 是其在宫中的常用称谓（如"韦淑妃"），realName 是本名；正文正式场合仍按位份称谓相称，本名只在私交、介绍身世等自然场合出现。位份升降只改 rank，name 与 realName 一经确定不再改动。',
-'10. dossier.traits 只增补与现有 profile.traits 相容的新词条，同义改写不重复上报；既有词条沿用不动；新增词条取自第十一节的固定性情词表，并与 hidden.真实性情同调。'
+'10. dossier.traits 只增补与现有 profile.traits 相容的新词条，同义改写不重复上报；既有词条沿用不动；新增词条取自第十一节的固定性情词表，并与 hidden.真实性情同调。',
+'11.【旧账】一场戏出了值得记的具体事件——当众发难与拆台、结盟或许诺、服软或交底、结怨结仇、托付把柄——以 statePatch.npcMemory 记一笔：{称谓:"一句具体的旧账（何事、谁得失、结果如何）"}，80字内。只记有分量的，日常寒暄不记；这一笔会写进人物档案，日后与她相处时翻得出来。'
+].join('\n');
+const SECRETS_MODULE=[
+'## 十二、隐秘与把柄（信息差经济）',
+'1. 每个在册人物都藏着秘密（存档 secrets，含主控尚未掌握的）。此清单是真账：hidden 层与其呼应的隐秘是真的，查证线、交底、搜检、读信等戏可以让主控掌握它，不得以「查无实据」敷衍掉已存在的秘密。',
+'2. 每旬请求附「主控掌握的把柄」清单：已掌握的把柄是对话里的硬通货——可以暗示、交易、要挟、当众抖出；每场与人相争的戏，先想一想手里有没有用得上的，别空手吵架。把柄也能换东西：换消息、换人情、换她退半步，都是戏。',
+'3. 交付与改写：查证线交付一件实证、或交底/搜检/读信发现秘密时，写 statePatch.secrets：掌握既有秘密用 {learn:[{who:"称谓"}]}（取此人最早未掌握的一条）或 {learn:[{id:"secN"}]}；新发现的秘密用 {add:[{who,text,kind}]}（kind 用 把柄/隐私/旧事，80字内，须有出处与知情人）。把柄被当众抖出或用掉写 {use:["secN"]}：用后即成公开旧事，不再是把柄，对方态度与关系照实结算。',
+'4. 分寸：拿把柄要挟须给出价码与退路；对方可以认怂、还价、反咬、灭口或求助旁人——把柄是戏的火种，不是免费的刀。低级错误（当众抖出不实之事、把柄递到错人手里）要有后果。'
 ].join('\n');
 
 /* 性情词表与头像适配：固定词表、相斥/近义规则、两层档案同源、头像气质一致 */
@@ -1776,13 +1784,14 @@ function sanitizePlot(p){ // 单条台账归一；字段缺失时给默认值（
     title:String(p.title||'').slice(0,30),
     stage:['进行中','已兑现','已作废'].includes(p.stage)?p.stage:'进行中',
     earliest:numOrNull(p.earliest),latest:numOrNull(p.latest),
-    dueText:String(p.dueText||'').slice(0,40),goal:String(p.goal||'').slice(0,180),note:String(p.note||'').slice(0,140),
+    dueText:String(p.dueText||'').slice(0,40),goal:String(p.goal||'').slice(0,180),note:String(p.note||'').slice(0,300),
     next:String(p.next||'').slice(0,90),tie:String(p.tie||'').slice(0,24), // next=下一步（一次见面内能办完的动作）；tie=所系（挂在哪条长期线上）
     touch:numOrNull(p.touch),staleMiss:numOrNull(p.staleMiss)||0, // touch=最近推进旬号（xunSerial 单位，与裁决一致）；staleMiss=发酵后连续被无视次数
     echo:numOrNull(p.echo),echoMiss:numOrNull(p.echoMiss)||0, // echo=最近被呼应的旬号；echoMiss=连续被呼应却无台账回写的次数
     echoTotal:numOrNull(p.echoTotal)||0,// echoTotal=被呼应的总次数（到 ECHO_LEAD_TOTAL 后不再主动提示）
     schemeId:p.schemeId?String(p.schemeId):undefined, // 暗流账的镜像条目：到期/发酵结账交给暗流账，不让台账代结
-    factionId:p.factionId?String(p.factionId):undefined // 派系排期的条目：到期无人应对时由派系账记一笔损失
+    factionId:p.factionId?String(p.factionId):undefined, // 派系排期的条目：到期无人应对时由派系账记一笔损失
+    seed:p.seed?String(p.seed):undefined // 故事引子的条目：铺垫/回响的分段提示靠它认
   };
 }
 function plotKeyOf(title){ // 同一件事的不同说法：去掉标点空白后取前 16 字作键，用来认重复条目
@@ -2014,7 +2023,7 @@ function adjudicatePlots(skipDice,mode){ // 旬首裁决：到期强制兑现 + 
         }
         for(const it of inv)if(it&&it.name&&sharedKey(hay,String(it.name),2))ev.push(`行囊「${it.name}」×${it.count||1}${it.crafted?'（手作成品）':''}`);
         for(const n of who){const r=(state.relationships||{})[n];if(r&&typeof r.value==='number')ev.push(`${n}当前好感/宠爱 ${r.value}`)}
-        return `「${p.title}」(${p.line}，${p.dueText||(p.latest!=null?'有期限':'缓图')}${p.tie?`，所系：${p.tie}`:''}）：${p.goal?`目标：${p.goal}；`:''}下一步：${p.next?p.next:'（未写——本轮须补一句一次见面内能办完的具体动作，或作废此条）'}；现状：${p.note||'—'}${ev.length?`；事实线索：${ev.join('；')}`:''}`;
+        return `「${p.title}」(${p.line}，${p.dueText||(p.latest!=null?'有期限':'缓图')}${p.tie?`，所系：${p.tie}`:''}）：${p.goal?`目标：${p.goal}；`:''}下一步：${p.next?p.next:'（未写——本轮须补一句一次见面内能办完的具体动作，或作废此条）'}；现状：${p.note||'—'}${ev.length?`；事实线索：${ev.join('；')}`:''}${p.seed?'；【铺垫中】这条线是故事引子：本旬只让它的痕迹渗出来（相关人物的异样、六宫里的一句议论、第二件小事冒出来），别急着爆；到期那旬才把话说破。了结时写清回响（谁记恨/欠情、留下什么实物或把柄）':''}`;
       });
       lines.push(`【自查·在途账目】以下条目仍在账上（stage=进行中）。请逐条对照截至本旬已真实发生的剧情事实（含手作记录、行囊变动、人物相处、面板数值）自查：条件其实已经满足的——东西已做成并送出/被收下、事已办成、约定已履行、数值已达成——本轮必须兑现（stage 改"已兑现"，写任务进度（积分由前端按条目发放）），不得继续挂账；确未发生的照实留账，可顺手在 note 写一句现状。客观线索仅供对照、不作裁决，以剧情事实为准：\n${rows.map((r,i)=>`${i+1}. ${r}`).join('\n')}`);
     }
@@ -2022,7 +2031,7 @@ function adjudicatePlots(skipDice,mode){ // 旬首裁决：到期强制兑现 + 
   lines.push('结算只经 statePatch.plots 回写【发生变化】的台账条目：兑现者 stage 改"已兑现"；改写期限者须在 note 说明理由并给出新 dueText；新埋引线新增条目（id 用 "p-" 加短标题，与现存 id 区分，goal 写一句目标和怎样算成）；作废者 stage 改"已作废"并注明缘由。只回写变化的条目，前端按 id 合并。注意：条件已足的条目必须兑现（stage 改"已兑现"，可附积分与任务进度），只改写 note 不算办结；手作成品相赠、请托办妥皆可兑现任务，规则见系统提示词手作模块与剧情台账条。pending 只留非剧情琐事。');
   if(parked)lines.push('本场只回写台账，不为这些账目另演一场：条件已足的照实改 stage 与 note，其余的留到旬首。');
   const before={};[...overdue,...due].forEach(p=>before[p.id]=p.dueText||'');
-  return {due,overdue,stale,pendStale,target,hit,seed,mainPub:!!mainPub,needMain:!!needMain,fest:festNew?fest:null,festSoft,gardenMeet:'',empDue:emp.due,schemeFire:sch.fire,schemeClue:sch.clues,before,parked:parkedList,text:'【剧情裁决 · 本旬】（前端判定：固定节宴到旬必演＋到期/超期强制兑现＋搁置发酵强制处理＋主线断档强制发布＋剧情骰被动触发，覆盖"自行决定是否触发剧情"）\n'+lines.map((l,i)=>`${i+1}. ${l}`).join('\n')+(state.mainLine?mainLineBrief():'')+npcMoveBrief()+factionMoveBrief()};
+  return {due,overdue,stale,pendStale,target,hit,seed,mainPub:!!mainPub,needMain:!!needMain,fest:festNew?fest:null,festSoft,gardenMeet:'',empDue:emp.due,schemeFire:sch.fire,schemeClue:sch.clues,before,parked:parkedList,text:'【剧情裁决 · 本旬】（前端判定：固定节宴到旬必演＋到期/超期强制兑现＋搁置发酵强制处理＋主线断档强制发布＋剧情骰被动触发，覆盖"自行决定是否触发剧情"）\n'+lines.map((l,i)=>`${i+1}. ${l}`).join('\n')+(state.mainLine?mainLineBrief():'')+npcMoveBrief(adj)+factionMoveBrief(adj)};
 }
 function matchLeads(ctxList){ // 与给定语境（人名/地名/事由）相关的在途引线：标题或备注含对方名讳/地名即命中
   const cvs=(ctxList||[]).map(s=>String(s||'').trim()).filter(s=>s.length>=2);
@@ -2516,6 +2525,70 @@ const STORY_SEEDS=[
        opening:`东西是你亲自看着装匣的。抬匣的是${maid}与两个小太监，一路上没离人。寿宴就在明日，重新备来不及；空着手去，是失礼，抬着空匣去，是失敬。`,
        stake:`寿礼出差错，丢的是你在太后跟前那份体面；换东西的人，也算准了明日之前你查不出来。`,
        entry:{title:'太后寿礼被换',goal:`在寿宴前找回玉佛，或想出一个不失礼的补救`,next:`封住经手的人，查这一路谁碰过匣子`,tie:'太后·位份'}};
+   }},
+  {id:'poem_attributed',title:'盗诗',cat:'名声',weight:2,cooldown:20,
+   build:s=>{
+     const who=seedPick(seedHostile(s))||'一位与你不睦的妃嫔';
+     return {hook:`诗社集稿，${who}献的一首咏梅，连你自己都看得出是你上月丢的那首——只改动了三个字。`,
+       opening:`你那首原稿没给外人看过，只在宫里给两个宫女念过。如今它署着${who}的名，传到第三宫了。说破，是撕破脸；不说，这首就是你的上限、她的台阶。`,
+       stake:`一首诗是小，往后你写的每一首，都可能先署别人的名。`,
+       entry:{title:'诗稿被署他人之名',goal:`查明稿子怎么流出去的，把这首诗的名分拿回来`,next:`先查宫里谁抄过你的稿子，再找诗社集稿的人问来路`,tie:'名声·旧怨'}};
+   }},
+  {id:'heir_tutor',title:'夺师',cat:'子嗣',weight:2,cooldown:22,
+   build:s=>{
+     const who=seedPick(seedHigh(s))||'一位主位娘娘';
+     return {hook:`你费心为皇嗣请的老翰林，明日就要进${who}宫里当差了——是${who}宫里先递的话，许了双倍的束脩。`,
+       opening:`老先生本来已经应了你。今儿他遣书童来回话，说“另有了高就”。这事办得干净：话是宫里传的话，钱是内帑出的钱，你连争的由头都没有。`,
+       stake:`先生可以另请，可这宫里的人若看明白“抢你的东西最划算”，后头就轮着来了。`,
+       entry:{title:`为皇嗣请的先生被${who}截走`,goal:`弄清这背后是谁递的话，把先生争回来或另请一位不逊的`,next:`探老先生那位书童的口风，弄清是谁递的话、许了什么`,tie:'子嗣·位份'}};
+   }},
+  {id:'alliance_test',title:'结盟之试',cat:'派系',weight:2,cooldown:20,
+   build:s=>{
+     const who=seedPick(seedHigh(s))||'一位主位娘娘';
+     return {hook:`${who}请你过宫吃茶，屏退左右后推来一只小匣：里头是一份名单——六宫里谁收过谁的银子，记着七七八八。`,
+       opening:`她说“妹妹是个明白人”，名单却只许你看这一盏茶的工夫，看完她要烧。这不是送礼，是递投名状：接了这份人情，你就上了她的船；不接，今日你看见的东西，来日都是她嘴里的把柄。`,
+       stake:`收下是结盟，也是把柄易主；推了是结怨，也是自清。`,
+       entry:{title:`${who}递来的名单`,goal:`定夺接不接这份投名状；接了换什么，不接怎么全身而退`,next:`当场缓一缓，说事关重大容想两日，再探她背后的图谋`,tie:'派系·暗处'}};
+   }},
+  {id:'wrong_medicine',title:'错药',cat:'宫务',weight:2,cooldown:22,
+   build:s=>{
+     const maid=seedMaid(s);
+     return {hook:`${maid}替你从小厨房取回来的安神汤，尝了一口是苦的——你这两年喝的安神汤，一直是甜的。`,
+       opening:`方子没变，煎药的人没变。苦的这一碗里多了一味你不认得的药渣，捞起来看，像是不慎混进去的，又像特意熬化了一半。喝是不喝、查是明查暗查，都在你一念。`,
+       stake:`一味药可能是失误，也可能是试探：试你的舌头灵不灵，试你身边的人严不严。`,
+       entry:{title:'安神汤里多了一味药',goal:`查明药渣是什么、从哪一环进的汤锅`,next:`留住药渣找懂行的人辨认，查今日煎药经手的人`,tie:'宫务·身边'}};
+   }},
+  {id:'banquet_dish',title:'献菜',cat:'恩宠',weight:2,cooldown:22,
+   build:s=>{
+     const who=seedPick(seedHigh(s))||'一位主位娘娘';
+     return {hook:`帝驾到${who}宫里用膳，席间一道“翡翠羹”得了圣赞——而那道菜，是你小厨房上月敬献过的方子。`,
+       opening:`宫里人都在学：今日${who}宫里赏了小厨房，明日御膳房也来讨方子。你的方子成了别人的功劳，你连吃醋都显得小气。可你若顺势说是家传，又坐实了“沽名邀宠”。`,
+       stake:`一道菜的方子是小事，帝记性里的“谁的巧思”是大事。`,
+       entry:{title:'你的羹方被别人献了功',goal:`在帝心里把这道羹的出处落回自己头上，又不显得争功`,next:`寻机再献一道更好的，席间提一句“上月那道羹也是臣妾家的方子”`,tie:'恩宠·名声'}};
+   }},
+  {id:'maid_marriage',title:'宫人婚配',cat:'宫人',weight:2,cooldown:24,
+   build:s=>{
+     const maid=seedMaid(s);
+     return {hook:`${maid}来跪你：尚宫局要把她指给内侍省的一个老太监“对食”，她求你留她。`,
+       opening:`按例宫女到了年纪可以放出宫去，也可以许配。可尚宫局这回指的人，明面上是“恩典”，暗地里是${maid}知道了些不该知道的事，有人要堵她的嘴。你若留她，就得给她一条活路与一个名目。`,
+       stake:`护一个宫女是小事，得罪要堵她嘴的人是大事；可不护，往后你宫里没人再敢替你办事。`,
+       entry:{title:`保住${maid}不被指对食`,goal:`弄清是谁要堵她的嘴，给她一个脱身的名目`,next:`问${maid}她到底知道了什么，再寻尚宫局的转圜余地`,tie:'宫人·身边'}};
+   }},
+  {id:'dowager_query',title:'太后问对',cat:'太后',weight:2,cooldown:24,
+   build:s=>{
+     const who=seedPick(seedHigh(s))||'两派相争的高位妃嫔';
+     return {hook:`太后忽然传你，问了一句没头没尾的话：“近日${who}与那一位争得凶，你说是非在谁？”`,
+       opening:`太后宫里烧着檀香，问完就端茶，等你答。这话怎么答都是坑：说${who}不是，是结怨；说那一位不是，是站队；和稀泥，太后最恨和稀泥。你知道这是太后在称你的斤两——答好了，是中宫之外又一条路；答砸了，这宫里多一双不待见你的眼睛。`,
+       stake:`一句话定太后眼里你的分量：是可用之人，还是墙头之草。`,
+       entry:{title:'太后称你的斤两',goal:`答好这一问，让太后记住你是个有主见又不轻狂的`,next:`答前先摸太后的喜怒与她对两派的真实态度`,tie:'太后·派系'}};
+   }},
+  {id:'stolen_sketch',title:'绣样失窃',cat:'宫务',weight:2,cooldown:20,
+   build:s=>{
+     const who=seedPick(seedLow(s))||'一位低位妃嫔';
+     return {hook:`你给帝绣到一半的那幅《春江图》，底样不见了——${who}宫里今日偏巧挂出了一幅起稿极像的绣屏。`,
+       opening:`底样锁在你妆奁下层，钥匙不离身。${who}那幅的起针、用色、连江水的走势都与你一般无二，只技艺生涩些。生涩说明是照着底样新学的——底样怎么出的你的殿门？`,
+       stake:`绣样本身不值什么，可今日能出去的若是绣样，明日就能出去别的。`,
+       entry:{title:'绣样外流',goal:`查清底样怎么流出去的，堵住这个口子`,next:`不动声色，查近两日进过你寝殿的所有人`,tie:'宫务·身边'}};
    }}
 ];
 function storySeedPick(s){
@@ -2549,12 +2622,13 @@ function storySeedPrompt(d){
 ${d.hook}
 ${d.opening}
 眼下要争的：${d.stake}
+正面这场的要求：开场三句内必须让人看清——谁来找、为了什么事、要主控当场交出什么（一句答复、一件东西、一个态度）。用 scene 结构当场演出来（hasEvent=true，scene.state="ongoing"），给 2—4 个方向不同的接话或处置选项后停下，不结算后果。不许把这场写成「又听到一桩风声就散了」：牌面已经把事推到眼前，必须有人当场站出来要个说法。
 分寸：牌面只定“发生了什么、谁被牵连、你眼下被逼到哪一步”；谁做的、为什么、最后谁赢，由在场各人按自己的性情、立场与手里的把柄演出来，不得照牌面预设真凶，也不要让人一被问就认罪。它不是暗流账的发难：不写 schemeOutcome，不在本旬结出幕后大案；若当真牵出真凶，另立条目慢慢走。
-落账：本场以 scene 结构开场（hasEvent=true，scene.state="ongoing"），给 2—4 个方向不同的接话或处置选项后停下，不结算后果。同时在 statePatch.plots 立一条：id="${pid}"，title="${e.title||d.card.title}"，line="支线"，goal="${e.goal||''}"，next="${e.next||''}"，tie="${e.tie||''}"，dueText="四旬内"，note 一句话写本旬进展。此后如何发展，交给主控的选择与在场诸人。牌面里的人若要留下后果（身孕、伤病、失窃、位份变动、把柄），一并写进 statePatch.npcArc、relationships.<称谓>.note 或 inventory.add，别演完就散。`;
+落账：同时在 statePatch.plots 立一条：id="${pid}"，title="${e.title||d.card.title}"，line="支线"，goal="${e.goal||''}"，next="${e.next||''}"，tie="${e.tie||''}"，dueText="四旬内"，note 一句话写本旬进展。此后这条线进入铺垫期：接下来的几旬里，它的痕迹要继续渗（相关人物的异样、六宫的议论、第二件事冒出来），别急着一两旬就结——到期那旬才把话说破、把账结清。了结时必须写清回响：谁因此记恨或欠情、六宫如何传这件事、留下什么实物或把柄（写进 statePatch.npcMemory、pending 或 inventory.add），别演完就散。牌面里的人若要留下后果（身孕、伤病、失窃、位份变动、把柄），一并写进 statePatch.npcArc、relationships.<称谓>.note 或 inventory.add。`;
 }
 function seedPlotEntry(d){
   const e=(d&&d.entry)||{};
-  return {id:(d&&d.plotId)||('p-'+(d&&d.id)),title:e.title||(d&&d.title)||'未了之事',line:'支线',goal:e.goal||'',next:e.next||'',tie:e.tie||'',stage:'进行中',note:(d&&d.hook)||'',dueText:'四旬内'};
+  return {id:(d&&d.plotId)||('p-'+(d&&d.id)),title:e.title||(d&&d.title)||'未了之事',line:'支线',goal:e.goal||'',next:e.next||'',tie:e.tie||'',stage:'进行中',note:(d&&d.hook)||'',dueText:'四旬内',seed:d&&d.id};
 }
 
 /* ============================================================ 暗流账（Schemes）
@@ -2646,6 +2720,7 @@ function spawnScheme(s,who){
   if(!s.npcs)s.npcs={};
   if(!s.npcs[who])s.npcs[who]={known:true,metAt:fmtTime(),name:who,realName:'',rank:rankTitleOf(who),faction:'',age:null,
     profile:{traits:[],biography:[],impressions:{},recent:[],depth:'初识'},hidden:{'当前目标':String((s.npcGoalCards||{})[who]||'')}}; // 旧档缺档：先立一份能演的最小档案
+  secretAssignS(s,who,[]); // 补上隐秘账
   const m=schemeMethodFor(s);
   const now=xunSerial(s.time);
   const clueAt=now+1+(Math.random()<0.5?0:1);
@@ -2801,6 +2876,7 @@ function resolveSchemeByModel(sc,result){ // 暗流结果由模型按玩家选�
     plot.note=(plot.note?plot.note+'；':'')+`已了：${schemeOutcomeText(r)}`;
   }
   chronicleAdd(`暗流「${sc.who}」：${sc.methodName||sc.aim||'出手'}——${schemeOutcomeText(r)}`);
+  npcMemoryAdd(sc.who,`对主控使了${sc.methodName||sc.aim||'手段'}——${schemeOutcomeText(r)}`);
   try{if(sc.mainLine)mainLineOnScheme(sc,r)}catch(e){console.warn('[命途] 发难结账失败',e)}
 }
 function applySchemeOutcome(sc,result,opt){ // result: win 挫败 / draw 勉强挡下 / lose 得手 / defuse 提前化解
@@ -2830,6 +2906,7 @@ function applySchemeOutcome(sc,result,opt){ // result: win 挫败 / draw 勉强�
     plot.note=(plot.note?plot.note+'；':'')+`已了：${result==='lose'?'对方得手':(result==='draw'?'勉强挡下':(result==='defuse'?'提前化解':'对方布置败露'))}`;
   }
   chronicleAdd(`暗流「${sc.who}」：${sc.methodName||sc.aim||'出手'}——${schemeOutcomeText(result)}`);
+  npcMemoryAdd(sc.who,`对主控使了${sc.methodName||sc.aim||'手段'}——${schemeOutcomeText(result)}`);
   try{if(sc.mainLine)mainLineOnScheme(sc,result)}catch(e){console.warn('[命途] 发难结账失败',e)}
   return ch.filter(Boolean);
 }
@@ -2841,35 +2918,69 @@ function applySchemeOutcome(sc,result,opt){ // result: win 挫败 / draw 勉强�
 const FACTION_ATTITUDES=['盟友','拉拢','观望','压制','敌对'];
 const FACTION_STANCES=['主和','主宠','观望','强硬','清流'];
 const FACTION_MOVE_GAP=2; // 同一派两次出手至少隔 2 旬（含出手那一旬共 3 旬）
+/* 派系动作库：每一招都是一场有场合、有在场者、有关键物/信息、要主控当场给答复的戏。
+   step=这一步怎么落地（写进派系"当前一步"与剧情账 note）；next=兑现那一场必须交出的东西；esc=升级发难（压制/敌对得手后启用，才是真刀真枪） */
 const FACTION_MOVES={
   盟友:[
-    {kind:'speak',title:'替你说话',line:'支线',goal:'把你从一桩是非里摘出来',step:'在皇后或帝前替你递一句话，说得不重，刚好把话头引开，事后并不居功'},
-    {kind:'share',title:'递个消息',line:'支线',goal:'让你早一步知道',step:'遣心腹把一桩还没传开的消息先递到你手里，叮嘱你别说是从她这边听去的'},
-    {kind:'cover',title:'替你兜一件事',line:'支线',goal:'免你一处短处',step:'把你宫里一桩对不上的账先揽过去，说是她那头经手时记错了数'},
-    {kind:'hand',title:'借你人手',line:'支线',goal:'替你补一处缺',step:'把自家一个得用的嬷嬷借到你宫里使几日，说用完了再还，不必客气'}
+    {kind:'speak',title:'替你说话',line:'支线',goal:'把你从一桩是非里摘出来',step:'皇后宫中问起近日一桩闲话，涉及你名下的人，她在众人开口前先把话接过去，三两句把事引到旁人头上，回头只字不提',next:'当面向她道谢，或记一份人情'},
+    {kind:'share',title:'递个消息',line:'支线',goal:'让你早一步知道风向',step:'她的心腹宫女借送花的由头来，压低声音说：尚宫局下月要裁撤几处份例，名单里有你宫里，让你早做打算，说完就走，不留名',next:'回赠一份谢礼，或据此提前布置'},
+    {kind:'cover',title:'替你兜一件事',line:'支线',goal:'免你一处短处',step:'你宫里上月领的料子对不上数，内务府要查，她派人来把单子揽过去，说是她家借去用了忘了记账，替你抹平',next:'登门致谢，这份人情记在账上'},
+    {kind:'hand',title:'借你人手',line:'支线',goal:'替你补一处缺',step:'听说你宫里掌事姑姑病了，她把自家得用的嬷嬷连人带铺盖送来，说用几日再还，嬷嬷进门就动手归置，嘴上严得很',next:'用好此人，或婉拒送还'},
+    {kind:'warn',title:'递一句祸事',line:'支线',goal:'让你躲过一发暗箭',step:'她借看戏的由头邀你同席，散了场在廊下“随口”说：近来有人把你的诗字拓了样去，你且留神那人要拿它做什么，说完登轿就走',next:'查出拓样落在谁手里、要做什么'},
+    {kind:'intro',title:'引荐一条路',line:'支线',goal:'给你递一个用得着的人',step:'她做东请吃茶，席间“恰好”有位太医院的旧识女官在座，她当着你的面夸你勤奋好学，把话头递到那位女官面前',next:'接住话头，与那人搭上关系'},
+    {kind:'voice',title:'御前递你名字',line:'支线',goal:'让你在御前露一回脸',step:'帝在御苑随口问起近来的诗会，她在旁边答得自然，说那日夺魁的正是你，还背得出你一句诗，帝记住了你的名字',next:'御前若有召见，接住这阵风'},
+    {kind:'shield',title:'替你挡一场问话',line:'支线',goal:'免你被当众盘问',step:'太后宫里传你去问话，她抢先一步到了，坐在下手替你答了三两句，话说得圆，太后摆摆手让你回去，她留下接着伺候',next:'记下这份相护，寻机相还'}
   ],
   拉拢:[
-    {kind:'invite',title:'递帖相邀',line:'支线',goal:'把你拉到她这一边',step:'遣一位心腹宫女来递话，说她家主子想请你过宫坐坐，有件体己事想当面说'},
-    {kind:'gift',title:'节礼探意',line:'支线',goal:'先卖你一份人情',step:'借着节礼的名目送来一份不轻不重的东西，单子上写的却是“日常往来”'},
-    {kind:'praise',title:'帝前美言',line:'支线',goal:'让你欠她一句',step:'在帝前顺口提了你一句好，话说得不重，却刚好让该听见的人听见'},
-    {kind:'lend',title:'荐人帮衬',line:'支线',goal:'在你身边安一只眼',step:'说自家有一位得用的嬷嬷，想荐到你宫里帮衬几日'}
+    {kind:'invite',title:'递帖相邀',line:'支线',goal:'把你拉到她这一边',step:'她的心腹宫女亲自来递帖子，说她家主子新得了前朝的古琴谱，知道你懂琴，请你过宫一起参详——谱子摊开，茶也沏了，就等你坐下',next:'赴约或回绝，都须有个说法'},
+    {kind:'gift',title:'节礼探意',line:'支线',goal:'先卖你一份人情',step:'节礼单子上多出一盒澄心堂的旧墨，附一张字笺只写“物赠识者”，东西不轻不重，恰是你正寻的物件，宫里人人都看见抬进了你门',next:'收或退，收了怎么还礼'},
+    {kind:'praise',title:'帝前美言',line:'支线',goal:'让你欠她一句',step:'帝前说起六宫近况，她顺口提了你一句，不夸容貌不夸宠，单说你抄经抄得用心，话说得淡，却恰好让该听见的人都听见',next:'谢她，或装作不知'},
+    {kind:'lend',title:'荐人帮衬',line:'支线',goal:'在你身边安一只眼',step:'她说自家有位绣活极精的嬷嬷闲置着，执意荐到你宫里帮衬，人来了手脚麻利，嘴也甜——只是眼睛总往你的书案上瞟',next:'用她、防她，或找个由头退回去'},
+    {kind:'copart',title:'邀你合办一桩事',line:'支线',goal:'把你们绑在一件事上',step:'中宫命各宫协办一件节礼，她来寻你合伙：她出银子你出主意，做成了六宫都看得见，做砸了也是你俩一起担',next:'应或不应，应了怎么分工'},
+    {kind:'dinner',title:'私设小宴',line:'支线',goal:'在私下与你交底',step:'她宫里小厨房做了几样南边的菜，请你去尝，席上没旁人，酒过三巡她忽然说“宫里太冷，想寻个能说话的人”，眼睛看着你',next:'接她的话，或把话岔开'},
+    {kind:'trade',title:'拿消息换交情',line:'支线',goal:'用一条有用的消息套牢你',step:'她遣人来，说知道你要找的那味药材哪里有，可以告诉你——但请你下回御前献艺时，替她带一句话给帝',next:'换或不换，带了话就要担干系'},
+    {kind:'favor',title:'替你料理小事',line:'支线',goal:'让你欠一份说不出口的人情',step:'你上月托人办的一件事，办成了，来回报的却是她宫里的小太监，说“我家主子顺手帮了把”——你从没告诉过她你在办这事',next:'这份人情认还是不认'}
   ],
   观望:[
-    {kind:'probe',title:'探你口风',line:'支线',goal:'看清你站哪边',step:'遣人来问你对一桩宫里旧事怎么看，问得绕，听的却是你的立场'},
-    {kind:'seat',title:'席上试你',line:'支线',goal:'看你在人前怎么接话',step:'在席间把话头递到你面前，看你接不接、往哪边接'},
-    {kind:'word',title:'借话探路',line:'支线',goal:'试你会不会顺着往下问',step:'托旁人递一句似是而非的话，看你会不会追问下去'}
+    {kind:'probe',title:'探你口风',line:'支线',goal:'看清你站哪边',step:'她宫里的人来给你送时令果子，坐下不走，绕来绕去问你“前儿宴上那桩事，你觉得皇后处置得可公？”——问的是旧事，听的是你的立场',next:'给一句答话，答成什么样都是把柄'},
+    {kind:'seat',title:'席上试你',line:'支线',goal:'看你在人前怎么接话',step:'节宴上她当着半席的人把话头递到你面前：“崔才人诗才最好，何不即席一首给大家助兴？”满席都放下筷子看你',next:'应或不应，应了成不成'},
+    {kind:'word',title:'借话探路',line:'支线',goal:'试你会不会顺着往下问',step:'她在御花园与你“偶遇”，叹一句“这园子里的花，开得太好的都先被折了”，说完看你一眼，看你接不接、怎么接',next:'接话探她底细，或装听不懂'},
+    {kind:'watch',title:'袖手看你的热闹',line:'支线',goal:'看清你的斤两',step:'有人当面对你发难时，她就在旁边坐着，不帮也不踩，只看你怎么拆——散场时她的宫女来递了杯茶，说“我家主子请你润润口”',next:'事后探她的口风'},
+    {kind:'ask',title:'请你评一件东西',line:'支线',goal:'借物试你的眼界与立场',step:'她拿出一件新得的器物请你掌眼，是一方前朝的砚——她真正想问的不是砚，是你懂不懂、识不识货、背后有没有高人',next:'评或不评，评到什么分寸'},
+    {kind:'cold',title:'刻意冷落',line:'支线',goal:'试你的耐性',step:'接下来几场场合她都对你视而不见：请安时不答你的话，宴上不与你的目光相接，连你宫里的人去领东西都被晾着',next:'沉住气，或主动去破局'},
+    {kind:'maid',title:'透过下人打听',line:'支线',goal:'摸清你的底',step:'你的宫女回来学舌：她宫里的掌事姑姑借借针线的由头，把你宫里几人的来历、月钱、谁管着钥匙，问了个遍',next:'处置这个漏风的口子'},
+    {kind:'invite2',title:'邀你同路',line:'支线',goal:'制造独处试探你',step:'去请安的路上她“恰好”与你同路，轿子并着走了一程，说了些天气衣裳的闲话，临分手忽然问：“你说这宫里，什么人最靠得住？”',next:'答她一句，答多答少都是表态'}
   ],
   压制:[
-    {kind:'supply',title:'份例做文章',line:'敌对',goal:'让你在宫人面前短了体面',step:'借份例发放的由头，让你宫里的炭火与纸墨短了一截，管事太监只说单子上就是这么写的'},
-    {kind:'rank',title:'座次挪位',line:'敌对',goal:'让六宫看见你被挪了位子',step:'在一场宴的座次上做了手脚，把你的位子挪到末席，理由挑不出错'},
-    {kind:'swap',title:'换你掌事',line:'敌对',goal:'让你宫里少一个得用的人',step:'把你宫里得用的掌事姑姑“调去别处帮几日忙”，换了个生面孔来'},
-    {kind:'warn',title:'捎话敲打',line:'敌对',goal:'让你自己收敛',step:'让人捎一句“年轻气盛，凡事收着些”，话说得客气，意思却不客气'}
+    {kind:'supply',title:'份例做文章',line:'敌对',goal:'让你在宫人面前短了体面',step:'本月份例发下来，你宫里的银霜炭只剩半数，管事太监摊着手说单子上就是这么写的，来领东西的宫女们都在看',next:'当场追问或事后查单，找出是谁改的'},
+    {kind:'rank',title:'座次挪位',line:'敌对',goal:'让六宫看见你被挪了位子',step:'宴席开席，引座的太监把你往末席领，说席单就是这么排的——满殿的目光跟着你一路走到最下首，挑不出错，又明明白白是羞辱',next:'当场忍下或寻机翻回来'},
+    {kind:'swap',title:'换你掌事',line:'敌对',goal:'让你宫里少一个得用的人',step:'一纸调令，你宫里得力的掌事姑姑被“借调”去尚宫局帮差，换来个眼生的，问你什么都摇头说不知道',next:'把人弄回来，或驯服这个新来的'},
+    {kind:'warn',title:'捎话敲打',line:'敌对',goal:'让你自己收敛',step:'赏菊宴散后，她宫里的嬷嬷堵住你的轿子，皮笑肉不笑地学她家主子的话：“年轻人风头太盛，仔细闪了腰”——说完福一福就走',next:'忍、顶回去，或记下这一笔'},
+    {kind:'cut',title:'抢你的差事',line:'敌对',goal:'让你空忙一场',step:'你备了半月的节礼花样，呈上去的却是她的——你的花样怎么会到她手里，经手的太监只说“小的只管递匣子”',next:'查出花样怎么漏的，堵上这个口子'},
+    {kind:'audit',title:'查你的账',line:'敌对',goal:'从账目上拿你的把柄',step:'尚宫局忽然派人来核你宫里的账，一笔一笔问得极细，连三年前赏下人的几百钱都翻出来对——核的人背后站着谁，人人都知道',next:'把账做平，或让查的人无功而返'},
+    {kind:'block',title:'断你一条门路',line:'敌对',goal:'让你求人无门',step:'你托人往宫外递的家书被退回来，说近来宫门查得严；替你递了两年信的那个小太监，忽然被调去了浣衣局',next:'另寻门路，或查是谁打的招呼'},
+    {kind:'snub',title:'抢你的风头',line:'敌对',goal:'让你备的场子替她做嫁衣',step:'你苦练了一旬准备在节宴上献的艺，她却抢先一步演了同题的曲目，演得还不差——你的节目再上去，就成了拾人牙慧',next:'临场换节目，或硬着头皮比一场'},
+    {kind:'rule',title:'借规矩挑错',line:'敌对',goal:'用礼制拿捏你',step:'尚宫局的女官来“提点”你：你上月请安时用的帕子颜色逾了位份的规矩，按例要申饬——规矩是真的，挑这时候提也是真的',next:'认罚或翻查旧例驳回去'},
+    {kind:'esc_seat',title:'esc·宴上发难',line:'敌对',esc:true,goal:'当众让你下不来台',step:'她在节宴上借着酒意当众问你一句：“听闻你才人妹妹前儿那首咏菊诗，是抄了前人的集子？”满殿安静下来，连帝后都抬了头',next:'当场自证，或让她这句话成为众矢之的'},
+    {kind:'esc_proof',title:'esc·拿实证说话',line:'敌对',esc:true,goal:'用一件实物钉死你',step:'她当着众人的面，命人呈上一方“你赏出去的”香囊，说这里头的东西逾了制——香囊确实出自你宫，里头的料却是谁换的',next:'当众拆开对质，揪出换药的人'},
+    {kind:'esc_order',title:'esc·借上命夺差',line:'敌对',esc:true,goal:'让中宫亲口削你的事',step:'中宫忽然传你，说有人举荐你协办万寿节的差事“年轻担不起”，要收回成命——旨意是真的，举荐的人站在皇后身侧',next:'在中宫面前把事接稳，或体面认下'},
+    {kind:'esc_ally',title:'esc·逼你站队',line:'敌对',esc:true,goal:'当众逼你表态',step:'她在几位高位妃嫔都在的场合，笑吟吟地问你：“方才那桩事，我与众位姐姐意见不合——才人妹妹说，谁对？”答谁都得罪另一边',next:'答出一番两边都挑不出错的话，或把话推回去'}
   ],
   敌对:[
-    {kind:'rumor',title:'放话毁名',line:'敌对',goal:'把你往不安分上引',step:'在六宫放出一段话头，说你近来“走动得太勤”，要把你往不安分上引'},
-    {kind:'cut',title:'截你机会',line:'敌对',goal:'让你连御前的面都见不上',step:'抢在你前头把御前的一桩差事截了，连说辞都备得与你相仿'},
-    {kind:'audit',title:'查你的账',line:'敌对',goal:'从账目上拿你的把柄',step:'借核对份例的名目来查你宫里的账，查得细，问得也细'},
-    {kind:'turn',title:'挑你身边的人',line:'敌对',goal:'在你身边埋一颗子',step:'许了你身边一个宫女好处，要她留神你平日见谁、说什么'}
+    {kind:'rumor',title:'放话毁名',line:'敌对',goal:'把你往不安分上引',step:'这两日六宫都在传：你宫里夜夜灯火到三更，说是描花样子，谁知道在绣什么见不得人的东西——传得有鼻子有眼，源头却摸不着',next:'止住谣言，或查出源头反打'},
+    {kind:'cut',title:'截你机会',line:'敌对',goal:'让你连御前的门都摸不着',step:'帝前传召精通琴艺的妃嫔伴驾，名单拟的是你，去的人却成了她——尚宫局说临时的旨意，谁也不知道旨意从哪儿来',next:'查证这道旨意，把机会夺回来'},
+    {kind:'turn',title:'挑你身边的人',line:'敌对',goal:'在你身边埋一颗子',step:'你宫里最机灵的小宫女近来手头阔绰得反常，新簪子、新鞋；你一问，她跪下哭着说没做什么，就是替人抄了两回书',next:'处置这颗子，或反用她递假消息'},
+    {kind:'break',title:'坏你的心血',line:'敌对',goal:'让你一场辛苦归零',step:'你备了十日的绣样，临呈前一夜被人浸了水，颜色晕成一团；守夜的太监说没听见动静，窗纸却破了个指节大的洞',next:'补救或重做，查出是谁伸的手'},
+    {kind:'expose',title:'揭你的私隐',line:'敌对',goal:'让六宫拿你的家世嚼舌',step:'宫人们嚼起你父兄的旧事，说你家门当年如何如何——这话只可能从你递回府的家书里漏出去，而你的家书两个月前丢过一封',next:'找回那封家书，堵住传话的人'},
+    {kind:'isolate',title:'拉人孤立你',line:'敌对',goal:'让你在这宫里没人说话',step:'这月三场聚会，两场你没接到帖子，接到的第三场到场才发现日子记错了——不是你记错，是帖子上的日子被改过',next:'破局重入她们的圈子，或另起炉灶'},
+    {kind:'steal',title:'夺你的窗口',line:'敌对',goal:'抢在你前头固宠',step:'帝翻了你的牌子——又被她“病中惊梦”截了去，敬事房的太监一脸为难，说她的宫女哭到了御前',next:'咽下这口气，或让帝知道这梦病得蹊跷'},
+    {kind:'plant',title:'栽一件小物',line:'敌对',goal:'在你的地方放见不得人的东西',step:'你宫里“搜”出一双男子的鞋——搜宫的由头是有人举报你私相授受。鞋是新的，码是宫外的，可它是从你床底下翻出来的',next:'当场洗清，反查出塞鞋的人'},
+    {kind:'proxy',title:'驱低位使坏',line:'敌对',goal:'借刀给你添恶心',step:'低位的小妃嫔开始处处学你：你穿什么她穿什么，你献什么她隔日也献什么，还在人前说“才人妹妹教得好”——她背后站着谁，人人心里有数',next:'处置这个马前卒，或点给主使她看'},
+    {kind:'family',title:'拿你家人说事',line:'敌对',goal:'用你的软肋拿捏你',step:'她宫里来“探病”的嬷嬷拉着你的手说了半天你娘身子不好、你弟弟读书不用功——每句都是关心，每句都是刀子',next:'把家人的事捂住，或让她够不着'},
+    {kind:'esc_trial',title:'esc·当面对质',line:'敌对',esc:true,goal:'把一桩旧事翻到人前',step:'她把一桩压了数月的旧事当着帝后的面翻出来，人证物证各备了一份，请帝后“评个是非”——那桩事你真的沾过边',next:'在帝后面前把这件事说清楚，全身而退'},
+    {kind:'esc_lever',title:'esc·把柄要挟',line:'敌对',esc:true,goal:'逼你交一件东西或退一场事',step:'她单独请你吃茶，屏退左右，推过来一封信——信里是你不想让人看见的东西。她说：不是要你命，是要你下月那场比试，称病',next:'答应她、骗过她，或把信夺回来'},
+    {kind:'esc_frame',title:'esc·实证构陷',line:'敌对',esc:true,goal:'让经手人出面钉死你',step:'一个本该死了心的小太监忽然当堂翻供，说受你指使做过见不得人的事，连时辰地点都说得有鼻子有眼——他袖子里有人塞的银子',next:'当庭拆穿翻供，让塞银子的人现形'},
+    {kind:'esc_banquet',title:'esc·宴上夺彩',line:'敌对',esc:true,goal:'在你露脸的场子踩死你的节目',step:'你备了半旬的献艺成了全宴的彩头——因为她在开宴前“无意”把你的节目透给了所有要献艺的人，人人都有了准备，你的成了最不出挑的那个',next:'临场拿出压箱底的东西翻回来'}
   ]
 };
 function factionNpc(name){
@@ -3151,7 +3262,11 @@ function recalcFactionAttitude(f){ // 态度看领袖亲疏，也看这一系最
   return f.attitude;
 }
 function factionMovePick(f){
-  const pool=FACTION_MOVES[f.attitude]||FACTION_MOVES['观望'];
+  const pool0=FACTION_MOVES[f.attitude]||FACTION_MOVES['观望'];
+  const hostile=f.attitude==='压制'||f.attitude==='敌对';
+  const esc=hostile&&(Number(f.esc)||0)>=1; // 得手过：下一招从升级发难里挑
+  const escPool=pool0.filter(m=>m.esc),normPool=pool0.filter(m=>!m.esc);
+  const pool=(esc&&escPool.length)?escPool:(normPool.length?normPool:pool0);
   const fresh=pool.filter(m=>m.kind!==f.lastMoveKind);
   const use=fresh.length?fresh:pool;
   return use[Math.floor(Math.random()*use.length)];
@@ -3176,15 +3291,19 @@ function factionLandUnopposed(f){ // 到期无人应对：这一步就真落了�
   if(f.attitude!=='压制'&&f.attitude!=='敌对')return '';
   if(at&&at['威望']!=null)at['威望']=clamp01_100(Number(at['威望'])-2);
   f.power=clamp01_100((Number(f.power)||0)+3);
+  f.esc=Math.min(2,(Number(f.esc)||0)+1); // 无人理会，她们尝到甜头：下一招升级
   f.notes=[...(f.notes||[]),{xun:fmtTime(),text:'无人理会，这一步落了地'}].slice(-4);
   return '威望-2';
 }
-function factionTick(){ // 旬首排期：一派一步，落成剧情账；一次只许一家走棋
+function factionTick(){ // 旬首排期：一派一步，落成剧情账；一次只许一家走棋；本旬已有主戏（节宴/到期/发酵）不排
   if(!state||!Array.isArray(state.factions)||!state.factions.length)return null;
   const now=xunSerial(state.time);
   const meta=ensurePlotMeta();
   if((state.turn||0)<(meta.graceTurn||0))return null; // 初入宫缓冲：先让玩家认路
+  if(festivalOf(state.time))return null; // 节宴之旬宴席即主戏，不再加派系戏
   if((state.plots||[]).some(p=>p&&p.factionId&&p.stage==='进行中'))return null;
+  const eligible=activePlots().filter(p=>p.id!==DESTINY_PLOT_ID&&!p.schemeId);
+  if(eligible.some(p=>(p.latest!=null&&now>=p.latest)||(p.latest==null&&now-(p.touch??now)>=STALE_PLOT_XUN)))return null; // 到期/发酵的线旬首必弹出，别抢戏
   for(const f of state.factions)recalcFactionAttitude(f);
   const ready=state.factions.filter(f=>!f.defunct&&!f.player&&f.leader&&(!f.lastMove||now-(Number(f.lastMove)||0)>=FACTION_MOVE_GAP)); // 自己这一系不另排棋
   if(!ready.length)return null;
@@ -3194,7 +3313,7 @@ function factionTick(){ // 旬首排期：一派一步，落成剧情账；一�
   f.stepPlotId='p-faction-'+now;
   f.lastMove=now;f.lastMoveKind=mv.kind;
   f.notes=[...(f.notes||[]),{xun:fmtTime(),text:`${mv.title}：${mv.step}`}].slice(-4);
-  const dueText=(now%2)?'四旬内':'三旬内';
+  const dueText=mv.esc?'三旬内':((now%2)?'四旬内':'三旬内');
   state.plots=mergePlots(state.plots,[{
     id:'p-faction-'+now,
     line:mv.line,
@@ -3202,12 +3321,13 @@ function factionTick(){ // 旬首排期：一派一步，落成剧情账；一�
     stage:'进行中',
     goal:mv.goal,
     note:mv.step,
+    next:mv.next||'',
     dueText,
     factionId:f.name
   }],now);
   return f;
 }
-function factionMoveBrief(){ // 灌进剧情裁决：本旬各派各走哪一步、这一步要落到谁身上
+function factionMoveBrief(adj){ // 灌进剧情裁决：本旬各派各走哪一步、这一步要落到谁身上；本旬已有主戏时各派只留痕迹
   if(!state||!Array.isArray(state.factions)||!state.factions.length)return '';
   const live=state.factions.filter(f=>!f.defunct);
   const dead=state.factions.filter(f=>f.defunct);
@@ -3228,11 +3348,15 @@ function factionMoveBrief(){ // 灌进剧情裁决：本旬各派各走哪一步
   const ownLine=own?`\n自己这一系：${own.name}｜领袖 ${own.leader}｜实力 ${own.power}｜成员 ${ (own.members||[]).join('、')||'尚无' }——主控自领，不另排棋；她行事时这一系可替她出力，但不能写成旁人拿主意。`:'';
   const off=dead.length?`\n名存实亡：${dead.map(f=>f.name+(f.leader?`（${f.leader}）`:'')).join('、')}——旧人还在，人心已散，只可写她们的零星动静，不得当作活派系发号施令。`:'';
   const anyStep=live.some(f=>f.step);
+  const busy=adj&&(adj.due.length||adj.overdue.length||adj.stale.length||adj.schemeFire.length||adj.hit||adj.mainPub||(adj.fest&&!adj.festSoft));
+  const rule2=busy
+    ? (anyStep?'本旬主戏已有着落：有“当前一步”的派系只在正文或 haremNews 留一条可见痕迹（谁来了、动了什么），别另起派系戏、别逼主控当场表态——清算照旧留给该账到期那一旬。玩家若主动查问、当面应对，照常接戏并可达标兑现（statePatch.plots，stage 改“已兑现”）。':'本旬主戏已有着落，各派按兵不动：只允许在 haremNews 留一条可见痕迹，不得平地起派系冲突。')
+    : (anyStep?'本旬有“当前一步”的派系，先在正文或后宫动态里演出它的可见痕迹（谁来了、动了什么、传了什么话），让主控看见、听见、起疑；不要当旬就逼她当场表态——清算留给该账到期那一旬。玩家若主动查问、当面应对，照常接戏并可达标兑现（statePatch.plots，stage 改“已兑现”）。':'本旬各派按兵不动：只允许在 haremNews 留一条可见痕迹（谁得了差事、谁被赏、谁宫里换了人），不得平地起派系冲突。');
   return `\n【派系动向·本旬】
 ${rows}${off}
 规矩：
 1. 派系不是独立剧情通道：每一步都要落到具体的人、物、差事、座次、份例、传话上。禁止只写“宫里暗流涌动”“众人心思各异”这类空转；一场派系戏必须有人当场得失（位份、差事、份例、眼线、人情、把柄，至少一项）。
-2. ${anyStep?'本旬有“当前一步”的派系，先在正文或后宫动态里演出它的可见痕迹（谁来了、动了什么、传了什么话），让主控看见、听见、起疑；不要当旬就逼她当场表态——清算留给该账到期那一旬。玩家若主动查问、当面应对，照常接戏并可达标兑现（statePatch.plots，stage 改“已兑现”）。':'本旬各派按兵不动：只允许在 haremNews 留一条可见痕迹（谁得了差事、谁被赏、谁宫里换了人），不得平地起派系冲突。'}
+2. ${rule2}
 3. 主控不入党派，除非玩家明确应下；不得替玩家表态、站队或收下人情。
 4. 派系实力、成员、态度与近况只经 statePatch.factions 回写：{"派系名":{"power":数字,"attitude":"盟友/拉拢/观望/压制/敌对","members":["…"],"step":"一句话","note":"本旬近况","defunct":false}}。power 单旬变动不超过 ±10；members 只写本档已有的人物；note 会进“最近动向”。
 5. 派系不得凭空出现或瓦解：领袖死亡或被降至从四品以下，前端才认瓦解；你只演事件，不自行宣布某系散了。
@@ -3766,7 +3890,7 @@ function personaActTable(){ // 本档在场人物的性情→言行对照（只�
   if(!set.size)return '';
   return [...set].slice(0,10).map(t=>{const a=PERSONA_ACT[t];return a?`${t}：说话${a.voice}；做法${a.act}；雷区${a.trigger}`:''}).filter(Boolean).join('\n');
 }
-function npcMoveBrief(){ // 人物动向：旁人不能只在旁白里点头，每旬至少一人的主动动作落到主控身上
+function npcMoveBrief(adj){ // 人物动向：旁人不能只在旁白里点头，每旬至少一人的主动动作落到主控身上；本旬已有主戏时降格为背景
   if(!state)return '';
   const cards=state.npcGoalCards||{};
   const names=Object.keys(cards).filter(n=>n&&n!=='皇帝'&&n!=='命途');
@@ -3785,8 +3909,12 @@ function npcMoveBrief(){ // 人物动向：旁人不能只在旁白里点头，�
   const em=state.emperor||{};
   const et=String(((state.world||{}).emperor||{}).traits||'');
   const empLine=et?`\n帝（${et}）：${em.hisState?em.hisState+'；':''}他若本旬有动作，须由这条性情推出——同一句话换个性情的帝，结果应当不同。`:'';
+  const busy=adj&&(adj.due.length||adj.overdue.length||adj.stale.length||adj.schemeFire.length||adj.hit||adj.mainPub||(adj.fest&&!adj.festSoft));
+  const demand=busy
+    ? '本旬主戏已有着落：人物动向只作背景——可在 haremNews 留一句她们的动静，至多让一人在正文里以一个眼神、一句试探掠过，别抢主戏，也不必强行让谁对主控出手。'
+    : '本旬至少让其中一人的主动动作落到主控身上：试她、压她、避她，或（相熟以上才可）有求于她、托她办事——写成一个具体动作，改变她一个选项、一笔人情、一处关系或一桩风险，并在 changes/statePatch 里落账。不得只在旁白里提一句“某某来过”。';
   return `\n【人物动向·本旬】\n${rows}${empLine}\n动作须合亲疏：初识及以下只会试探、打听、挑刺、施压、避让或托人递话，不会开口托主控办事，也不会请她捎手帮个忙；要托事，先给上命、利益、把柄或人情作由头。
-本旬至少让其中一人的主动动作落到主控身上：试她、压她、避她，或（相熟以上才可）有求于她、托她办事——写成一个具体动作，改变她一个选项、一笔人情、一处关系或一桩风险，并在 changes/statePatch 里落账。不得只在旁白里提一句“某某来过”。
+${demand}
 这件事若要延续成一件要主控在几旬内应对的事（有得失、有后续），才以 statePatch.plots 立条：line 用“支线”或“敌对”，id 用“p-人物-事由”，goal 写清此人要什么、卡在哪、怎样算成，next 写一次见面内能办完的下一步，tie 写它挂在哪条长期线上，dueText 给 3—6 旬。一句话就能了结的试探、传话、避让，当场演完、只改关系或留一句传闻，不立账——别为每旬一动的规矩往账上堆空条目。账上已有 ${PLOT_ACTIVE_CAP} 条在途时不得再立新条，把这个动作演成一次当场的事。
 arc 里若写着期限或下一步，本旬须推进或改写它（statePatch.npcArc）；连续三旬不动，视为搁置——她自己的事会自己往前拱，不能让全宫停着等你。`;
 }
@@ -4592,7 +4720,7 @@ function presenceNote(p){ // 面板「属性」里的一行说明
 /* ============================================================ 工具 */
 const $=s=>document.querySelector(s);
 const MONTHS=['','正月','二月','三月','四月','五月','六月','七月','八月','九月','十月','冬月','腊月'];
-const BUILD='2026-11-22·小厨房与月份例'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
+const BUILD='2026-11-27·剧情精彩度四刀（派系事件库/NPC旧账/把柄经济/引子三段式）'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
 /* 月俸：按位份每月下旬末由前端自动入账（单位：两） */
 const SALARY_BY_GRADE={'正一品':220,'从一品':150,'正二品':110,'从二品':80,'正三品':60,'从三品':45,'正四品':36,'从四品':28,'正五品':20,'从五品':15,'正六品':12,'从六品':10,'正七品':8,'从七品':6,'正八品':5,'从八品':4,'正九品':3,'从九品':2};
 const SALARY_TITLES=[[/皇后/,220],[/皇贵妃/,150],[/贵妃/,110],[/贤妃|良妃|淑妃|德妃/,80],[/昭仪|昭容|昭媛|修仪|修容|修媛|充仪|充容|充媛/,45],[/贵嫔/,36],[/嫔/,28],[/贵人/,20],[/才人/,15],[/美人/,12],[/宝林/,10],[/常在/,8],[/答应/,6],[/选侍/,5],[/更衣/,4],[/采女/,3],[/官女子/,2],[/妃/,60]];
@@ -5866,6 +5994,85 @@ function chronicleAdd(text){ // 大事记：持续记录里程碑；同一条不
   state.chronicle.push({time:fmtTime(),text:t});
   if(state.chronicle.length>160)state.chronicle=state.chronicle.slice(-160);
 }
+function npcMemoryAdd(who,text){ // NPC 事件记忆账：此人与主控之间具体的、可翻的旧账（恩怨、许诺、当众得失）
+  if(!state||!who||!text)return;
+  const n=(state.npcs||{})[who];
+  if(!n)return; // 只记在册人物
+  if(!Array.isArray(n.memories))n.memories=[];
+  const entry={xun:fmtTime(),text:String(text).slice(0,80)};
+  if(n.memories.some(m=>m&&m.text===entry.text))return; // 同款不重复
+  n.memories.push(entry);
+  if(n.memories.length>10)n.memories=n.memories.slice(-10);
+}
+
+/* ============================================================ 隐秘与把柄（信息差经济）
+   每个在册人物藏着 1—2 条秘密；查证线交付、读心笺、交底可让主控 learn；
+   已掌握的把柄是对话里的硬通货（暗示、交易、要挟、当众抖出），use 后即公开、不再是把柄。 */
+const SECRET_POOL=[
+  {kind:'把柄',fit:['机敏','圆滑','好胜'],text:'入宫前家里曾托人改动过{w}的生辰帖，为合一句吉谶——改帖的牙人如今还在京里'},
+  {kind:'把柄',fit:['谨慎','多疑','隐忍'],text:'{w}宫里三年前没了一个小太监，对外说病故，卷宗上写的却是"暴亡"，当夜正是{w}当值'},
+  {kind:'把柄',fit:['机敏','大气','果决'],text:'{w}曾替母家递过一封信出宫，走的是宫里小太监的路子；那太监后来被发落去了浣衣局，至今不敢翻案'},
+  {kind:'把柄',fit:['柔婉','清傲','孤傲'],text:'{w}那份"风寒"病档其实是避宠装病——太医院的脉案与她宫里煎的药，药性对不上'},
+  {kind:'把柄',fit:['温厚','柔婉','细腻'],text:'{w}与一位太医往来过密，早过了问诊该有的分寸，有人撞见过那太医从角门进出'},
+  {kind:'把柄',fit:['执拗','坚忍','多疑'],text:'{w}暗地查过先皇后病故的旧档，抄了半本带走——宫里忌讳私录中宫病档'},
+  {kind:'把柄',fit:['圆滑','风趣','大气'],text:'{w}收过宫外递进来的东西，回礼走的是赏戏班子的账——戏班的班主是她家旧人'},
+  {kind:'把柄',fit:['骄矜','孤傲','好胜'],text:'{w}殿上挂的那副"御赐"的字其实是她自仿的——真迹被她拿去换了东西'},
+  {kind:'把柄',fit:['多疑','谨慎','细腻'],text:'{w}身边最得用的嬷嬷手里攥着她早年一封不该留的信——主仆情分，其实是互相拴着'},
+  {kind:'隐私',fit:['柔婉','细腻','温厚'],text:'{w}入宫前心里有过一个人，是母家的表兄；如今逢年过节，两家还借着礼数互通音讯'},
+  {kind:'隐私',fit:['怯懦','柔婉','细腻'],text:'{w}怕雷，雷雨天必遣散左右独自躲着；这事她宫里人得了封口钱，从不外传'},
+  {kind:'隐私',fit:['孤傲','清傲','骄矜'],text:'{w}生母出身寒微，是外室抬进来的；她最忌人提出身，谁多说半句都要记恨'},
+  {kind:'隐私',fit:['淡泊','坚忍','谨慎'],text:'{w}夜里偷偷抄经为亡母祈福——宫里忌讳私设灵位，那卷经藏在佛堂签筒的夹层里'},
+  {kind:'隐私',fit:['爽直','风趣','好胜'],text:'{w}酒品极差偏又贪杯，去年节宴失态那次，是被身边嬷嬷掐着人中拖回去的'},
+  {kind:'隐私',fit:['谨慎','机敏','多疑'],text:'{w}睡前必亲自查看门窗，柜里还备着一包石灰——刚入宫时被人吓过一回，落下了病根'},
+  {kind:'隐私',fit:['细腻','柔婉','机敏'],text:'{w}养猫只是幌子，猫笼夹层是她藏私信的地方——送信的是御膳房采买的小太监'},
+  {kind:'隐私',fit:['风趣','爽直','好胜'],text:'{w}暗地学得一手驯鸟的绝活，御花园那只爱停在帝肩上的鹦哥，见了她比见了谁都亲'},
+  {kind:'旧事',fit:['大气','果决','孤傲'],text:'先皇后在时{w}是贴身伺候的旧人，先皇后驾崩那夜她当值——太医院没记下来的事，她知道一些'},
+  {kind:'旧事',fit:['圆滑','多疑','机敏'],text:'{w}刚入宫时投过另一派的门，后来那边败了，她顺势跳了出来；老宫人都记得，只是没人点破'},
+  {kind:'旧事',fit:['淡泊','温厚','柔婉'],text:'{w}与一位已出家的太妃是旧识，每月借着送供品的名义通信，信走的是太后宫里的路子'},
+  {kind:'旧事',fit:['好胜','骄矜','执拗'],text:'{w}当年选秀本不是头名，是前头那位病了才补上去的——这事她自己最忌讳人提'},
+  {kind:'旧事',fit:['隐忍','坚忍','谨慎'],text:'{w}入宫头一年在尚宫局当过差，各宫账目的门道她摸得门清——这也是她如今手眼通明的来处'},
+  {kind:'旧事',fit:['果决','爽直','坚忍'],text:'{w}的兄长在前朝站错过队，如今外放赎罪；她每月省下的份例银，一半都填了那个窟窿'},
+  {kind:'旧事',fit:['温厚','淡泊','柔婉'],text:'{w}入宫前在闺中替人抄书养家，一手馆阁体是那时候练的——她从不提，一提就岔开话'}
+];
+function secretAddS(s,who,text,kind){ // 新立一条秘密（s 可为任意存档对象；全局态走 secretAdd）
+  if(!s||!who||!text)return null;
+  s.secrets=Array.isArray(s.secrets)?s.secrets:[];
+  s.secretSeq=(Number(s.secretSeq)||0)+1;
+  const sec={id:'sec'+s.secretSeq,who:String(who).slice(0,20),text:String(text).slice(0,90),kind:['把柄','隐私','旧事'].includes(kind)?kind:'隐私',learned:false,used:false,born:fmtTime(s.time)};
+  s.secrets.push(sec);
+  return sec;
+}
+function secretAdd(who,text,kind){return secretAddS(state,who,text,kind)}
+function secretAssignS(s,who,traits){ // 给一个人物从牌库挑 1—2 条合性情的秘密（幂等：一人只发一次）
+  if(!s)return;
+  s.secrets=Array.isArray(s.secrets)?s.secrets:[];
+  if(s.secrets.some(x=>x.who===who))return;
+  const tr=Array.isArray(traits)?traits:[];
+  const fit=SECRET_POOL.filter(x=>!tr.length||x.fit.some(f=>tr.includes(f)));
+  const pool=(fit.length>=2?fit:SECRET_POOL).slice();
+  const n=1+(Math.random()<0.35?1:0),picks=[];
+  while(picks.length<n&&pool.length)picks.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]);
+  for(const p of picks)secretAddS(s,who,p.text.split('{w}').join(who),p.kind);
+}
+function secretAssign(who,traits){secretAssignS(state,who,traits)}
+function secretLearn(ref){ // 主控掌握一条秘密：按 id，或按 who 取此人最早未掌握的一条
+  if(!state||!Array.isArray(state.secrets))return null;
+  const s=state.secrets.find(x=>x.id===ref)||state.secrets.find(x=>x.who===ref&&!x.learned);
+  if(!s||s.learned)return s||null;
+  s.learned=true;
+  toast(`掌握了${s.who}的一条${s.kind}`,3200);
+  chronicleAdd(`掌握了${s.who}的一条${s.kind}`);
+  return s;
+}
+function secretUse(id){
+  if(!state||!Array.isArray(state.secrets))return;
+  const s=state.secrets.find(x=>x.id===id&&x.learned&&!x.used);
+  if(!s)return;
+  s.used=true;
+  npcMemoryAdd(s.who,`把柄被抖了出来：${s.text.slice(0,36)}`);
+  chronicleAdd(`抖出了${s.who}的隐秘：${s.text.slice(0,40)}`);
+}
+function secretsKnownOf(who){return ((state&&state.secrets)||[]).filter(s=>s.who===who&&s.learned)}
 let toastHoldUntil=0; // 新得物品的提示要看完：这段时间里别的寒暄提示不许覆盖它
 function toast(msg,ms=2200){const el=$('#toast');el.textContent=msg;el.classList.add('on');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('on'),ms)}
 
@@ -6041,6 +6248,10 @@ function normalizeState(s){
   ensureNpcMeets(s); // 会面账：旧档按既有好感折回次数，新档从零计
   s.system=(s.system&&typeof s.system==='object')?s.system:{shop:[]};
   if(!Array.isArray(s.system.shop))s.system.shop=[];
+  if(!Array.isArray(s.secrets)){ // 旧档补隐秘账：在册人物各发一两条，只发一次
+    s.secrets=[];s.secretSeq=0;
+    for(const id in s.npcs){const n=s.npcs[id];if(n&&n.rank)secretAssignS(s,id,((n.profile||{}).traits)||[])}
+  }
   s.time=s.time||{era:'元朔',year:1,month:3,xun:'上旬'};
   if(!s.plotLedgerV1){migratePlotLedger(s);s.plotLedgerV1=true} // 一次性迁移须先于 pending 归一：此时剧情类条目还是字符串，模式才匹配得上；归一后再迁永远命中不了
   s.pending=normalizePending(s.pending,s.turn);
@@ -6558,9 +6769,18 @@ function buildStaticSystem(){
       .replace('{{世界书全文：02-世界书.md}}',WORLD_BOOK_RUNTIME)
       .replace('{{叙事文风全文：03-叙事文风.md}}',STYLE_GUIDE)
       .replace('{{当前存档 JSON：04-当前存档-v36.json 或玩家当前档}}','（见本提示词末尾「当前存档」段，动态存档在最后）')
-      +'\n\n'+NPC_MODULE+'\n\n'+ENERGY_MODULE+'\n\n'+PLOTS_MODULE+'\n\n'+MAIN_LINE_MODULE+'\n\n'+SCHEME_MODULE+'\n\n'+FACTION_MODULE+'\n\n'+FESTIVAL_MODULE+'\n\n'+EMPEROR_MODULE+'\n\n'+EMPEROR_PERSONA_MODULE+'\n\n'+CHAMBER_MODULE+'\n\n'+SCENE_MODULE+'\n\n'+SKILL_MODULE+'\n\n'+CRAFT_MODULE+'\n\n'+COOKING_MODULE+'\n\n'+STUDIO_MODULE+'\n\n'+GIFT_MODULE+'\n\n'+PERFORM_MODULE+'\n\n'+PERSONA_MODULE+'\n\n'+PERSONA_ACT_MODULE+'\n\n'+LENGTH_MODULE+'\n\n'+PRESENCE_MODULE+'\n\n'+PLAY_UI_MODULE; // 只放与存档无关的常量：本档人物性情表是动态的，见 buildSystem
+      +'\n\n'+NPC_MODULE+'\n\n'+SECRETS_MODULE+'\n\n'+ENERGY_MODULE+'\n\n'+PLOTS_MODULE+'\n\n'+MAIN_LINE_MODULE+'\n\n'+SCHEME_MODULE+'\n\n'+FACTION_MODULE+'\n\n'+FESTIVAL_MODULE+'\n\n'+EMPEROR_MODULE+'\n\n'+EMPEROR_PERSONA_MODULE+'\n\n'+CHAMBER_MODULE+'\n\n'+SCENE_MODULE+'\n\n'+SKILL_MODULE+'\n\n'+CRAFT_MODULE+'\n\n'+COOKING_MODULE+'\n\n'+STUDIO_MODULE+'\n\n'+GIFT_MODULE+'\n\n'+PERFORM_MODULE+'\n\n'+PERSONA_MODULE+'\n\n'+PERSONA_ACT_MODULE+'\n\n'+LENGTH_MODULE+'\n\n'+PRESENCE_MODULE+'\n\n'+PLAY_UI_MODULE; // 只放与存档无关的常量：本档人物性情表是动态的，见 buildSystem
   }
   return _staticSystem;
+}
+function secretsBrief(){ // 主控掌握的把柄：随每旬请求附上，是对话里的硬通货
+  const known=((state&&state.secrets)||[]).filter(s=>s.learned);
+  if(!known.length)return '';
+  const rows=known.filter(s=>!s.used).map(s=>`${s.id}（${s.who}·${s.kind}）：${s.text}`);
+  const used=known.filter(s=>s.used).length;
+  return '\n\n【主控掌握的把柄】（已掌握的隐秘；可暗示、交易、要挟、当众抖出；用后写 statePatch.secrets={use:["secN"]}）\n'
+    +(rows.length?rows.map((r,i)=>`${i+1}. ${r}`).join('\n'):'（手头暂无未用的把柄）')
+    +(used?`\n另有 ${used} 条已抖出成公开旧事。`:'');
 }
 function buildSystem(focusMsg){
   // 静态内容（世界书/文风/模块）全部在前、动态存档放最后：
@@ -6570,7 +6790,8 @@ function buildSystem(focusMsg){
     +'\n\n'+presenceBrief(state) // 当前外貌/忌惮档位，每旬随存档变化
     +'\n\n'+disguiseBrief(state) // 本旬易容：旁人只认这张脸，后果记在被冒名者名下
     +'\n\n'+personaActTable() // 本档在场人物的性情→言行对照：随存档变动，不能进静态前缀
-    +emperorPersonaBrief(); // 帝设：每旬给一句执行要求，避免被长存档稀释
+    +emperorPersonaBrief() // 帝设：每旬给一句执行要求，避免被长存档稀释
+    +secretsBrief(); // 主控掌握的把柄：信息差经济的硬通货
   return sys.split('<player>').join(String(state.protagonist.name||'主控')); // 帝设变量：player=主控名讳
 }
 function emperorPersonaBrief(){ // 帝设每旬点一次：不靠模型自己翻存档
@@ -6605,7 +6826,7 @@ SCENE_PARTS_RULES,
 '【收尾】narrative 只写旁白，不写引号对白。',
 '【约束】scene.state 只写 "ongoing"；narrative 为空字符串，changes=[]，statePatch={}；scene.where 只在场景移动时写。不得替玩家结束对话：话已说尽也只写一句带去意的回应，仍给接话；玩家点「结束对话」后前端才另发收尾请求。对方必须回应玩家这一轮的言行，哪怕只是拒绝、反问或转移话题，不能不作答就走。换人（被传入阁面圣、正主登场）：把 scene.who 改写为新对象，过渡写进 narr；引见场景正主一开口就交出 scene.who（帝写「皇帝」），宫人只通传引路捧物，不得替主子发话、下令、代答。',
 '【承接】严格承接用户消息里的本场对话记录，把话题往前推；对方只依据自己的性情、目标、与主控的关系及已知信息回应。',
-'【旧事】soFar 里的 pending（在办与约定）、items（与他有关的旧物）、emperor.memories（共同经历）都是已经发生的事：给过的信物不再重给，定过的时辰不再重订，答应过的事照办、改口要说明缘由。再提旧事须写成“接着上次说”，不得演成“头一回提起”，也不得让同一件事重新走一遍初次安排。',
+'【旧事】soFar 里的 pending（在办与约定）、npcMemories（眼前此人与主控的旧账：哪场当众得失、欠过什么人情的具体事）、leverage（主控握着她的把柄）、items（与他有关的旧物）、emperor.memories（共同经历）都是已经发生的事：给过的信物不再重给，定过的时辰不再重订，答应过的事照办、改口要说明缘由。再提旧事须写成“接着上次说”（如她当众发难过，这次见面她的态度要承那一笔），不得演成“头一回提起”，也不得让同一件事重新走一遍初次安排。npcMemories 与 leverage 是最该翻的料：对话写不出东西时，从旧账与把柄里找 tension，而不是另编新话题；用把柄须见《隐秘与把柄》条（暗示、交易、要挟皆可，用后写 statePatch.secrets={use:["secN"]}）。',
 '【信息】玩家直接问到对方知道的事，必须在本轮给出实质信息：具体名目、缘由、时间、经手人或明确去处。可以害怕、压低声音、提条件，但不能用“谁提谁落不是”“只当没听见”这类空话把话吊住；确实不能说时，须给出具体缘由与下一步可问的人或可查之处。不得凭空发明与存档无关的禁忌或旧案；若引入新的忌讳，必须同时讲清它是什么、为何犯忌、与谁相关。',
 '【戏核】brief 是这场戏的核心问题：玩家要得到/保住什么、谁在阻止、失败失去什么。每轮都让它前进一步，不另起无关小问题，也不能只有问答——每轮至少让事态变一点：有人来、物被拿走、传旨、搜检、证据出现、条件变化。本场若确实没有得失，一句交代即可，不要用追问硬撑。',
 '【暗流】若本场有 scheme：结果不掷骰。根据玩家本轮的选择、当前局势、对方性格与手段、既有准备推断成败；最终收尾时在 JSON 顶层写 schemeOutcome（win/draw/lose/defuse），并把实际后果写进 narrative/changes/statePatch，不得只判输赢不写后果。',
@@ -6663,6 +6884,8 @@ function buildSceneSystem(who){
     soFar:{
       disguise:dg?`以下 pending／items／emperor／recentTurns 都是主控自己的旧账，不是「${dg.name}」的；对方不认，也不得当成与这张脸的共同经历。`:null,
       pending:(state.pending||[]).slice(-6).map(x=>String(typeof pendText==='function'?pendText(x):((x&&(x.t||x.text))||x||'')).slice(0,60)).filter(Boolean),
+      npcMemories:(!isEmp&&!isChamber&&n.memories&&n.memories.length)?n.memories.slice(-4).map(m=>`${m.xun||''}：${String(m.text||'').slice(0,50)}`):null, // 眼前这人的旧账：可翻、可接、可别重提
+      leverage:(!isEmp&&!isChamber&&secretsKnownOf(who).some(s=>!s.used))?secretsKnownOf(who).filter(s=>!s.used).map(s=>`${s.id}（${s.kind}）：${s.text.slice(0,50)}`):null, // 主控握着她的把柄：可用、可换、可别空手吵架
       items:relItems,
       recentTurns:(typeof history!=='undefined'&&Array.isArray(history)?history.slice(-5):[])
         .map(h=>`${h&&h.turn?`第${xunNoOf(h.turn)}旬`:'近旬'}：${String((h&&(h.log||h.focus))||'').slice(0,50)}`).filter(s=>s.length>4),
@@ -7008,6 +7231,15 @@ function applyPatch(patch){
     if(k==='npcArc'){ // 各人眼下的事：{称谓: "一句话（含期限）"}
       const obj=patch[k]||{};for(const w in obj){const n=(state.npcs||{})[w]||Object.values(state.npcs||{}).find(x=>x&&(x.name===w||x.realName===w));if(n)n.arc=String(obj[w]||'').slice(0,120)}
       continue}
+    if(k==='npcMemory'){ // 事件记忆账：{称谓: "一句具体的旧账"}——当众发难、结盟许诺、结怨服软等值得翻的旧事
+      const obj=patch[k]||{};for(const w in obj)npcMemoryAdd(w,obj[w]);
+      continue}
+    if(k==='secrets'){ // 隐秘与把柄：learn 让主控掌握一条（查证交付/交底），add 新立秘密，use 用掉一条把柄
+      const v=patch[k]||{};
+      if(Array.isArray(v.add))for(const a of v.add)secretAdd(a&&a.who,a&&a.text,a&&a.kind);
+      if(Array.isArray(v.learn))for(const l of v.learn)secretLearn(l&&(l.id||l.who));
+      if(Array.isArray(v.use))for(const id of v.use)secretUse(id);
+      continue}
     if(k==='factions'){ // 派系账：只认白名单字段；实力单旬±10；瓦解须过前端条件
       const obj=patch[k];
       if(obj&&typeof obj==='object'&&!Array.isArray(obj))for(const nm in obj){
@@ -7049,10 +7281,17 @@ function applyPatch(patch){
         const names=doneNow.slice(0,2).map(d=>`「${d.title}」`).join('、')+(doneNow.length>2?`等 ${doneNow.length} 件`:'');
         toast(`任务完成：${names} +${base} 分${bonus?`（另命途长赐 +${bonus}）`:''}`,3600);
       }
-      for(const f of (state.factions||[])){ // 派系那一步已结：清掉当前一步，免得模型照着旧棋继续演
+      for(const f of (state.factions||[])){ // 派系那一步已结：清掉当前一步，免得模型照着旧棋继续演；得手则升级、被挫败则降温
         if(!f.stepPlotId)continue;
         const p=(state.plots||[]).find(x=>x.id===f.stepPlotId);
-        if(!p||p.stage!=='进行中')factionClearStep(f);
+        if(!p||p.stage!=='进行中'){
+          if(p&&p.stage==='已兑现'&&(f.attitude==='压制'||f.attitude==='敌对')){
+            if(/挫败|败露|化解|无功|自证|洗清|拆穿|驳倒|夺回|翻回|现形|没成|落空/.test(p.note||''))f.esc=0; // 玩家接住了：降温
+            else f.esc=Math.min(2,(Number(f.esc)||0)+1); // 落了地：下一招升级到发难
+          }
+          if(p&&p.stage==='已兑现')npcMemoryAdd(f.leader,`「${p.title}」这一步落了地：${String(p.note||'').slice(0,40)}`);
+          factionClearStep(f);
+        }
       }
       continue}
     if(k==='schemeExpose'){ // 玩家查实了暗流征兆：降难度、把图谋推到明处
@@ -7114,6 +7353,7 @@ function applyDossier(list){
     if(!state.npcs[id]){
       state.npcs[id]={known:true,metAt:fmtTime(),name:id,realName:d.realName||'',rank:d.rank||'',faction:d.faction||'',age:Number(d.age)||null,
         profile:{traits:[],biography:[],impressions:{},recent:[],depth:'初识'},hidden:d.hidden||{}};
+      secretAssign(id,d.traits||[]);
     }
     const npc=state.npcs[id];
     if(d.rank)npc.rank=String(d.rank); // 位份会升降：以最新档案为准
@@ -9042,6 +9282,8 @@ const UI={
       <div class="sec"><div class="sec-cap">已感知的性情</div>${normalizePersona(prof.traits).map(t=>`<span class="tag">${esc(t)}</span>`).join('')||'<div class="sheet-note">所知尚浅。</div>'}</div>
       <div class="sec"><div class="sec-cap">才艺见闻</div>${intelSection||`<div class="sheet-note">尚未听说${ta}精于何艺。</div>`}</div>
       <div class="sec"><div class="sec-cap">${ta}对你</div>${this.mindSection(id)}</div>
+      ${(secretsKnownOf(id).length)?`<div class="sec"><div class="sec-cap">掌握的把柄</div>${secretsKnownOf(id).map(s=>`<div class="itemrow"><span>${s.used?'（已抖出，成公开旧事）':''}${esc(s.text)}</span></div>`).join('')}</div>`:''}
+      ${(n.memories&&n.memories.length)?`<div class="sec"><div class="sec-cap">旧账</div><div class="tl">${[...n.memories].reverse().map(m=>`<div class="tl-item"><div class="tl-time">${esc(m.xun||'')}</div>${esc(m.text)}</div>`).join('')}</div></div>`:''}
       <div class="sec"><div class="sec-cap">${ta}对他人（据你所知）</div>${impOther}</div>
       <div class="sec"><div class="sec-cap">生平所知</div>${bio?`<div class="tl">${bio}</div>`:'<div class="sheet-note">还没有可记的往来。</div>'}</div>
       ${recent?`<div class="sec"><div class="sec-cap">最近动向</div>${recent}</div>`:''}`;
@@ -10115,6 +10357,7 @@ function annualConsortIntake(){ // 每年一次；已在此年发过则不重复
   state.npcs[name]=npc;
   state.relationships=state.relationships||{};
   state.relationships[name]={type:'好感',value:wlInt(0,8)};
+  secretAssign(name,traits); // 新人自带一两条隐秘：日后查证与读心的交付物
   const cands=((state.factions)||[]).filter(f=>f&&!f.defunct&&f.leader&&rankScoreOf(f.leader)>=rankScoreOf(rank));
   if(cands.length&&Math.random()<0.4){ // 有现成靠山就挂进去；没有就暂不入派系
     const f=wlPick(cands);
@@ -10405,6 +10648,10 @@ function buildOpeningWorld(proto){
    const dealt=dealAvatars(assign);
    protagonist.avatar=dealt['__me__'];
    for(const id in npcs)npcs[id].avatar=dealt[id];}
+
+  /* 开局隐秘：每个在册人物自带一两条秘密，是日后查证线与读心笺的交付物 */
+  state.secrets=[];state.secretSeq=0;
+  for(const id in npcs)if(npcs[id]&&npcs[id].rank)secretAssignS(state,id,npcTraits(npcs[id]));
 
   /* 开局正文 */
   const closing=wlPick([
@@ -13940,6 +14187,8 @@ const Game={
         try{const a=raw.indexOf('{'),b=raw.lastIndexOf('}');if(b>a)text=String((JSON.parse(raw.slice(a,b+1))||{}).impression||'').trim()}catch(e){}
         if(!text)throw new Error('模型未返回有效印象');
         impView[id]={text:text.slice(0,200),turn:state.turn};
+        const sec=state.secrets&&state.secrets.find(x=>x.who===id&&!x.learned); // 窥心顺带察觉一桩隐秘：读心笺的真正价值
+        if(sec){secretLearn(sec.id);impView[id].text+=`\n（窥心之际，你顺带察觉一桩她的隐秘——${sec.text}）`}
         persistCurrent();markSafe();UI.renderSheet('NPC详情',id);
       })
       .catch(e=>{
