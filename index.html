@@ -2038,7 +2038,8 @@ function adjudicatePlots(skipDice,mode){ // 旬首裁决：到期强制兑现 + 
   lines.push('结算只经 statePatch.plots 回写【发生变化】的台账条目：兑现者 stage 改"已兑现"；改写期限者须在 note 说明理由并给出新 dueText；新埋引线新增条目（id 用 "p-" 加短标题，与现存 id 区分，goal 写一句目标和怎样算成）；作废者 stage 改"已作废"并注明缘由。只回写变化的条目，前端按 id 合并。注意：条件已足的条目必须兑现（stage 改"已兑现"，可附积分与任务进度），只改写 note 不算办结；手作成品相赠、请托办妥皆可兑现任务，规则见系统提示词手作模块与剧情台账条。pending 只留非剧情琐事。');
   if(parked)lines.push('本场只回写台账，不为这些账目另演一场：条件已足的照实改 stage 与 note，其余的留到旬首。');
   const before={};[...overdue,...due].forEach(p=>before[p.id]=p.dueText||'');
-  return {due,overdue,stale,pendStale,target,hit,seed,mainPub:!!mainPub,needMain:!!needMain,fest:festNew?fest:null,festSoft,gardenMeet:'',empDue:emp.due,schemeFire:sch.fire,schemeClue:sch.clues,before,parked:parkedList,text:'【剧情裁决 · 本旬】（前端判定：固定节宴到旬必演＋到期/超期强制兑现＋搁置发酵强制处理＋主线断档强制发布＋剧情骰被动触发，覆盖"自行决定是否触发剧情"）\n'+lines.map((l,i)=>`${i+1}. ${l}`).join('\n')+(state.mainLine?mainLineBrief():'')+npcMoveBrief(adj)+factionMoveBrief(adj)};
+  const self={due,overdue,stale,pendStale,hit,mainPub:!!mainPub,fest:festNew?fest:null,festSoft,schemeFire:sch.fire}; // 降噪判定要的几样：本旬有主戏时人物动向/派系只留背景
+  return {due,overdue,stale,pendStale,target,hit,seed,mainPub:!!mainPub,needMain:!!needMain,fest:festNew?fest:null,festSoft,gardenMeet:'',empDue:emp.due,schemeFire:sch.fire,schemeClue:sch.clues,before,parked:parkedList,text:'【剧情裁决 · 本旬】（前端判定：固定节宴到旬必演＋到期/超期强制兑现＋搁置发酵强制处理＋主线断档强制发布＋剧情骰被动触发，覆盖"自行决定是否触发剧情"）\n'+lines.map((l,i)=>`${i+1}. ${l}`).join('\n')+(state.mainLine?mainLineBrief():'')+npcMoveBrief(self)+factionMoveBrief(self)};
 }
 function matchLeads(ctxList){ // 与给定语境（人名/地名/事由）相关的在途引线：标题或备注含对方名讳/地名即命中
   const cvs=(ctxList||[]).map(s=>String(s||'').trim()).filter(s=>s.length>=2);
