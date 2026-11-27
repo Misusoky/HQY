@@ -4936,7 +4936,8 @@ const SCENE_ONGOING_RULES = [
 '- 选项每轮换新，不重复上轮原句或同义改写；每个选项是不同策略（答应、拒绝、拖延、反将、求助、交换条件），并写出可见的机会或代价，不得全是「答：……」。',
 '- 每轮输出 scene.ledger（本场已确认的事，每条≤20字，前端会回灌）；ledger 里的事不再重提。第三轮起核心问题必须落定，第五轮后不再另起问句。',
 '- 一场对话只在同一日、同一处发生：scene.when 只写当日时辰推移，不跳次日；已定下的事直接推进结果，不换个日子再演一遍准备。',
-'- parts 的 say/quote 里提到天子一律称「陛下」，叙述仍称「帝」。'
+'- parts 的 say/quote 里提到天子一律称「陛下」，叙述仍称「帝」。',
+'- 一轮里谁开口就给谁标 who（{type:"say",who:"晚晴",…}）；换了人必须换 who，不许把后一个人的话接在前一个人没有 who 的段后面——前端只按 who 分组，没标的会跟在上一位名下。帝开口写 who:"皇帝"，绝不能挂在宫人、太监名下。宫人只传话，不许代帝发话。'
 ].join('\n');
 /* 收尾轮专用：只收束本场，不结算本旬养成 */
 const SCENE_SETTLE_RULES = [
@@ -5110,7 +5111,7 @@ function presenceNote(p){ // 面板「属性」里的一行说明
 /* ============================================================ 工具 */
 const $=s=>document.querySelector(s);
 const MONTHS=['','正月','二月','三月','四月','五月','六月','七月','八月','九月','十月','冬月','腊月'];
-const BUILD='2026-11-28·孕事分两段（未验→太医报喜）＋孕中禁项与六宫生嫉＋庭院·子女教养面板'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
+const BUILD='2026-11-28·子嗣系统（孕事两段／子女教养）＋气泡认人：帝自称“朕”即归帝'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
 /* 月俸：按位份每月下旬末由前端自动入账（单位：两） */
 const SALARY_BY_GRADE={'正一品':220,'从一品':150,'正二品':110,'从二品':80,'正三品':60,'从三品':45,'正四品':36,'从四品':28,'正五品':20,'从五品':15,'正六品':12,'从六品':10,'正七品':8,'从七品':6,'正八品':5,'从八品':4,'正九品':3,'从九品':2};
 const SALARY_TITLES=[[/皇后/,220],[/皇贵妃/,150],[/贵妃/,110],[/贤妃|良妃|淑妃|德妃/,80],[/昭仪|昭容|昭媛|修仪|修容|修媛|充仪|充容|充媛/,45],[/贵嫔/,36],[/嫔/,28],[/贵人/,20],[/才人/,15],[/美人/,12],[/宝林/,10],[/常在/,8],[/答应/,6],[/选侍/,5],[/更衣/,4],[/采女/,3],[/官女子/,2],[/妃/,60]];
@@ -5989,6 +5990,8 @@ function avatarCatFor(s,who,rank){ // 位份/称谓之外，再看一眼存档�
     if(who&&hs.indexOf('皇子'+who+'（')>-1)return'prince';
     if(who&&hs.indexOf('皇女'+who+'（')>-1)return'princess';
   }
+  const maids=(s&&s.protagonist&&Array.isArray(s.protagonist.maids))?s.protagonist.maids:[];
+  if(who&&maids.indexOf(who)>-1&&!/妃|嫔|贵人|才人|美人|宝林|常在|答应|选侍|更衣|采女|官女子/.test(String(rank||'')))return'maid'; // 配属宫女：一律用宫人池，别落成妃嫔的脸
   return avatarClassOf(who,rank);
 }
 function avatarIdOf(src){const m=String(src||'').match(/(\d+)\.jpg$/);return m?Number(m[1]):0}
@@ -13177,6 +13180,39 @@ const Game={
     const fallback=who||(sceneCtx?sceneCtx.who:'');
     const proto=String((state&&state.protagonist&&state.protagonist.name)||'');
     parts=(Array.isArray(parts)?parts:[]).map(p=>Object.assign({},p));
+    // 帝的自称是硬标记：一段里出现「朕／寡人」，无论模型把它标在谁名下（或没标），都归帝。
+    // 模型常把帝的插话接在宫人那段后面又不写 who，只往回认就会并进宫人气泡里。
+    // 若同一段前半截是对主控说的话（小主／主子／娘娘…），先在最近一个句末断开，前半还给原说话人。
+    {
+      const empKey=chamberFavorKey();
+      const out=[];
+      for(const p of parts){
+        if(!p||(p.type!=='say'&&p.type!=='act')||!/朕|寡人/.test(String(p.text||''))){out.push(p);continue}
+        const raw=String(p.who||'').trim();
+        if(raw&&UI.isEmperorId(canonicalSceneWho(raw)||raw)){out.push(p);continue}
+        const t=String(p.text||''),head=t.slice(0,t.search(/朕|寡人/));
+        if(/小主|主子|娘娘|殿下/.test(head)){
+          const cut=Math.max(head.lastIndexOf('。'),head.lastIndexOf('！'),head.lastIndexOf('？'),head.lastIndexOf('」'));
+          if(cut>=0){
+            out.push(Object.assign({},p,{text:t.slice(0,cut+1)}));
+            out.push({type:'say',who:empKey,text:t.slice(cut+1)});
+            continue;
+          }
+        }
+        out.push(Object.assign({},p,{who:empKey}));
+      }
+      parts=out;
+      // 帝开口前的那个动作（「他由人搀着起身」）若没标人，跟着下一句帝的话归帝，别留在宫人气泡里
+      for(let i=0;i<parts.length;i++){
+        const p=parts[i];
+        if(!p||p.type!=='act'||p.who)continue;
+        if(!/他|帝|陛下|圣驾|御/.test(String(p.text||'')))continue;
+        const nx=parts[i+1];
+        if(!nx||nx.type!=='say')continue;
+        const nw=String(nx.who||'').trim();
+        if(/朕|寡人/.test(String(nx.text||''))||(nw&&UI.isEmperorId(canonicalSceneWho(nw)||nw)))p.who=nw||empKey;
+      }
+    }
     // 没标 who 的段认人：
     // 台词是当前说话人接着说的，只往回认；若往后认，上一句就会被挂到下一位名下，同一只气泡里混进两个人的话。
     // 动作默认也算当前说话人的；只有这条动作点名了后面那位（「（赵贵妃从廊那头过来）」），才算是对方的过场。
