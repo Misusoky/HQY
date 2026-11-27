@@ -4754,7 +4754,7 @@ function presenceNote(p){ // 面板「属性」里的一行说明
 /* ============================================================ 工具 */
 const $=s=>document.querySelector(s);
 const MONTHS=['','正月','二月','三月','四月','五月','六月','七月','八月','九月','十月','冬月','腊月'];
-const BUILD='2026-11-27·帝设独大+好感页对齐+性情语言指纹'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
+const BUILD='2026-11-27·帝设独大+好感页对齐+性情语言指纹+开局空档修复'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
 /* 月俸：按位份每月下旬末由前端自动入账（单位：两） */
 const SALARY_BY_GRADE={'正一品':220,'从一品':150,'正二品':110,'从二品':80,'正三品':60,'从三品':45,'正四品':36,'从四品':28,'正五品':20,'从五品':15,'正六品':12,'从六品':10,'正七品':8,'从七品':6,'正八品':5,'从八品':4,'正九品':3,'从九品':2};
 const SALARY_TITLES=[[/皇后/,220],[/皇贵妃/,150],[/贵妃/,110],[/贤妃|良妃|淑妃|德妃/,80],[/昭仪|昭容|昭媛|修仪|修容|修媛|充仪|充容|充媛/,45],[/贵嫔/,36],[/嫔/,28],[/贵人/,20],[/才人/,15],[/美人/,12],[/宝林/,10],[/常在/,8],[/答应/,6],[/选侍/,5],[/更衣/,4],[/采女/,3],[/官女子/,2],[/妃/,60]];
@@ -8754,7 +8754,9 @@ const UI={
   isEmperorId(who){
     const w=String(who||'').trim();
     if(/^(皇帝|皇上|陛下|圣上|圣人|天子|万岁|今上|官家|大家|帝)$/.test(w))return true; // 古代称谓都归到帝：模型常把 who 写成单字「帝」
-    return w==='皇帝'||(state.world&&state.world.emperor&&state.world.emperor.name===w)||(((state.relationships||{})[w]||{}).type==='宠爱');
+    if(w==='皇帝')return true;
+    if(!state)return false; // 开局生成时全局 state 尚未落定：按称谓判完就收
+    return !!(state.world&&state.world.emperor&&state.world.emperor.name===w)||(((state.relationships||{})[w]||{}).type==='宠爱');
   },
   empPill(who){ // 列表行知心徽标：只显阶段不显数字
     if(!this.isEmperorId(who)||!state.emperor)return '';
