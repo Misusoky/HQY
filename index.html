@@ -280,7 +280,7 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
 .fac-meta{font-size:12px;color:var(--ink-soft);line-height:1.75}
 .fac-step{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);font-size:13px;line-height:1.75}
 .fac-step b{font-weight:400;color:var(--cinnabar)}
-.rel-v{flex:none;width:64px;text-align:right;font-size:13px;color:var(--ink-soft)}
+.rel-v{display:inline-block;flex:none;width:64px;text-align:right;font-size:13px;color:var(--ink-soft)}
 .itemrow{display:flex;align-items:center;gap:10px;min-height:38px;font-size:14px;border-bottom:1px dashed var(--line)}
 .itemrow:last-child{border-bottom:0}
 .itemrow .cnt{margin-left:auto;font-size:13px;color:var(--ink-soft)}
@@ -357,7 +357,7 @@ button.itemrow .cnt{flex:none;max-width:48%;overflow:hidden;text-overflow:ellips
 .npcrow .nr-main .nr-name{flex:none;min-width:0;letter-spacing:.02em}
 .npcrow .nr-role{flex:0 1 auto;min-width:0;font-size:11px;color:var(--ink-soft);opacity:.7;letter-spacing:.06em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transform:translateY(-1px)}
 .npcrow .nr-depth{flex:none;font-size:11px;color:var(--gold);border:1px solid var(--gold);border-radius:2px;padding:1px 8px;letter-spacing:.1em}
-.npcrow .nr-rel{margin-left:auto;font-size:12px;color:var(--ink-soft)}
+.npcrow .nr-rel{margin-left:auto;flex:none;display:flex;align-items:center;gap:6px;padding-right:2px;font-size:12px;color:var(--ink-soft)}
 /* 承宠选项：两行，长说明不挤成小字签 */
 .nightopt{display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;padding:9px 2px;border-bottom:1px dashed var(--line);color:var(--ink)}
 .nightopt:last-of-type{border-bottom:0}
@@ -1535,7 +1535,7 @@ const NPC_MODULE = [
 '## 六、NPC 双层档案（严格遵守）',
 '1. 存档 npcs 字段中每个已认识 NPC 含两层：hidden（完整真相：全部性格、真实目标、秘密、对每个人的真实印象、私下行事）是你扮演此人的唯一依据；profile（主控已解锁信息）只记录主控可感知内容。',
 '2. 扮演言行必须符合 hidden 层，且同一 NPC 对不同对象说话方式应不同——言谈风格 = 完整性格 × 对交谈对象的真实印象。',
-'3. 每轮输出在 JSON 中新增 dossier 数组，只上报本回合主控新感知到的信息：[{npc, firstMet, traits[], learned[], impressions{人:"note"}, src, rank?, faction?, realName?, age?}]；src 为来源总标：亲见/听说/传闻。位份升降或派系变动时附 rank/faction，前端据此更新身份；主控新得知其本名时附 realName；首次建档时附年龄（数字）。impressions 只记"她对第三人"的、主控可感知的表态；她对主控的真实印象只留在 hidden 层（主控无从自知），由【读心笺】专项查询呈现（见第 8 条）。',
+'3. 每轮输出在 JSON 中新增 dossier 数组，只上报本回合主控新感知到的信息：[{npc, firstMet, traits[], learned[], impressions{人:"note"}, src, rank?, faction?, realName?, age?}]；src 为来源总标：亲见/听说/传闻。位份升降或派系变动时附 rank/faction，前端据此更新身份；主控新得知其本名时附 realName；首次建档时附年龄（数字）。impressions 只记"她对第三人"的、主控可感知的表态；她对主控的真实印象只留在 hidden 层（主控无从自知），由【读心笺】专项查询呈现（见第 8 条）。帝已有玩家亲撰帝设（world.emperor.persona）时，不得再给帝写与帝设相冲突的性情词；已载于人物档的旧性情与帝设相冲突处，一律以帝设为准、不得照旧演绎。',
 '4. 传闻可与事实有偏差；hidden 层内容（动机、秘密、真实评价）只留在存档里，正文、dossier 与 profile 只写主控可感知的信息。',
 '5. 未建档的重要 NPC 首次与主控产生交集时 firstMet:true 建档；龙套 NPC 不建档。',
 '6. 存档 protagonist.attributes.忌惮（0—100，旧档由心机+野心合并）＝宫中众人对主控的忌惮程度：忌惮越高，不熟或敌对的 NPC 越对主控戒备提防——言行更谨慎、先观望再表态、结盟前多掂量，敌对者更可能先下手为强；相熟且信任者（如韦昭仪之流）不受影响。此数值只在重大事件后增减；新建档以忌惮一项记之。',
@@ -4754,7 +4754,7 @@ function presenceNote(p){ // 面板「属性」里的一行说明
 /* ============================================================ 工具 */
 const $=s=>document.querySelector(s);
 const MONTHS=['','正月','二月','三月','四月','五月','六月','七月','八月','九月','十月','冬月','腊月'];
-const BUILD='2026-11-27·帝专用秘密池+敌意提速+派系关系单值'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
+const BUILD='2026-11-27·帝设独大+好感页对齐+性情语言指纹'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
 /* 月俸：按位份每月下旬末由前端自动入账（单位：两） */
 const SALARY_BY_GRADE={'正一品':220,'从一品':150,'正二品':110,'从二品':80,'正三品':60,'从三品':45,'正四品':36,'从四品':28,'正五品':20,'从五品':15,'正六品':12,'从六品':10,'正七品':8,'从七品':6,'正八品':5,'从八品':4,'正九品':3,'从九品':2};
 const SALARY_TITLES=[[/皇后/,220],[/皇贵妃/,150],[/贵妃/,110],[/贤妃|良妃|淑妃|德妃/,80],[/昭仪|昭容|昭媛|修仪|修容|修媛|充仪|充容|充媛/,45],[/贵嫔/,36],[/嫔/,28],[/贵人/,20],[/才人/,15],[/美人/,12],[/宝林/,10],[/常在/,8],[/答应/,6],[/选侍/,5],[/更衣/,4],[/采女/,3],[/官女子/,2],[/妃/,60]];
@@ -5295,26 +5295,26 @@ const PERSONA_PAIR=(()=>{const s=new Set();const add=(a,b)=>{s.add(a+'|'+b);s.ad
 /* 性情落到言行：每一条都写清「怎么说话」「惯用什么手段」「什么会立刻触怒她」。
    模型据此刻画，读者不看标签也应能反推出性情；同一句话对不同性情的人，结果可以相反。 */
 const PERSONA_ACT={
-  机敏:{voice:'话不说满，先递半句看人反应，爱用反问',act:'借别人的手办事，自己不出面',trigger:'被当众点破心思，会立刻换一副说辞'},
-  谨慎:{voice:'先问清来由再答，“容我想想”常挂嘴边',act:'留退路、留凭据，绝不第一个表态',trigger:'被逼着当场站队，会记恨很久'},
-  隐忍:{voice:'受了气也只答“是”，语气平得听不出情绪',act:'把账记在心里，等一个能一次算清的机会',trigger:'被当成软柿子反复拿捏，会突然翻脸'},
-  爽直:{voice:'开口见底，不绕弯，敬语用得少',act:'当场把话挑明，先动手再想后果',trigger:'被人阴阳怪气地绕话，会直接拍桌'},
-  温厚:{voice:'先问对方冷暖，拒绝也先给台阶',act:'替人补台、私下劝和，不当众驳人',trigger:'被辜负一次，会沉默很久，此后不再多管'},
-  孤傲:{voice:'惜字如金，不接闲话，也不称“姐姐”',act:'独来独往，宁可自损也不求人',trigger:'被当众轻慢，会当场冷脸，此后不见'},
-  执拗:{voice:'别人说三句，她只说一句“不”',act:'认死理，撞了南墙也不改口',trigger:'被强压着改主意，会记一辈子'},
-  柔婉:{voice:'轻声细语，句末常带“罢了”“也罢”',act:'以退为进，用示弱换余地',trigger:'被逼到没有退路，会做出极狠的事'},
-  果决:{voice:'短句，问一句就要一句答复',act:'先定后说，宁可错也不拖',trigger:'被人拖着不办，会直接掀桌'},
-  多疑:{voice:'爱反问“你怎么知道”“谁告诉你的”',act:'听一半信一半，暗中派人去对',trigger:'一句对不上的话，能让她想三天'},
-  淡泊:{voice:'不争不辩，常说“随它去”',act:'避开是非，能不出面就不出面',trigger:'被硬拖进争斗，会记住是谁拖的'},
-  好胜:{voice:'句句带比较，见人先看位份与穿戴',act:'抢在前头，哪怕多花银子',trigger:'被人压一头，会当众找回场子'},
-  细腻:{voice:'记得旁人说过的细节，不动声色地提一句',act:'从小处入手，送东西必合人心意',trigger:'被敷衍，会默默疏远，不再多话'},
-  大气:{voice:'不缠小节，先说大局',act:'肯让利、肯担责，收人心',trigger:'被算计到头上才出手，一出手不留情'},
-  怯懦:{voice:'话尾常带“许是我想多了”，先把自己说小',act:'推给别人拿主意，遇事先躲',trigger:'被逼到墙角，会哭着去告状'},
-  风趣:{voice:'正经话也包在玩笑里',act:'用玩笑试探，用自嘲脱身',trigger:'玩笑被当真、被当众驳面，会收起笑脸'},
-  坚忍:{voice:'不多说苦，只报结果',act:'熬，一件事做十遍也不喊累',trigger:'被说她熬不住，会格外较劲'},
-  清傲:{voice:'用词讲究，不肯附和，也不肯说俗话',act:'宁可不合群，也不改自己的规矩',trigger:'被逼着低头，会当场拂袖'},
-  圆滑:{voice:'两头都留话，句句能进能退',act:'递消息、牵线、做和事佬，从中取利',trigger:'被逼表态，会立刻称病避开'},
-  骄矜:{voice:'爱提家世与位份，语气居高，不给人台阶',act:'以势压人，先声夺人',trigger:'被驳面子，会当场发作'}
+  机敏:{voice:'话不说满，先递半句看人反应，爱用反问与设问；答非所问其实是答了',act:'借别人的手办事，自己不出面',trigger:'被当众点破心思，会立刻换一副说辞'},
+  谨慎:{voice:'先问清来由再答，「容我想想」「这话谁还听过」常挂嘴边；出口的话都留三分',act:'留退路、留凭据，绝不第一个表态',trigger:'被逼着当场站队，会记恨很久'},
+  隐忍:{voice:'受了气也只答「是」，语气平得听不出情绪；越客气，越是在记账',act:'把账记在心里，等一个能一次算清的机会',trigger:'被当成软柿子反复拿捏，会突然翻脸'},
+  爽直:{voice:'开口见底不绕弯，敬语省半；想到什么说什么，不管场合',act:'当场把话挑明，先动手再想后果',trigger:'被人阴阳怪气地绕话，会直接拍桌'},
+  温厚:{voice:'先问对方冷暖，拒绝也先给台阶；口头禅是「不打紧」',act:'替人补台、私下劝和，不当众驳人',trigger:'被辜负一次，会沉默很久，此后不再多管'},
+  孤傲:{voice:'惜字如金，不接闲话，称呼能省则省；答你一句是给你脸',act:'独来独往，宁可自损也不求人',trigger:'被当众轻慢，会当场冷脸，此后不见'},
+  执拗:{voice:'别人说三句，她只说一句「不」；认定的事翻来覆去还是那句',act:'认死理，撞了南墙也不改口',trigger:'被强压着改主意，会记一辈子'},
+  柔婉:{voice:'轻声细语，句末常带「罢了」「也好」；拒绝人先道歉',act:'以退为进，用示弱换余地',trigger:'被逼到没有退路，会做出极狠的事'},
+  果决:{voice:'短句，问一句要一句答复；「行」「不行」当场给，不拖',act:'先定后说，宁可错也不拖',trigger:'被人拖着不办，会直接掀桌'},
+  多疑:{voice:'爱反问「你怎么知道」「谁告诉你的」；同一件事要换个人再问一遍',act:'听一半信一半，暗中派人去对',trigger:'一句对不上的话，能让她想三天'},
+  淡泊:{voice:'不争不辩，常说「随它去」「与我何干」',act:'避开是非，能不出面就不出面',trigger:'被硬拖进争斗，会记住是谁拖的'},
+  好胜:{voice:'句句带比较，见人先看位份穿戴；夸人也要压半头：「这点子东西，难得你当宝贝」',act:'抢在前头，哪怕多花银子',trigger:'被人压一头，会当众找回场子'},
+  细腻:{voice:'记得旁人随口说过的细节，不动声色地提一句；送人东西必合人心意',act:'从小处入手，织人缘',trigger:'被敷衍，会默默疏远，不再多话'},
+  大气:{voice:'不缠小节先说大局，称呼人带笑；真恼了反而客气：「好，很好」',act:'肯让利、肯担责，收人心',trigger:'被算计到头上才出手，一出手不留情'},
+  怯懦:{voice:'话尾带「许是我想多了」，先把自己说小；请示多，主见少',act:'推给别人拿主意，遇事先躲',trigger:'被逼到墙角，会哭着去告状'},
+  风趣:{voice:'正经话也包在玩笑里；打岔、自嘲、顺水推舟',act:'用玩笑试探，用自嘲脱身',trigger:'玩笑被当真、被当众驳面，会收起笑脸'},
+  坚忍:{voice:'不多说苦，只报结果；被问难处也只说「还过得去」',act:'熬，一件事做十遍也不喊累',trigger:'被说她熬不住，会格外较劲'},
+  清傲:{voice:'用词讲究不肯附和，不肯说俗话；夸人也像点评：「尚可」',act:'宁可不合群，也不改自己的规矩',trigger:'被逼着低头，会当场拂袖'},
+  圆滑:{voice:'两头都留话，句句能进能退；场面称呼最齐整，谁也不得罪',act:'递消息、牵线、做和事佬，从中取利',trigger:'被逼表态，会立刻称病避开'},
+  骄矜:{voice:'抬声拖腔，自称本宫；称呼人挑最生疏的叫；爱用反问压人：「也配？」「凭她？」；施恩像赏，道谢免谈',act:'以势压人，先声夺人',trigger:'被驳面子，会当场发作'}
 };
 function npcTraitsOf(who){
   const w=String(who||'').trim();if(!w)return [];
@@ -6370,6 +6370,7 @@ function normalizeState(s){
     const ps=String(s.world.emperor.persona).slice(0,1000);
     if(ps)s.world.emperor.persona=ps;else delete s.world.emperor.persona;
   }
+  if(s.world.emperor&&s.world.emperor.persona)s.world.emperor.traits=''; // 帝设在档：随机性情清空——旧档里的「温和持重」之类会与帝设唱对台戏
   if(typeof s.protagonist.maids==='string')s.protagonist.maids=s.protagonist.maids.split(/[、,，\s]+/).filter(Boolean);
   if(!Array.isArray(s.protagonist.maids))s.protagonist.maids=[];
   s.protagonist.personality=normalizePersona(s.protagonist.personality); // 旧档性情去重、归并近义、剔除相斥
@@ -6896,7 +6897,7 @@ function buildMessages(userMsg,noHistory){
 const SCENE_RULES=[
 '你是文字游戏《带着系统去宫斗》的主持人，现在只推进一段剧情对话里「场上人物这一轮的反应」。时间与数值留到收尾结算。只输出 JSON。',
 '【文风】严格按上文《叙事文风》写，尤其「去 AI 味」与「对话气泡」两节；只写场上人物的话与关键动作，谁开口就写谁。',
-'【性情】本场信息里 npc.act 是此人的说话方式、惯用手段与雷区，照它写：台词要能从性情反推，至少一处细节只属于这个人；不要写成通用宫斗腔。同一句话落在不同性情的人身上，反应可以相反。',
+'【性情】本场信息里 npc.act 是此人的说话方式、惯用手段与雷区，照它写：每轮台词都要带着这份性情的语言指纹——句式长短、口头禅、称呼分寸、反问还是直给，遮住名字也能认出是她；不要写成通用宫斗腔。同一句话落在不同性情的人身上，反应应当不同。性情还须与交情合力：骄矜、孤傲、清傲、好胜的人对生人与低位者是打量、居高临下、不给台阶，对知己才卸三分锋芒；温厚、柔婉者拒绝人也留余地；结怨者连客气都省。好感越低，同一句话越冷、越硬、越短；傲不是失礼的借口，位份礼数在，但分寸之内句句带刺。',
 '【输出】{"narrative":"","changes":[],"hasEvent":true,"scene":{"state":"ongoing","who":"对方称谓","parts":[{"type":"act","text":"对方的动作神态"},{"type":"say","text":"对方原话，不带引号"}],"ledger":["本场已确认、已有结论的事"],"where":"有变化才写","when":"有变化才写"},"options":[{"id":"a","text":"≤70字"},{"id":"b","text":"≤70字"}]}　scene.state 只写 "ongoing"，不要写 "wrap" 或 "resolve"。',
 SCENE_PARTS_RULES,
 '【收尾】narrative 只写旁白，不写引号对白。',
@@ -6912,7 +6913,7 @@ SCENE_PARTS_RULES,
 '【在场人】scene.who 写场上开口的那位在册人物的称谓（如「赵贵妃」「冯常在」；帝写「皇帝」，也可写「帝」），同一场沿用同一称呼，不得写「…」「⋯」「某人」「宫人」这类占位——写成占位，前端就查不到她的性情与交情，人物会当场走形。一轮里不止一人开口时，每一段 act/say 都要在 who 写明是谁（包括当前说话人的段），前端按 who 分气泡、换头像；没标 who 的台词按上一位说话人算。换个说话人先写一段 narr 交代过场，再让新人开口。玩家没有当面叫到别人时，scene.who 沿用当前对象：由本人回应（可为难、可推说不敢、可反问），旁人可以插一句并标 who，但不得替她作答，也不得顶掉 scene.who——玩家话里提到谁只是在说谁，不是要跟谁说。',
 '【推进】不得原地盘问：问过并得到回答的事不再问、不换说法重问；关键信息一轮给足，不拆成多轮挤牙膏。问完必须给出自己的立场、条件或处置，不能只问不答。每轮至少推进一项：新信息、决定、态度/关系变化、后果或新的具体行动。',
 '【收束】核心问题落定后主动往收场走：给带去意的回应（改日再叙、起身相送、吩咐下人），不另起话头。玩家追问、续聊是她的权利：可简短作答，也可婉拒（不便深谈、时机不对、话到此处），婉拒也是有效回应；只有玩家明确转开一件新事，才重新展开。',
-'【选项】本轮 options 与上一轮不同，不重复原句或同义改写，玩家已选过的方向不再作为选项；每个选项是不同策略（答应、拒绝、拖延、反将、求助、交换条件），并写出当下可见的机会或代价，不得全是「答：……」。从第二轮起至少一个选项是把事推进的动作（递出去、去见某人、当场办、暂且搁下、起身告退）。选项一律写成现场言行：括号内是她此刻的动作/神情/环境，括号外是当场说出口的原话，不带引号；不用转述口吻，不把「回殿后连夜理清」「次日送来」这类后话写进选项。整轮只做动作、不开口时，整个选项放括号里。',
+'【选项】本轮 options 与上一轮不同，不重复原句或同义改写，玩家已选过的方向不再作为选项；每个选项是不同策略（答应、拒绝、拖延、反将、求助、交换条件），并写出当下可见的机会或代价，不得全是「答：……」。从第二轮起至少一个选项是把事推进的动作（递出去、去见某人、当场办、暂且搁下、起身告退）。选项一律写成现场言行：括号内是她此刻的动作/神情/环境，括号外是当场说出口的原话，不带引号；不用转述口吻，不把「回殿后连夜理清」「次日送来」这类后话写进选项。整轮只做动作、不开口时，整个选项放括号里。接话选项是主控当场说出口的话：她的性情要落在选项口吻里——骄矜者带三分傲、爽直者不绕弯、温厚者先留余地、谨慎者留退路、柔婉者先致歉；选项不是主持人的旁观转述。',
 '【玩家】用户消息里「玩家应对」引号内的文字是主控这一轮的言行：括号内是动作/神情，括号外是当场说出口的话。NPC 只回应她实际做了与说了的，不得把她没开口的打算、离开之后的安排当成她当众说出的台词来复述或应答。',
 '【不抛回】对方自己拿主意：除开场第一次请示外，不用「你打算怎么办」「你说呢」「你怎么答」「要不要」把决定推回玩家；只问能改变结果的具体事实（谁、何时、何地、何物、经手人），一轮至多一个问句，问的同时给出自己的判断、条件或处置。旁人提醒一件还没发生的事（谁要问你什么、该怎么答），只写一句提醒并给行动选项，不得围着「打算怎么答」再演一轮。',
 '【已确认】scene.ledger 逐轮累积本场已交代清楚、已有结论的事（每条≤20字，含人物给过的答复与已定的处置）；写进 ledger 的事后续不得再问、不换说法重提，玩家不必重复表态。',
@@ -6935,6 +6936,7 @@ function buildSceneSystem(who){
   const relationship=rels[who]!=null?rels[who]:(n.name&&rels[n.name]!=null?rels[n.name]:null);
   const isEmp=typeof UI!=='undefined'&&UI.isEmperorId(who);
   const isChamber=typeof sceneCtx!=='undefined'&&sceneCtx&&sceneCtx.chamber;
+  const empPersonaOn=!!(w.emperor&&String(w.emperor.persona||'').trim()); // 帝设在档：随机性情全部退场，帝设独大
   const nameOf=String(n.name||''),realOf=String(n.realName||'');
   const relItems=(state.inventory||[]).filter(x=>x&&Number(x.count)!==0).filter(x=>{ // 与眼前这人有关的旧物：他赐的、他经手的、他给的
     const s=String(x.note||'')+' '+String(x.src||'')+' '+String(x.name||'');
@@ -6947,12 +6949,12 @@ function buildSceneSystem(who){
     protagonist:{name:p.name,rank:p.rank,age:p.age,personality:normalizePersona(p.personality),look:p.look,stance:dg?`易容·${dg.name}${dg.rank?`（${dg.rank}）`:''}：${dg.desc||'形容如她'}`:presenceCue(state)},
     disguise:dg?{name:dg.name,rank:dg.rank||'',desc:dg.desc||'',note:'本场所有人只认这张脸；主控的姓名、位份与旧情都不适用。'}:null,
     npc:{name:who,realName:n.realName,rank:n.rank,age:n.age,faction:n.faction,
-      traits:normalizePersona(prof.traits),act:personaActText(prof.traits),hidden,relationship,
+      traits:(isEmp&&empPersonaOn)?[]:normalizePersona(prof.traits),act:(isEmp&&empPersonaOn)?'':personaActText(prof.traits),hidden,relationship,
       rel:(function(){const t=relTier(who);return {label:t.label,value:t.value,allow:t.allow,deny:t.deny}})(),
       emp:(typeof UI!=='undefined'&&UI.isEmperorId(who))?empTier():null,arc:String(n.arc||'') ,
       biography:Array.isArray(prof.biography)?prof.biography.slice(-5).map(b=>String((b&&b.text)||b||'').slice(0,100)):[],
       recent:Array.isArray(prof.recent)?prof.recent.slice(-2):[]},
-    world:{dynasty:w.dynasty,emperor:w.emperor?{name:w.emperor.name,age:w.emperor.age,traits:w.emperor.traits,persona:String(w.emperor.persona||'').split('<player>').join(String(p.name||'主控'))}:null,factions:w.factions},
+    world:{dynasty:w.dynasty,emperor:w.emperor?{name:w.emperor.name,age:w.emperor.age,traits:empPersonaOn?'':w.emperor.traits,persona:String(w.emperor.persona||'').split('<player>').join(String(p.name||'主控'))}:null,factions:w.factions},
     activePlots:(state.plots||[]).filter(x=>x.stage==='进行中').slice(0,6).map(x=>({title:x.title,line:x.line,note:String(x.note||'').slice(0,100)})),
     brief:(typeof sceneCtx!=='undefined'&&sceneCtx&&sceneCtx.brief)?sceneCtx.brief:null, // 本场戏核：目标/阻碍/得失
     scheme:(typeof sceneCtx!=='undefined'&&sceneCtx&&sceneCtx.scheme)?{who:sceneCtx.scheme.who,target:SCHEME_TARGET_TEXT[sceneCtx.scheme.target]||sceneCtx.scheme.target,severity:sceneCtx.scheme.severity,methodName:sceneCtx.scheme.methodName,exposed:!!sceneCtx.scheme.exposed}:null, // 暗流：结果由模型裁定
@@ -9321,6 +9323,7 @@ const UI={
       <div class="sheet-note">尚无档案。</div>`;
     }
     const prof=n.profile||{};
+    const empPersonaOn=this.isEmperorId(id)&&!!(state.world&&state.world.emperor&&String(state.world.emperor.persona||'').trim()); // 帝设在档：感知性情栏退位
     const imp=prof.impressions||{};
     const me=state.protagonist.name||'主控';
     const ta=npcSexOf(state,id)==='m'?'他':'她';
@@ -9359,7 +9362,7 @@ const UI={
         <div class="itemrow"><span>帝待她</span><span class="cnt">${esc(emperorAttitudeOf(n))}</span></div>
         ${n.emperorStory?`<div class="sheet-note" style="margin-top:6px">${esc(n.emperorStory)}</div>`:''}
         ${n.arc?`<div class="itemrow" style="margin-top:6px"><span>她眼下的事</span><span class="cnt">${esc(n.arc)}</span></div>`:''}</div>`:''}
-      <div class="sec"><div class="sec-cap">已感知的性情</div>${normalizePersona(prof.traits).map(t=>`<span class="tag">${esc(t)}</span>`).join('')||'<div class="sheet-note">所知尚浅。</div>'}</div>
+      ${(this.isEmperorId(id)&&empPersonaOn)?'':`<div class="sec"><div class="sec-cap">已感知的性情</div>${normalizePersona(prof.traits).map(t=>`<span class="tag">${esc(t)}</span>`).join('')||'<div class="sheet-note">所知尚浅。</div>'}</div>`}
       <div class="sec"><div class="sec-cap">才艺见闻</div>${intelSection||`<div class="sheet-note">尚未听说${ta}精于何艺。</div>`}</div>
       <div class="sec"><div class="sec-cap">${ta}对你</div>${this.mindSection(id)}</div>
       ${(secretsKnownOf(id).length)?`<div class="sec"><div class="sec-cap">掌握的把柄</div>${secretsKnownOf(id).map(s=>`<div class="itemrow"><span>${s.used?'（已抖出，成公开旧事）':''}${esc(s.text)}</span></div>`).join('')}</div>`:''}
@@ -10466,7 +10469,7 @@ function buildOpeningWorld(proto){
     health:wlPick(WORLD_LIB.emperorHealth),
     hobby:wlPick(WORLD_LIB.emperorHobbies)
   };
-  if(proto.emperorPersona)emperor.persona=String(proto.emperorPersona).slice(0,1000); // 玩家亲撰帝设：开局写入存档，演绎以它为准
+  if(proto.emperorPersona){emperor.persona=String(proto.emperorPersona).slice(0,1000);emperor.traits=''} // 玩家亲撰帝设：开局写入存档并清空随机性情——两者并存只会打架，帝设独大
   const hasQueen=Math.random()<0.6;
   const dowager=Math.random()<0.7?Object.assign({},wlPick(WORLD_LIB.dowagers)):null;
   if(dowager&&!hasQueen)dowager.stance=dowager.stance.replace(/皇后/g,'主位');
