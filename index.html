@@ -4955,7 +4955,7 @@ function presenceNote(p){ // 面板「属性」里的一行说明
 /* ============================================================ 工具 */
 const $=s=>document.querySelector(s);
 const MONTHS=['','正月','二月','三月','四月','五月','六月','七月','八月','九月','十月','冬月','腊月'];
-const BUILD='2026-11-27·界面描金：绢底全局铺开+顶栏渐变描金+细滚动条'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
+const BUILD='2026-11-27·界面描金润色＋帝离场后交人、等待气泡不挂头像'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
 /* 月俸：按位份每月下旬末由前端自动入账（单位：两） */
 const SALARY_BY_GRADE={'正一品':220,'从一品':150,'正二品':110,'从二品':80,'正三品':60,'从三品':45,'正四品':36,'从四品':28,'正五品':20,'从五品':15,'正六品':12,'从六品':10,'正七品':8,'从七品':6,'正八品':5,'从八品':4,'正九品':3,'从九品':2};
 const SALARY_TITLES=[[/皇后/,220],[/皇贵妃/,150],[/贵妃/,110],[/贤妃|良妃|淑妃|德妃/,80],[/昭仪|昭容|昭媛|修仪|修容|修媛|充仪|充容|充媛/,45],[/贵嫔/,36],[/嫔/,28],[/贵人/,20],[/才人/,15],[/美人/,12],[/宝林/,10],[/常在/,8],[/答应/,6],[/选侍/,5],[/更衣/,4],[/采女/,3],[/官女子/,2],[/妃/,60]];
@@ -11182,7 +11182,62 @@ function sceneHandoffTarget(parts,narr,cur){ // 该不该把对话人交回正�
   const presence=/御案|御笔|御前|御览|御座|龙颜|龙袍|天子/.test(scene)||/(^|[。！？；\s])(陛下|皇上|圣上)[，,]/.test(says); // 「上首」是座次、「御书房／御膳房」是地方：都不等于帝在场
   return presence?emperorSceneId():'';
 }
+function whoNamesOf(id){ // 一个人物的三种叫法：存档键、官称、本名
+  const n=((state&&state.npcs)||{})[id]||{};
+  return [id,n.name,n.realName].filter(Boolean).map(String).filter(s=>s.length>=2);
+}
+function servantOnStage(cur,narrAll){ // 场上那个宫人：旁白里正点到的人优先，其次本场唯一的宫人，再从旁白里认在册的人
+  const cast=(typeof sceneCtx!=='undefined'&&sceneCtx&&Array.isArray(sceneCtx.cast))?sceneCtx.cast:[];
+  const others=cast.filter(w=>w&&w!==cur);
+  for(const w of others){const id=canonicalSceneWho(w)||w;if(whoNamesOf(id).some(nm=>String(narrAll||'').includes(nm)))return id}
+  const servants=others.map(w=>canonicalSceneWho(w)||w).filter(id=>isServantWho(id));
+  if(servants.length===1)return servants[0];
+  const hits=[];
+  for(const id in ((state&&state.npcs)||{})){
+    if(!id||id===cur||!isServantWho(id))continue;
+    if(whoNamesOf(id).some(nm=>String(narrAll||'').includes(nm)))hits.push(id);
+  }
+  return hits.length===1?hits[0]:'';
+}
+function sceneHandoffAway(parts,narr,cur){ // 帝走了、留下的人接话：帝这一轮没开口，台词却在称「陛下」、自称「奴才」，就不能再挂在他名下
+  const curW=String(cur||'').trim();
+  const isEmp=w=>typeof UI!=='undefined'?UI.isEmperorId(w):/^(皇帝|皇上|陛下|圣上|圣人|天子|万岁|今上|官家|大家)$/.test(String(w||'').trim());
+  if(!curW||!isEmp(curW))return '';
+  const says=(parts||[]).filter(p=>p&&p.type==='say');
+  if(!says.length)return '';
+  if(says.some(p=>/朕|寡人/.test(String(p.text||''))))return ''; // 帝这一轮真开了口
+  const servantish=t=>/陛下|皇上|圣上|万岁|圣驾|奴才|老奴|奴婢|小的/.test(String(t||''));
+  const empLabeled=says.filter(p=>(canonicalSceneWho(p.who)||'')===curW);
+  if(empLabeled.some(p=>!servantish(p.text)))return ''; // 帝标了名的台词不像宫人腔：帝还在这场上
+  const narrAll=[String(narr||''),...(parts||[]).filter(p=>p&&/narr/i.test(String(p.type||p.t||''))).map(p=>String(p.text||''))].join(' ');
+  // 帝只是被丢在台上不开口，还不算离场：旁白要写出他真走了（起驾、袍角消失、退出去），才把对话人交出去
+  const gone=/(帝|御驾|圣驾|袍角|龙袍|明黄|玄色)[^。！？]{0,26}(离开|消失|起驾|摆驾|远去|走了|出门|退了出去|不见了|不见)/.test(narrAll);
+  if(!gone&&!empLabeled.length)return '';
+  const labeled=[...new Set(says.map(p=>canonicalSceneWho(p.who)).filter(w=>w&&w!==curW))];
+  if(labeled.length===1)return labeled[0]; // 模型自己标了别人
+  if(labeled.length>1)return '';
+  const text=says.map(p=>String(p.text||'')).join(' ');
+  if(!servantish(text))return '';
+  return servantOnStage(curW,narrAll);
+}
 function applySceneHandoff(parts,narr,cur){ // 交人：未标 who 的台词归正主，交人后的动作也归正主，宫人的陪衬动作仍归宫人
+  const narrAll=[String(narr||''),...(parts||[]).filter(p=>p&&/narr/i.test(String(p.type||p.t||''))).map(p=>String(p.text||''))].join(' ');
+  const curIsEmp=typeof UI!=='undefined'?UI.isEmperorId(cur):/^(皇帝|皇上|陛下|圣上|圣人|天子|万岁|今上|官家|大家)$/.test(String(cur||'').trim());
+  // 帝还在场时，未标 who 却自称奴才的话也是宫人说的：先把这类段落摘给场上那个宫人，标题仍留在帝
+  if(curIsEmp)for(const p of parts||[]){if(p&&p.type==='say'&&isPlaceholderWho(p.who)&&/奴才|老奴|奴婢|小的/.test(String(p.text||''))){const sv=servantOnStage(cur,narrAll);if(sv)p.who=sv}}
+  const away=sceneHandoffAway(parts,narr,cur); // 帝离场、留下的人接话：先把错挂到帝名下的话摘出来
+  if(away){
+    const empId=emperorSceneId();
+    for(const p of parts||[]){
+      if(!p||(p.type!=='act'&&p.type!=='say'))continue;
+      const txt=String(p.text||'');
+      if(/朕|寡人/.test(txt)){p.who=empId;continue} // 帝自己的话：仍归帝
+      const labeled=canonicalSceneWho(p.who)||'';
+      if(labeled&&labeled!==empId)continue; // 模型标了第三个人：不动
+      if(/陛下|皇上|圣上|万岁|圣驾|奴才|老奴|奴婢|小的/.test(txt))p.who=away; // 称陛下、自称奴才：归留下的那位
+    }
+    return away;
+  }
   const to=sceneHandoffTarget(parts,narr,cur);
   if(!to)return '';
   const curName=String(cur||'');
@@ -11193,7 +11248,7 @@ function applySceneHandoff(parts,narr,cur){ // 交人：未标 who 的台词归�
     if(!isPlaceholderWho(p.who)||(p.type!=='act'&&p.type!=='say'))continue;
     if(p.type==='say'){p.who=to;continue}
     const txt=String(p.text||'');
-    const aboutCur=(curName&&txt.includes(curName))||/奴才|奴婢|公公|太监|宫人|内侍|退到一边|退了出去/.test(txt); // 明确写宫人的动作：仍归他
+    const aboutCur=(curName&&txt.includes(curName))||/奴才|奴婢|公公|太监|宫人|内侍|退到一边|退了出去/.test(txt)||/听他|听她/.test(txt); // 明确写宫人的动作：仍归他
     p.who=(/御|龙|朕|陛下|皇上|圣上|天子/.test(txt)||(empSpeaks&&!aboutCur))?to:cur;
   }
   return to;
@@ -12825,9 +12880,8 @@ const Game={
   recordLine(who,text){if(sceneCtx&&text)sceneCtx.lines.push({who,text:String(text)})},
   chatBusy(on){
     const box=$('#chatOpts');
-    if(on){
-      const who=sceneCtx?sceneCtx.who:'';
-      box.innerHTML=`<div class="msg typing">${avatarHtml(who,'mav sm')}<div class="mcol"><div class="mwho">${esc(dispName(who))}</div><div class="bubble npc"><span class="busy-dots"><i>·</i><i>·</i><i>·</i></span></div></div></div>`;
+    if(on){ // 等回话时只给一串点：此刻还没定是谁开口，先把头像与名字省掉，免得挂错人
+      box.innerHTML=`<div class="msg typing"><div class="mcol"><div class="bubble npc"><span class="busy-dots"><i>·</i><i>·</i><i>·</i></span></div></div></div>`;
     }
   },
   closeChat(){ // 剧情未收尾前须先应对；否则收起对话回住处
@@ -13214,6 +13268,9 @@ const Game={
     const plainChoice=!/[（(【]/.test(String(choice||'')); // 老式选项只有叙述、没标动作与台词：额外交代一句，别把打算当成她说出口的话
     const parseNote=plainChoice?'这一条没有用括号标出动作、也没标明哪句是说出口的原话：按她此刻的言行演绎，NPC 只回应她实际做了、说了的，不得把她心里的打算当作已说出口的承诺来复述。':'';
     const whoNote='一轮里两人以上开口时，每段 act/say 都要标 who（含当前说话人的段），换人先写一句 narr 过场；没标 who 的台词按上一位说话人算。';
+    const awayNote=(typeof UI!=='undefined'&&UI.isEmperorId(sceneCtx.who))
+      ?`【帝离场】帝若在本轮起驾、离开或被引走（袍角消失、圣驾远去、摆手令退都算），场上只剩宫人、侍卫或妃嫔时，下一句起必须把 scene.who 改成留下开口的那位，台词与动作都标 who；此后未标 who 的话一律算在留下的人头上——不得再让帝开口、不得替帝安动作，也不得把宫人的话（称「陛下」、自称「奴才／奴婢」、称主控「主子／娘娘」）算成帝说的。`
+      :'';
     const addressee=(function(){ // 只有当面称呼（开口叫名、转向/看向某人）才算冲另一个人说话；话里提到谁不等于跟谁说
       const t=String(choice||'');if(!t||!state)return null;
       const cur=String(sceneCtx.who||'');
@@ -13243,7 +13300,7 @@ const Game={
       :`这一轮玩家当面叫「${addressee.id}」，但这一场她还没出过场：她若就在近处（廊下、外间、同院、随行），可写她应声进来，由本人回应并把 scene.who 改为她；她若不在这一处（别宫、宫外、已回去），由当前对话人${sceneCtx.who}如实回一句不在、已回去或改日再请，不得让「${addressee.id}」凭空开口，也不得改 scene.who。`);
     const personaCue=npcActCue(sceneCtx.who);
     const relNote=relCue(sceneCtx.who);
-    let msg=`第${xunNo()}旬剧情对话第${r}轮：玩家应对「${choice}」（括号内是主控的动作/神情，括号外是当场说出口的话；未加括号的叙述按她此刻要说/要做的事理解，其中离开之后的安排不是她当众说出的台词）。${parseNote}演绎场上人物的当即反应与场面变化：scene.parts 总长 ≤120 字，另给 scene.ledger（逐条累积已确认的事）与 2—3 个接话选项（按【选项写法】）；scene.state 只写 "ongoing"，不结算数值。${addrNote?addrNote:banquet?'':`${sceneCtx.who}本人必须回应玩家这一轮的言行，不能不作答就走；话里提到别的人、旁人插话都可以，但不得替她作答，也不得把 scene.who 换成玩家没有当面叫的人（引见交人除外）。`}${handoffNote}${briefNote}${banquetNote}${optNote}${askedNote}${paceNote}${maidNote}${chamberNote}${whoNote?'\n【换人】'+whoNote:''}${personaCue?'\n【性情】'+personaCue:''}${relNote?'\n【分寸】'+relNote:''}`+this.sceneContextBlock();
+    let msg=`第${xunNo()}旬剧情对话第${r}轮：玩家应对「${choice}」（括号内是主控的动作/神情，括号外是当场说出口的话；未加括号的叙述按她此刻要说/要做的事理解，其中离开之后的安排不是她当众说出的台词）。${parseNote}演绎场上人物的当即反应与场面变化：scene.parts 总长 ≤120 字，另给 scene.ledger（逐条累积已确认的事）与 2—3 个接话选项（按【选项写法】）；scene.state 只写 "ongoing"，不结算数值。${addrNote?addrNote:banquet?'':`${sceneCtx.who}本人必须回应玩家这一轮的言行，不能不作答就走；话里提到别的人、旁人插话都可以，但不得替她作答，也不得把 scene.who 换成玩家没有当面叫的人（引见交人除外）。`}${handoffNote}${awayNote}${briefNote}${banquetNote}${optNote}${askedNote}${paceNote}${maidNote}${chamberNote}${whoNote?'\n【换人】'+whoNote:''}${personaCue?'\n【性情】'+personaCue:''}${relNote?'\n【分寸】'+relNote:''}`+this.sceneContextBlock();
     if(sceneCtx.chamber)msg=msg.replace(/她/g,'帝');
     if(sceneCtx)sceneCtx.wantWho=addressee?addressee.id:null; // 玩家当面叫到谁：这一轮若那人应了声，就把对话人换过去
     this.requestScene(msg,choice,MAX_OUTPUT_TOKENS,true,true); // 正常接话轮永不结算：聊多久由玩家决定，点「结束对话」才收场
