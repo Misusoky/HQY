@@ -118,6 +118,13 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
 .cr-v input{width:100%;border:0;border-bottom:1px solid var(--line);background:transparent;font-size:16px;padding:2px 0;outline:none;color:var(--ink)}
 .cr-txt{font-size:15px;line-height:1.8}
 .cr-note{font-size:12px;color:var(--ink-soft);margin-top:2px}
+/* 捏人·头像自选：按位份定池的候选网格 */
+.cr-avgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:8px;margin-top:2px}
+.cr-av{position:relative;padding:0;border:1px solid var(--line-strong);border-radius:2px;overflow:hidden;background:var(--paper-deep);height:72px;display:flex;align-items:center;justify-content:center;transition:border-color .15s,box-shadow .15s}
+.cr-av img{width:100%;height:100%;object-fit:cover;display:block}
+.cr-av-rnd{font-size:13px;letter-spacing:.1em;color:var(--ink-soft)}
+.cr-av.on{border-color:var(--cinnabar);box-shadow:0 0 0 1px var(--cinnabar),var(--shadow-flat)}
+.cr-av:active{transform:translateY(1px)}
 .cr-dice{width:34px;height:34px;flex:none;border-radius:2px;border:1px solid var(--line-strong);color:var(--cinnabar);font-size:15px;background:var(--card)}
 .cr-dice:hover{border-color:var(--gold)}
 .cr-chips{display:flex;flex-wrap:wrap;gap:8px}
@@ -4064,7 +4071,9 @@ const EMPEROR_MODULE = [
 '4. 系统道具对知心无效；侍寝不自动涨知心，按场面质量结算。知心变化须与场面对等，不得为维持“选择都有意义”而每相处必涨。',
 '5. 每旬请求附【恩宠账】行（含注意力落点：后台给帝安排一处注意力去向，主控可感知的部分写入 haremNews，与主控相处则不必单写）。列【恩宠账·到期】时，该相处成本旬主要剧情（hasEvent=true，scene 呈现，2—4 个接话选项后停止）；列【并账】时并入当旬已须触发的剧情或 narrative；列【搁置】时本旬必须推进所记原因（接近真相、化解误会或发酵为剧情线）。',
 '6. 帝与六宫各有一笔账：存档 npcs.<称谓>.favor（帝对她的宠爱 0—100）、emperorStory（与帝的旧事，一句）、arc（她眼下的事）。帝待每人的态度＝他的性情 × 与那人的旧事 × 那人的宠爱：念旧者记得旧人旧事，多疑者盯着得宠的人与旁人来往，重规矩者宠归宠也不饶越制；冷落的人不必有错，得宠的人也不必样样都好。写到帝与旁人时按这笔账来，不要人人都得宠，也不要人人都恨主控。',
-'7. 回写：帝宠变化写 statePatch.emperorFavor={"称谓":新值}（单次±1—8，须有戏里的因由）；帝与某人的旧事被提起或改写，写 statePatch.emperorStory={"称谓":"一句话"}；各人眼下的心思与期限写 statePatch.npcArc={"称谓":"一句话（含期限）"}。只写变化的人。'
+'7. 回写：帝宠变化写 statePatch.emperorFavor={"称谓":新值}（单次±1—8，须有戏里的因由）；帝与某人的旧事被提起或改写，写 statePatch.emperorStory={"称谓":"一句话"}；各人眼下的心思与期限写 statePatch.npcArc={"称谓":"一句话（含期限）"}。只写变化的人。',
+'8. 相处质感（恋爱感硬要求）：与主控的每场私下相处，写出"只有两个人时"才有的东西——他记得她随口说过的半句话、这次带了出来；称呼与语气有专属分寸（人前称位份，私下少一个字或换个声调）；有克制的身体语言（替她拢披风、把灯挪近、话到嘴边顿一顿）；每一场至少留一句没说出口的话、一个没做完的动作，或一处只有两人知道的旧典故。亲密按层级递进、不许跳档：生疏→留意（多答半句、记住细节）→熟悉（留她用膳、肯谈旧事）→信任（许她看见疲态、交半句底）→亲近（破例、主动安排、私下有专属的措辞）→牵挂（替她挡事、盘算将来）。同档内换花样，升档必须有铺垫事件；倒退（冷落、误会、避嫌）也要写得出缘由。写完自查一句：把这场戏里的"赏赐"全部删掉，剩下的部分还像两个人在靠近吗？不像就重写，不许用赏赐糊一个空壳。',
+'9. 谈情不写说明书：一切情意落在言行细节上，正文不得出现"他心里有你""她对你动了心"这类判词；让玩家自己从细节里尝出来。'
 ].join('\n');
 
 /* ============================================================ 承宠与子嗣（前端裁决）
@@ -4074,6 +4083,7 @@ const CHAMBER_MODULE = [
 '## 十四、承宠与子嗣（bedchamber / pregnancy / heirs；前端裁决，覆盖世界书冲突处）',
 '1. 每旬的侍寝由前端结算：存档 bedchamber 记最近若干旬「帝召幸谁」的公开记档，last 为最近一夜；夜账由前端在玩家点「结束本旬」后呈现，不再等到次旬早晨。主控若在夜账点「入帐相见」，会另开一段承宠夜话（scene 对话，只演那一夜，不结算本旬）；模型写正文时须与夜账和夜话相符，不得改写招幸对象、时间与结果。帝召幸他人是六宫可见的公开消息，可写入 haremNews 与宫人议论；主控不可知的私下细节不得写。',
 '2. 主控的侍寝场面点到为止：只写事前准备、帷帐之外与次日余波；不写露骨过程。侍寝不自动涨知心；夜账中已由前端结算的恩宠（如“恩宠 +1”）不得在同一夜重复加恩；其余宠爱变化以 statePatch["relationships.皇帝.value"] 回写为准，不得凭空大幅加恩。',
+'2b. 夜话写法：帷帐之内只写枕边话——低语、停顿、试探、没说出口的那半句。写他卸下白日帝王壳的片刻：疲态、旧伤、一句不问就当没说过的真心话；也写主控递过去的温柔被接住、被躲开、或被记住。亲密用留白与回声（次日清晨多留的一盏茶、他出门前停的那半步），不用形容词的堆砌。主控若在帷帐里献艺、递物，照枕边人的分量演反应：他接的不是节目与贡品，是她这个人。',
 '3. 有孕、胎象、小产与生产由前端结算（存档 pregnancy）。模型不得自行判定主控有孕、小产、生产或皇嗣性别；可写太医请脉、胎象、保胎与孕中反应，结果以存档为准。剧情要伤胎，只能通过体质下降与风险，不得直接改写 pregnancy。',
 '4. 皇嗣出生后由前端建档（存档 heirs：姓名、性别、生母、年龄、学识/礼仪/体魄/依赖）。模型写皇嗣须符合这些事实；皇嗣教育按世界书 §6E，前端给底、模型演过程。',
 '5. 主控本旬若已争取承宠，正文可写递牌子、打点、宫人议论与等待的心绪；结果已在夜账中给出，不得另编一次召幸。避宠同样是一种选择，须写出安全与失宠之间的代价。'
@@ -4720,7 +4730,7 @@ function presenceNote(p){ // 面板「属性」里的一行说明
 /* ============================================================ 工具 */
 const $=s=>document.querySelector(s);
 const MONTHS=['','正月','二月','三月','四月','五月','六月','七月','八月','九月','十月','冬月','腊月'];
-const BUILD='2026-11-27·剧情精彩度四刀（派系事件库/NPC旧账/把柄经济/引子三段式）'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
+const BUILD='2026-11-27·自选头像+侍寝互动+帝线恋爱感'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
 /* 月俸：按位份每月下旬末由前端自动入账（单位：两） */
 const SALARY_BY_GRADE={'正一品':220,'从一品':150,'正二品':110,'从二品':80,'正三品':60,'从三品':45,'正四品':36,'从四品':28,'正五品':20,'从五品':15,'正六品':12,'从六品':10,'正七品':8,'从七品':6,'正八品':5,'从八品':4,'正九品':3,'从九品':2};
 const SALARY_TITLES=[[/皇后/,220],[/皇贵妃/,150],[/贵妃/,110],[/贤妃|良妃|淑妃|德妃/,80],[/昭仪|昭容|昭媛|修仪|修容|修媛|充仪|充容|充媛/,45],[/贵嫔/,36],[/嫔/,28],[/贵人/,20],[/才人/,15],[/美人/,12],[/宝林/,10],[/常在/,8],[/答应/,6],[/选侍/,5],[/更衣/,4],[/采女/,3],[/官女子/,2],[/妃/,60]];
@@ -5871,6 +5881,8 @@ function crRollSkills(){
 }
 function crRollEmpPersona(){cr.emperorPersona=''} // 帝设由玩家亲撰：骰子＝清空恢复，回到世界书库随机性情
 function crRollAll(){crRollName();crRollAge();crRollFamily();crRollOrigin();crRollPersona();crRollLook();crRollAttrs();crRollSkills()}
+function crAvatarCat(){return avatarClassOf('',CR_FAMILIES[cr.family].rank)||'consort'} // 候选池按位份定档：低位 consort／嫔及以上 consortHi
+function crAvatarValidate(){if(cr.avatar!=null&&!avatarFitsCat(cr.avatar,crAvatarCat()))cr.avatar=null} // 家世重掷、位份档变了：已选的脸作废回随机
 /* NPC 才艺：用于“求师”。太医必有医术、姑姑宫女必有女红，妃嫔则在十艺里随机一二门。
    旧档与模型新建人物缺此字段时，按名讳哈希稳定补齐，读音一致、重载不变。 */
 function npcSkillPlan(id,rank){
@@ -5905,7 +5917,15 @@ function ensureNpcSkills(n,id){
   n.skills=out;
   return n.skills;
 }
+function crAvatarHtml(){ // 头像自选：按当前位份的池子摆开，不选＝入宫时随机
+  const cat=crAvatarCat();
+  const pool=avatarPoolOf(cat,true).slice().sort((a,b)=>a-b);
+  return `<div class="cr-avgrid"><button type="button" class="cr-av cr-av-rnd${cr.avatar==null?' on':''}" onclick="Game.crPickAvatar(null)">随机</button>${
+    pool.map(id=>`<button type="button" class="cr-av${cr.avatar===id?' on':''}" onclick="Game.crPickAvatar(${id})"><img src="${AV(id)}" alt="" loading="lazy"></button>`).join('')
+  }</div><div class="cr-note">${cat==='consortHi'?'高位妃嫔妆':'低位妃嫔妆'} · 候选按位份定档 · 入宫后随位份升降换装</div>`;
+}
 function renderCreator(){
+  crAvatarValidate();
   const fam=CR_FAMILIES[cr.family];
   const row=(k,v,dice,extra)=>`<div class="cr-row"><span class="cr-k">${k}</span><div class="cr-v">${v}</div>${extra||''}<button class="cr-dice" onclick="Game.rollCreator('${dice}')">⟳</button></div>`;
   $('#createBody').innerHTML=
@@ -5916,6 +5936,7 @@ function renderCreator(){
     row('出身',`<span class="cr-txt">${esc(cr.origin)}</span>`,'origin')+
     row('性情',`<div class="cr-tags">${normalizePersona(cr.persona).map(p=>`<span class="tag">${esc(p)}</span>`).join('')}</div>`,'persona')+
     row('容貌',`<span class="cr-txt">${esc(cr.look)}</span><div class="cr-note num">外貌 ${cr.attrs['外貌']}</div>`,'look')+
+    row('头像',crAvatarHtml(),'avatar')+
     row('属性',`<div class="cr-attrs num">${Object.entries(cr.attrs).map(([k,v])=>`<span>${k} <b>${v}</b></span>`).join('')}</div>`,'attrs')+
     row('才艺',`<span class="cr-txt num">${Object.entries(cr.skills).map(([k,v])=>`${esc(k)} ${v}`).join('　')||'暂未开窍'}</span><div class="cr-note num">共 ${Object.values(cr.skills).reduce((a,b)=>a+b,0)} 点 · 余下诸艺可求师或往藏书阁另学</div>`,'skills')+
     `<div class="cr-row"><span class="cr-k">帝设</span><div class="cr-v cr-emp">
@@ -6904,7 +6925,9 @@ function buildSceneSystem(who){
       return {route:def.name,sub:def.sub,stage:ml.stage,title:st.title,goal:st.goal,beat:{id:st.beat.id,text:st.beat.text},slots:st.slots}})()
     // 本场账与轮次只放在每轮的用户消息里（sceneContextBlock/【节奏】）：system 保持整场不变，前缀缓存才命中
   };
-  return STYLE_CORE+'\n\n'+SCENE_RULES+'\n\n【本场信息】\n'+JSON.stringify(payload);
+  return STYLE_CORE+'\n\n'+SCENE_RULES+'\n\n【本场信息】\n'+JSON.stringify(payload)
+    +(isEmp?'　【相对帝】眼前是帝：一切情意走恩宠账第 8 条的相处质感——专属称呼、克制的身体语言、没说出口的话；按当前知心档位定分寸，不许跳档、不许用赏赐代替靠近。':'')
+    +(isChamber?'　【夜话】这是帷帐里的枕边话：低语、停顿、留白，只写帐前与次日余波，不露骨；他此刻卸了帝王的壳，写他接住或躲开主控的温柔。':'');
 }
 
 /* ============================================================ API */
@@ -10645,8 +10668,8 @@ function buildOpeningWorld(proto){
      npcs[id].avatarCat=cat; // 记下发放时的身份池：皇嗣等泛称旧档回读时仍按皇子/皇女校验
      assign.push({who:id,cat,traits:npcTraits(npcs[id]),age:npcs[id].age});
    }
-   const dealt=dealAvatars(assign);
-   protagonist.avatar=dealt['__me__'];
+   const dealt=dealAvatars(assign,cr.avatar?[AV(cr.avatar)]:[]); // 玩家选定的脸优先占位，其余按池分发、全局不重复
+   protagonist.avatar=cr.avatar?AV(cr.avatar):(dealt['__me__']||'');
    for(const id in npcs)npcs[id].avatar=dealt[id];}
 
   /* 开局隐秘：每个在册人物自带一两条秘密，是日后查证线与读心笺的交付物 */
@@ -11170,9 +11193,10 @@ const Game={
   openCreator(){crRollAll();cr.emperorPersona='';UI.show('#screen-create');renderCreator()},
   backToStart(){UI.show('#screen-start')},
   rollCreator(field){ // 单项重掷
-    ({name:crRollName,age:crRollAge,family:()=>crRollFamily(),origin:crRollOrigin,persona:crRollPersona,look:crRollLook,attrs:crRollAttrs,skills:crRollSkills,empPersona:crRollEmpPersona}[field]||(()=>{}))();
+    ({name:crRollName,age:crRollAge,family:()=>crRollFamily(),origin:crRollOrigin,persona:crRollPersona,look:crRollLook,attrs:crRollAttrs,skills:crRollSkills,empPersona:crRollEmpPersona,avatar:()=>{cr.avatar=null}}[field]||(()=>{}))();
     renderCreator();
   },
+  crPickAvatar(id){cr.avatar=(id==null)?null:id;renderCreator()}, // 选脸：null＝随机；位份档不符的在渲染时自动作废
   pickFamily(i){crRollFamily(i);renderCreator()},
   crSetName(v){cr.name=String(v||'').slice(0,8)||cr.name},
   crSetEmpPersona(v){cr.emperorPersona=String(v||'').slice(0,1000);const c=$('#crEmpCount');if(c)c.textContent=cr.emperorPersona.length+'/1000';syncEmpPresets('crEmpPersona')},
@@ -12474,15 +12498,22 @@ const Game={
     }
     const box=$('#chatOpts');
     const banquet=!!(sceneCtx&&sceneCtx.banquet);
-    const interBtn=(sceneCtx&&sceneCtx.chamber)?'':`<button class="chat-tool gift" onclick="Game.toggleInter()">互动</button>`;
-    const interMenu=(sceneCtx&&sceneCtx.chamber)?'':(banquet
+    const chamber=!!(sceneCtx&&sceneCtx.chamber);
+    // 侍寝夜话也给互动：帷帐里唱一段、递一件东西，都是枕边话的一部分
+    const interBtn=`<button class="chat-tool gift" onclick="Game.toggleInter()">互动</button>`;
+    const interMenu=banquet
       ?`<div class="chat-inter" id="chatInter"><button class="chat-tool" onclick="Game.interAct('fest')">献艺</button></div>`
+      :chamber
+      ?`<div class="chat-inter" id="chatInter">
+        <button class="chat-tool" onclick="Game.interAct('perform')">献艺</button>
+        <button class="chat-tool" onclick="Game.interAct('gift')">赠礼</button>
+      </div>`
       :`<div class="chat-inter" id="chatInter">
         <button class="chat-tool" onclick="Game.interAct('perform')">献艺</button>
         <button class="chat-tool" onclick="Game.interAct('chess')">对弈</button>
         <button class="chat-tool" onclick="Game.interAct('consult')">问诊</button>
         <button class="chat-tool" onclick="Game.interAct('gift')">赠礼</button>
-      </div>`);
+      </div>`;
     const sch=sceneCtx?sceneCtx.scheme:null;
     const warn=sch?`<div class="chat-warn">暗流当前：如何应对、后果如何，由你的选择、当场局势与她的人设决定。</div>`:'';
     box.innerHTML=`<div class="cap">— 接话或行动 —</div>`+warn+
@@ -12525,9 +12556,13 @@ const Game={
   },
   interAct(kind){
     if(phase!=='EVENT_CHOICE'||!sceneCtx){toast('此刻不便');return}
-    if(sceneCtx.chamber){toast('夜话不必互动');return}
     if(sceneCtx.perfBusy||sceneCtx.giftBusy)return;
     const m=$('#chatInter');if(m)m.classList.remove('on');
+    if(sceneCtx.chamber){ // 帷帐之内：只留枕边该有的两项
+      if(kind==='gift'){this.openGift();return}
+      if(kind==='perform'){UI.openSheet('献艺');return}
+      toast('此刻不宜');return
+    }
     if(kind==='gift'){this.openGift();return}
     if(kind==='fest'){UI.openSheet('节宴献艺');return} // 宴席上献艺：本地结算赏罚，席上反应由下一轮承接
     if(kind==='perform')UI.openSheet('献艺');
@@ -12541,7 +12576,6 @@ const Game={
   /* 赠礼：从行囊取一件递给眼前的人；前端扣物，模型演反应并结算关系 */
   openGift(){
     if(phase!=='EVENT_CHOICE'||!sceneCtx){toast('此刻不便赠礼');return}
-    if(sceneCtx.chamber){toast('夜话不必献物');return}
     if(sceneCtx.giftBusy)return;
     UI.openSheet('赠礼');
   },
@@ -13551,11 +13585,10 @@ const Game={
     if(!state||!state.protagonist){toast('尚未开局');return}
     const pc=pieceById(id);if(!pc){toast('此作已不在');return}
     if(phase==='EVENT_CHOICE'&&sceneCtx){
-      if(sceneCtx.chamber){toast('夜话不必献艺');return}
       if(sceneCtx.perfBusy)return;
       if((state.energy??0)<focusEnergyCost('献艺')){toast('精力不足，先歇一歇');return}
-      if(pc.skill==='棋'){this.sceneChess(pc.id);return}
-      if(pc.skill==='医术'){this.sceneConsult(pc.id);return}
+      if(pc.skill==='棋'){sceneCtx.chamber?toast('帷帐里不摆棋'):this.sceneChess(pc.id);return}
+      if(pc.skill==='医术'){sceneCtx.chamber?toast('此刻不是问诊的时候'):this.sceneConsult(pc.id);return}
       this.scenePerform(pc);
       return;
     }
@@ -13578,9 +13611,9 @@ const Game={
     ensureXunBook();
     UI.closeSheet();
     const who=sceneCtx.who;
-    const act=pc.improv?`（起身，即席${pc.skill==='舞'?'舞':'唱'}了一段）`
-      :pc.skill==='舞'?`（起身，当众舞了一折${pc.name}）`
-      :`（起身，当众唱了一曲${pc.name}）`;
+    const act=pc.improv?(sceneCtx.chamber?`（就着灯影，轻轻${pc.skill==='舞'?'旋了':'哼唱了'}一段）`:`（起身，即席${pc.skill==='舞'?'舞':'唱'}了一段）`)
+      :pc.skill==='舞'?(sceneCtx.chamber?`（起身，就着烛影舞了一折${pc.name}）`:`（起身，当众舞了一折${pc.name}）`)
+      :(sceneCtx.chamber?`（移步灯下，轻轻唱了一曲${pc.name}）`:`（起身，当众唱了一曲${pc.name}）`);
     this.bubble('me','',act);
     this.recordLine('me',pc.improv?'（即席献艺）':`（献上${pc.name}）`);
     this.requestScene(this.perfMsg(pc,who),`献艺·${pc.name}`,MAX_OUTPUT_TOKENS,true,true,false,null,{kind:'perform',piece:pc,who,beforeEnergy,cost});
