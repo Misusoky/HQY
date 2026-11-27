@@ -302,6 +302,7 @@ input,textarea,select{font-family:inherit;color:var(--ink)}
 .itemrow{display:flex;align-items:center;gap:10px;min-height:38px;font-size:14px;border-bottom:1px dashed var(--line)}
 .itemrow:last-child{border-bottom:0}
 .itemrow .cnt{margin-left:auto;font-size:13px;color:var(--ink-soft)}
+.rk-ok{color:var(--cinnabar)}
 button.itemrow{width:100%;background:none;border:0;border-bottom:1px dashed var(--line);padding:0;text-align:left;font:inherit;color:inherit;cursor:pointer}
 button.itemrow:last-child{border-bottom:0}
 button.itemrow:active{opacity:.6}
@@ -398,6 +399,10 @@ button.itemrow .cnt{flex:none;max-width:48%;overflow:hidden;text-overflow:ellips
 /* toast */
 .toast{position:fixed;left:50%;bottom:calc(96px + var(--sab));transform:translateX(-50%) translateY(20px);z-index:90;background:var(--grain),var(--ink);color:var(--paper);font-size:13px;padding:8px 16px;border:1px solid var(--line-gold);border-radius:3px;opacity:0;pointer-events:none;transition:all .25s;max-width:80vw;text-align:center;font-family:var(--sans)}
 .toast.on{opacity:.92;transform:translateX(-50%) translateY(0)}
+/* 数值变动：当场结算的属性／关系变化，压在提示条上方，几息自散 */
+.deltas{position:fixed;left:50%;bottom:calc(148px + var(--sab));transform:translateX(-50%) translateY(10px);z-index:89;min-width:126px;max-width:78vw;padding:7px 13px;border-radius:3px;background:rgba(96,93,86,.9);color:#f7f2e8;font-family:var(--sans);font-size:12.5px;line-height:1.75;letter-spacing:.02em;text-align:center;opacity:0;pointer-events:none;transition:all .22s;box-shadow:0 2px 10px rgba(0,0,0,.16)}
+.deltas.on{opacity:.96;transform:translateX(-50%) translateY(0)}
+.deltas .dl-more{opacity:.62;font-size:11.5px}
 
 /* 全局设置入口：压在加载/弹窗之上，对话与铺排中也能打开 */
 .global-set{position:fixed;right:0;top:calc(var(--gbar-h) + 2px);z-index:67;display:none;flex-direction:column;align-items:center;justify-content:center;width:30px;padding:8px 0;border:1px solid rgba(245,239,227,.26);border-right:0;border-radius:2px 0 0 2px;background:rgba(45,40,33,.7);color:#f5efe3;font-family:var(--serif);font-size:12px;line-height:1.35;letter-spacing:.08em;backdrop-filter:blur(3px);box-shadow:-1px 1px 0 rgba(0,0,0,.18)}
@@ -709,6 +714,7 @@ button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:cente
   <div class="sheet-body" id="sheetBody"></div>
 </div>
 <div class="toast" id="toast"></div>
+<div class="deltas" id="deltas"></div>
 <button class="global-set" id="globalSet" type="button" aria-label="打开设置" onclick="Game.openSettings()"><span>设</span><span>置</span></button>
 
 <!-- 剧情对话：全屏聊天气泡 -->
@@ -1623,6 +1629,10 @@ function serialTimeText(s){ // 旬号还原成年月旬：给剧情账详情页�
   if(s==null||!Number.isFinite(+s))return '';
   const n=Math.max(0,Math.floor(+s)),era=(state&&state.time&&state.time.era)||'';
   return `${era}${toCN(Math.floor(n/24)+1)}年${MONTHS[Math.floor((n%24)/2)+1]}${n%2?'下旬':'上旬'}`;
+}
+function shortSerial(n){ // 只留「三月下旬」：面板里追述时间用
+  const t=serialTimeText(n);
+  return t?t.replace(/^.*?年/,''):'';
 }
 function nextMonthSerial(t,m){ // 下一处「m 月下旬」的旬号（m：正月=1…腊月=12）
   let y=Number(t.year)||1;
@@ -3966,6 +3976,36 @@ function relSnapshotNum(){
   for(const who in rels){const v=relNumOf(who);if(v!=null)m[who]=v}
   return m;
 }
+/* 数值变动小窗：applyPatch 前后各拍一张，差额当场列出（属性／关系／银两／积分），不等旬末小结 */
+function statSnapshot(){
+  const p=(state&&state.protagonist)||{};
+  return {at:Object.assign({},p.attributes||{}),rels:relSnapshotNum(),silver:Number(p.silver)||0,points:Number(state&&state.system&&state.system.points)||0};
+}
+function statDeltaList(b){
+  const out=[],p=(state&&state.protagonist)||{},at=p.attributes||{};
+  for(const k of ['威望','忌惮','交际','外貌','才华','体质']){
+    const a=Number(b.at[k])||0,c=Number(at[k])||0;
+    if(c!==a)out.push(`${k} ${c>a?'+':'−'}${Math.abs(c-a)}`);
+  }
+  const rels=(state&&state.relationships)||{};
+  for(const who of Object.keys(b.rels)){
+    const v=rels[who],n=relNumOf(who);
+    if(n==null||n===b.rels[who])continue;
+    const type=(v&&typeof v==='object'&&v.type)||'好感';
+    out.push(`${who} ${type} ${n>b.rels[who]?'+':'−'}${Math.abs(n-b.rels[who])}`);
+  }
+  const dS=(Number(p.silver)||0)-b.silver,dP=(Number(state&&state.system&&state.system.points)||0)-b.points;
+  if(dS)out.push(`银两 ${dS>0?'+':'−'}${Math.abs(dS)}`);
+  if(dP)out.push(`积分 ${dP>0?'+':'−'}${Math.abs(dP)}`);
+  return out;
+}
+/* 不进 applyPatch 的本地结算（侍寝夜账、节宴献艺）也走这一步：包一层，结束后照同样口径弹变动 */
+function withDeltas(fn){
+  const hasAttrs=!!(state&&state.protagonist&&state.protagonist.attributes&&Object.keys(state.protagonist.attributes).length);
+  const snap=hasAttrs?statSnapshot():null;
+  try{return fn()}
+  finally{if(snap){try{UI.flashDeltas(statDeltaList(snap))}catch(e){console.warn('[数值] 变动提示失败',e)}}}
+}
 function longBuffState(){
   const now=xunSerial(state.time);
   if(!state.longBuff||Number(state.longBuff.xun)!==now)state.longBuff={xun:now,tong:0,an:0};
@@ -4953,7 +4993,7 @@ function presenceNote(p){ // 面板「属性」里的一行说明
 /* ============================================================ 工具 */
 const $=s=>document.querySelector(s);
 const MONTHS=['','正月','二月','三月','四月','五月','六月','七月','八月','九月','十月','冬月','腊月'];
-const BUILD='2026-11-28·开场与逐轮规矩拆开＋剧情账瘦身＋人物详情默认收起、定高'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
+const BUILD='2026-11-28·晋位独立成栏＋局面分时局/账目/承宠＋数值变动当场提示'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
 /* 月俸：按位份每月下旬末由前端自动入账（单位：两） */
 const SALARY_BY_GRADE={'正一品':220,'从一品':150,'正二品':110,'从二品':80,'正三品':60,'从三品':45,'正四品':36,'从四品':28,'正五品':20,'从五品':15,'正六品':12,'从六品':10,'正七品':8,'从七品':6,'正八品':5,'从八品':4,'正九品':3,'从九品':2};
 const SALARY_TITLES=[[/皇后/,220],[/皇贵妃/,150],[/贵妃/,110],[/贤妃|良妃|淑妃|德妃/,80],[/昭仪|昭容|昭媛|修仪|修容|修媛|充仪|充容|充媛/,45],[/贵嫔/,36],[/嫔/,28],[/贵人/,20],[/才人/,15],[/美人/,12],[/宝林/,10],[/常在/,8],[/答应/,6],[/选侍/,5],[/更衣/,4],[/采女/,3],[/官女子/,2],[/妃/,60]];
@@ -7543,6 +7583,7 @@ function advanceTime(t){ // 两旬制日历推进：上旬→同月下旬；下�
 }
 function applyPatch(patch){
   if(!patch)return[];
+  const __snap=statSnapshot(); // 本补丁的起点：结束后算差额，当场弹小窗，不等旬末
   const majors=[];
   let rankChanged=false;
   const buffBefore=relSnapshotNum(); // 命途长赐：本轮结束后统一给上涨的关系补点
@@ -7706,7 +7747,11 @@ function applyPatch(patch){
     }
     if(k==='protagonist.constitutionBase'&&typeof v==='number'){v=Math.max(30,Math.round(v));setPath(state,k,v);continue} // 体质根基 30 起，不设上限：锻炼/调理/伤病在此结算
     if(/^rankProg\.(since|lastPush|denied|lastDenied|lastRank)$/.test(k))continue; // 晋位排期字段由前端管，模型只能写功绩
-    if(k==='rankProg.merit'&&typeof v==='number')v=Math.max(0,Math.min(9,Math.round(v)));
+    if(k==='rankProg.merit'&&typeof v==='number'){
+      v=Math.max(0,Math.min(9,Math.round(v)));
+      const prog=rankProgOf(state),before=Number(prog.merit)||0;
+      if(v>before){prog.meritLog=Array.isArray(prog.meritLog)?prog.meritLog:[];prog.meritLog.push({xun:xunSerial(state.time||{}),d:v-before});if(prog.meritLog.length>6)prog.meritLog=prog.meritLog.slice(-6)}
+    }
     if(/protagonist\.skills\./.test(k)&&typeof v==='number')v=Math.max(0,Math.min(SKILL_MAX,Math.round(v)));
     else if(/protagonist\.attributes\./.test(k)&&typeof v==='number')v=clamp01_100(v);
     if(k==='protagonist.attributes.体质'&&baseCap>0)v=Math.min(v,baseCap); // 气血（体质）永不高于根基
@@ -7736,6 +7781,7 @@ function applyPatch(patch){
   }
   if(rankChanged){try{syncAvatarsToRanks()}catch(e){console.warn('[头像] 位份变动后校正失败',e)}}
   longBuffAfterGains(buffBefore);
+  try{if(Object.keys(__snap.at).length)UI.flashDeltas(statDeltaList(__snap))}catch(e){console.warn('[数值] 变动提示失败',e)}
   return majors;
 }
 function applyDossier(list){
@@ -8346,17 +8392,19 @@ const UI={
     const festSec=`<div class="sec"><div class="sec-cap">节令</div>
         ${fest?`<div class="itemrow"><span>本旬 · ${esc(fest.name)}</span><span class="cnt">${esc(fest.scale)}${festSoft?'·初入宫仅作背景':''}</span></div><div class="sheet-note" style="margin-top:4px">${esc(fest.scene)}</div>`:'<div class="sheet-note">本旬无固定节宴。</div>'}
         ${soonFest?`<div class="itemrow" style="margin-top:6px"><span>下一场 · ${esc(soonFest.fest.name)}</span><span class="cnt">${esc(festWhen(soonFest.fest))}</span></div>`:''}</div>`;
-    return `<div class="sec"><div class="sec-cap">当前局面</div>
+    const ledger=`<div class="sec"><div class="sec-cap">剧情账</div>${plots}</div>
+      <div class="sec"><div class="sec-cap">待续事项</div>${pend}</div>`;
+    const chamber=this.chamberLedgerHtml();
+    const favor=chamber||'<div class="sec"><div class="sheet-note">尚无承宠记档。</div></div>';
+    const now=`<div class="sec"><div class="sec-cap">当前局面</div>
         <div class="itemrow"><span>${esc(state.lastNode||'—')}</span></div>
         ${state.time&&state.time.note?`<div class="itemrow"><span>${esc(state.time.note)}</span></div>`:''}
         ${state.nextStep?`<div class="itemrow"><span>下一步：${esc(state.nextStep)}</span></div>`:''}</div>
       ${festSec}
       ${this.factionWindHtml()}
       ${this.festPerfHtml()}
-      ${this.chamberLedgerHtml()}
-      <div class="sec"><div class="sec-cap">剧情账</div>${plots}</div>
-      <div class="sec"><div class="sec-cap">待续事项</div>${pend}</div>
       <div class="setbtns"><button class="btn btn-line" onclick="UI.goSheet('命途')">${state.mainLine?'命途 · '+esc(MAIN_LINES[state.mainLine.id].name):'命途 · 未定'}</button><button class="btn btn-line" onclick="UI.goSheet('大事记')">剧情大事记</button></div>`;
+    return this.splitPanes('局面',[{k:'时局',html:now},{k:'账目',html:ledger,n:active.length||null},{k:'承宠',html:favor}]);
   },
   /* 才艺修习（v2 网格面板） */
   sheetSkills(){
@@ -9016,6 +9064,14 @@ const UI={
     wrap.querySelectorAll(':scope > .sheet-spane > .sheet-pane').forEach(p=>p.classList.toggle('on',p.dataset.pane===btn.dataset.pane));
     const sp=wrap.querySelector(':scope > .sheet-spane');if(sp)sp.scrollTop=0; // 换页回到顶部：三页共用同一块高度，别把上一页的滚动位置带过来
   },
+  flashDeltas(list){ // 当场结算的数值变动：底部灰色小窗，几息自散
+    if(!list||!list.length)return;
+    const el=$('#deltas');if(!el)return;
+    const rows=list.slice(0,6),more=list.length-rows.length;
+    el.innerHTML=rows.map(t=>`<div>${esc(t)}</div>`).join('')+(more>0?`<div class="dl-more">另 ${more} 项</div>`:'');
+    el.classList.add('on');
+    clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('on'),4200);
+  },
   meter(nm,v,cls){return `<div class="meter ${cls}"><span class="meter-nm">${esc(nm)}</span><span class="meter-track"><span class="meter-fill" style="width:${clamp01_100(Number(v)||0)}%"></span></span><span class="meter-v num">${esc(v)}</span></div>`},
   sheetStatus(){
     const p=state.protagonist,at=p.attributes||{},sk=p.skills||{};
@@ -9036,18 +9092,43 @@ const UI={
     const dg=disguiseActive(state);
     const disguiseRow=dg?`<div class="sheet-note">易容：${esc(dg.name)}${dg.rank?` · ${esc(dg.rank)}`:''}（本旬）${dg.desc?`<br>${esc(dg.desc)}`:''}</div>`:'';
     const L=rankLadder(state);
-    const rankSec=`<div class="sec"><div class="sec-cap">位份</div>
-        <div class="itemrow"><span>${esc(p.rank||'—')}</span><span class="cnt">${L.next?`下一阶 ${esc(rankWithGrade(L.next))}`:'已至顶阶'}</span></div>
-        ${L.next?`<div class="itemrow"><span>晋位窗口</span><span class="cnt">${L.breakOpen?'帝意正洽':(L.windowOpen?'本旬开':`${esc(L.nextWinLabel)} · ${L.nextWinIn} 旬`)}</span></div><div class="itemrow"><span>晋位之资</span><span class="cnt num">${L.met}／${L.need} 项</span></div>${L.items.map(x=>`<div class="itemrow"><span>${esc(x.label)}</span><span class="cnt num">${esc(x.have)}／${esc(x.need)}${x.ok?' ✓':''}</span></div>`).join('')}<div class="itemrow"><span>在此位（旬）</span><span class="cnt num">${L.xun}／${L.gateXun}${L.xunOk?' ✓':''}</span></div>`:''}
-        ${L.block?`<div class="sheet-note">阻力：${esc(L.block)}</div>`:''}</div>`;
+    const rankLine=`<div class="sec"><div class="sec-cap">位份</div>
+        <div class="itemrow"><span>${esc(p.rank||'—')}</span><span class="cnt">${L.next?`下一阶 ${esc(rankWithGrade(L.next))}`:'已至顶阶'}</span></div></div>`;
     const panes=[
-      {k:'属性',html:rankSec+`<div class="sec">${this.meter('精力',Math.round(state.energy??ENERGY_MAX),'m-cinnabar')}${tiMeter}${attrs||'<div class="sheet-note">—</div>'}${stance?`<div class="sheet-note">言行：${esc(stance)}</div>`:''}${baseNote}${disguiseRow}
+      {k:'属性',html:rankLine+`<div class="sec">${this.meter('精力',Math.round(state.energy??ENERGY_MAX),'m-cinnabar')}${tiMeter}${attrs||'<div class="sheet-note">—</div>'}${stance?`<div class="sheet-note">言行：${esc(stance)}</div>`:''}${baseNote}${disguiseRow}
         <div class="itemrow"><span>月俸</span><span class="cnt num">每月 ${esc(salary)} 两</span></div></div>`},
-      {k:'才艺',html:`<div class="sec">${skills||'<div class="sheet-note">—</div>'}${talent}</div>`}
+      {k:'才艺',html:`<div class="sec">${skills||'<div class="sheet-note">—</div>'}${talent}</div>`},
+      {k:'晋位',html:this.rankPaneHtml()}
     ];
     if(displayed.length)panes.push({k:'陈设',html:`<div class="sec">${displayed.map(it=>`<div class="itemrow"><span>${esc(it.name)}</span><span class="cnt">${esc(it.quality||'')}${it.category?' · '+esc(it.category):''}</span></div>`).join('')}</div>`});
     panes.push({k:'孕事',html:this.nightLedgerHtml()});
-    return this.splitPanes('状态',panes)+'<div class="sheet-note">剧情账与待续在「时间」打开的页面里。</div>';
+    return this.splitPanes('状态',panes)+'<div class="sheet-note">剧情账、待续与六宫动向在顶栏时间处。</div>';
+  },
+  rankPaneHtml(){ // 晋位：五样之资任凑 N 项，资历单算；窗口与破格写清楚
+    const L=rankLadder(state);
+    const p=state.protagonist||{};
+    if(!L.next)return `<div class="sec"><div class="sec-cap">位份</div>
+      <div class="itemrow"><span>${esc(p.rank||'—')}</span><span class="cnt">已至顶阶</span></div>
+      <div class="sheet-note">位极六宫，无阶可升；往后是册后、夺位、废立，皆属变局。</div></div>`;
+    const now=xunSerial(state.time||{});
+    const okRow=(label,have,need,ok)=>`<div class="itemrow"><span>${esc(label)}</span><span class="cnt num">${esc(have)}／${esc(need)}${ok?' <span class="rk-ok">✓</span>':''}</span></div>`;
+    const items=L.items.map(x=>okRow(x.label,x.have,x.need,x.ok)).join('');
+    const lack=Math.max(0,L.need-L.met),lackXun=Math.max(0,L.gateXun-L.xun);
+    const stateText=L.ok?((L.windowOpen||L.breakOpen)?'可晋':'资已足 · 待窗口'):(lack>0?`尚差 ${lack} 项`:`资历还差 ${lackXun} 旬`);
+    const winText=L.windowOpen?`本旬开（${rankWindowLabel(now)}）`:(L.breakOpen?'帝意正洽 · 两旬内可越窗':`下一次 ${L.nextWinLabel} · 还差 ${L.nextWinIn} 旬`);
+    const logs=(rankProgOf(state).meritLog||[]).slice(-3);
+    const logText=logs.length?`<div class="sheet-note">功绩来历：${logs.map(x=>`${shortSerial(x.xun)} +${x.d}`).join(' · ')}</div>`:'';
+    return `<div class="sec"><div class="sec-cap">下一阶</div>
+        <div class="itemrow"><span>${esc(p.rank||'—')}</span><span class="cnt">${esc(rankWithGrade(L.next))}</span></div>
+        <div class="itemrow"><span>之资</span><span class="cnt">已备 ${L.met} 项 · 需 ${L.need} 项</span></div>
+        <div class="itemrow"><span>当前</span><span class="cnt">${esc(stateText)}</span></div></div>
+      <div class="sec"><div class="sec-cap">五样之资（任凑 ${L.need} 项）</div>${items}${okRow('资历 · 本阶旬数',L.xun,L.gateXun,L.xunOk)}${logText}</div>
+      <div class="sec"><div class="sec-cap">晋位窗口</div>
+        <div class="itemrow"><span>${esc(winText)}</span></div>
+        <div class="sheet-note">一年四窗：三月、六月、九月、腊月下旬。资足而窗未开，只可造势：递话、备礼、托人说项、摸清谁掌名单。</div>
+        ${L.block?`<div class="sheet-note">阻力：${esc(L.block)}</div>`:''}
+        ${L.lastDenied===state.turn?`<div class="sheet-note">上一版把位份写高了，已被驳回；这一笔要落在「谁压了、卡在哪」上。</div>`:''}</div>
+      <div class="sec"><div class="sheet-note">宠爱看帝前；威望、忌惮看属性；子嗣计皇嗣与身孕；功绩靠查清旧案、救驾、家族立功、诞育皇嗣。资历单算，不计入项数。</div></div>`;
   },
   sheetChronicle(){
     const entries=state&&Array.isArray(state.chronicle)?state.chronicle:null;
@@ -12236,7 +12317,7 @@ const Game={
     this.leavePlace();
     const prevTurn=state.turn||0;
     if(state.disguise){delete state.disguise;toast('易容药力已散，镜中人又是你自己',3000)} // 易容只保一旬
-    const dawn=resolveNight(prevTurn); // 本旬末先结敬事房这一夜：时间还停在本旬，弹出的侍寝/夜账才合时序
+    const dawn=withDeltas(()=>resolveNight(prevTurn)); // 本旬末先结敬事房这一夜：时间还停在本旬，弹出的侍寝/夜账才合时序
     state.turn=(state.turn||0)+1;state.energy=ENERGY_MAX;state.energyWarned=false;state.mealCount=0;state.walkCount=0;state.time=advanceTime(state.time);
     if(state.protagonist&&state.protagonist.health==='肠胃不适')state.protagonist.health='康健'; // 黑暗料理的肠胃不适只拖一旬
     let newcomer=null;
@@ -14004,7 +14085,8 @@ const Game={
     UI.actResult('才艺修习 · '+k,flavor,deltas);
     if(state.energy<=0)setTimeout(()=>this.collapse(),600);
   },
-  festPerform(k,pieceId){ // 节宴献艺：本地掷定成色与赏罚，不调模型；歌舞可指定已成曲目
+  festPerform(k,pieceId){return withDeltas(()=>this._festPerform(k,pieceId))},
+  _festPerform(k,pieceId){ // 节宴献艺：本地掷定成色与赏罚，不调模型；歌舞可指定已成曲目
     if(!state||!state.protagonist){toast('尚未开局');return}
     if(!ART_SKILLS.includes(k)){toast('此艺不列席间献艺');return} // 骑射、烹饪不上宴
     const banquet=!!(phase==='EVENT_CHOICE'&&sceneCtx&&sceneCtx.banquet); // 宴席对话里当场献：结果落在席上，不弹窗
