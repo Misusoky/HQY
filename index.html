@@ -2647,7 +2647,7 @@ function seedPlotEntry(d){
    前端管"谁在何时动手"：每条图谋有布子、发难两个时刻；布子只给征兆，发难必演；不应对就真扣。
    模型只负责演，胜负由前端判定，不依赖模型自觉。 */
 const SCHEME_MAX_ACTIVE=2;    // 同时可存的图谋上限：再多会挤占养成与帝线
-const SCHEME_SPAWN_GAP=4;     // 两起新图谋之间至少隔几旬：给玩家喘息与查证的时间
+const SCHEME_SPAWN_GAP=3;     // 两起新图谋之间至少隔几旬：敌意来得快，但也要给一口喘息
 const RANK_ORDER=['官女子','采女','更衣','选侍','答应','常在','宝林','美人','才人','贵人','嫔','贵嫔','昭仪','昭容','昭媛','修仪','修容','修媛','充仪','充容','充媛','妃','贤妃','良妃','淑妃','德妃','贵妃','皇贵妃','皇后'];
 const RANK_GRADE={官女子:'从九品',采女:'正九品',更衣:'从八品',选侍:'正八品',答应:'从七品',常在:'正七品',宝林:'从六品',美人:'正六品',才人:'从五品',贵人:'正五品',嫔:'从四品',贵嫔:'正四品',昭仪:'从三品',昭容:'从三品',昭媛:'从三品',修仪:'从三品',修容:'从三品',修媛:'从三品',充仪:'从三品',充容:'从三品',充媛:'从三品',妃:'正三品',贤妃:'从二品',良妃:'从二品',淑妃:'从二品',德妃:'从二品',贵妃:'正二品',皇贵妃:'从一品',皇后:'正一品'};
 function rankWithGrade(title){return (RANK_GRADE[title]||'')+title}
@@ -2690,7 +2690,7 @@ function schemeHosts(s){ // 有动机、有身份、能被演出来的人：仇�
     const v=Number(r.value);
     const hate=r.type==='仇恨';
     const depth=String(((npcs[who]||{}).profile||{}).depth||'初识');
-    if(!hate&&!(Number.isFinite(v)&&v<=12&&(v<0||depth!=='初识')))continue; // 0 与初识都是中性：没有嫌隙就不下手
+    if(!hate&&!(Number.isFinite(v)&&v<=18&&(v<0||depth!=='初识')))continue; // 0 与初识都是中性：没有嫌隙就不下手；嫌隙线放宽到 18，敌意起念更早
     const n=npcs[who]||Object.values(npcs).find(x=>x&&x.name===who)||null;
     const rank=(n&&n.rank)||rankTitleOf(who); // 旧档 npcs 可能为空：关系里带着位份称谓也能起念
     if(!n&&!rank&&!cards[who])continue;
@@ -3030,18 +3030,10 @@ function factionRelValue(who,s){
   const v=(r&&typeof r==='object')?Number(r.value):Number(r);
   return Number.isFinite(v)?v:null;
 }
-function factionRelLine(f){ // 派系对你的数值化交代：综合关系（首领六成、相识成员均值四成）与近期出手次数（另有实力表）
+function factionRelLine(f){ // 派系对你的数值化交代：只给一个关系值（首领×0.6＋相识成员均值×0.4，另有实力表）；明细不逐项列出
   if(!f||f.defunct)return '';
   const mix=factionRelMix(f);
-  const lv=factionRelValue(f.leader);
-  const mem=(f.members||[]).map(m=>factionRelValue(m)).filter(v=>v!=null);
-  const avg=mem.length?Math.round(mem.reduce((a,b)=>a+b,0)/mem.length):null;
-  const ev=factionHostileEvidence(f);
-  const bits=[];
-  bits.push(mix==null?'关系未明':`关系 ${mix}`);
-  if(lv!=null||avg!=null)bits.push([lv!=null?`首领 ${Math.round(lv)}`:null,avg!=null?`相识成员均值 ${avg}`:null].filter(Boolean).join(' · '));
-  bits.push(ev.mid>0?`近十二旬对你出手 ${ev.mid} 次`:'近期未对你出手');
-  return bits.join(' · ');
+  return mix==null?'关系未明':`关系 ${mix}`;
 }
 function factionRelMix(f){ // 派系对主控的关系值：首领六成、相识成员均值四成；首领无账全看成员，成员无账全看首领
   if(!f)return null;
@@ -3272,8 +3264,8 @@ function factionHostileEvidence(f){ // 近期真对你下过几次手：以剧�
     if(p.stage==='进行中')hasPlot=true;
     const t=Number(p.touch||p.earliest||0);
     if(!t)continue;
-    if(now-t<=6)near++;
-    if(now-t<=12)mid++;
+    if(now-t<=4)near++;
+    if(now-t<=8)mid++;
   }
   if(!hasPlot&&f&&f.step&&f.stepLine==='敌对')near++; // 旧档只留了这一步、没立账的，也算一次
   return {near,mid};
@@ -3285,7 +3277,7 @@ function recalcFactionAttitude(f){ // 态度看领袖亲疏，也看这一系最
   const t=relTier(f.leader);
   const ev=factionHostileEvidence(f);
   if(t.key==='feud'||ev.near>=2||ev.mid>=3){f.attitude='敌对';return f.attitude}
-  if(ev.near>=1){if(f.attitude!=='敌对')f.attitude='压制';return f.attitude} // 六旬内动过手：不是观望
+  if(ev.near>=1){if(f.attitude!=='敌对')f.attitude='压制';return f.attitude} // 四旬内动过手：不是观望
   if(f.attitude==='敌对'){
     if(t.key==='close'||t.key==='ally')f.attitude='压制'; // 亲厚起来才能松一档
     return f.attitude;
@@ -4762,7 +4754,7 @@ function presenceNote(p){ // 面板「属性」里的一行说明
 /* ============================================================ 工具 */
 const $=s=>document.querySelector(s);
 const MONTHS=['','正月','二月','三月','四月','五月','六月','七月','八月','九月','十月','冬月','腊月'];
-const BUILD='2026-11-27·节奏提速：例行速览+对话收束+周期压缩+门槛下调'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
+const BUILD='2026-11-27·帝专用秘密池+敌意提速+派系关系单值'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
 /* 月俸：按位份每月下旬末由前端自动入账（单位：两） */
 const SALARY_BY_GRADE={'正一品':220,'从一品':150,'正二品':110,'从二品':80,'正三品':60,'从三品':45,'正四品':36,'从四品':28,'正五品':20,'从五品':15,'正六品':12,'从六品':10,'正七品':8,'从七品':6,'正八品':5,'从八品':4,'正九品':3,'从九品':2};
 const SALARY_TITLES=[[/皇后/,220],[/皇贵妃/,150],[/贵妃/,110],[/贤妃|良妃|淑妃|德妃/,80],[/昭仪|昭容|昭媛|修仪|修容|修媛|充仪|充容|充媛/,45],[/贵嫔/,36],[/嫔/,28],[/贵人/,20],[/才人/,15],[/美人/,12],[/宝林/,10],[/常在/,8],[/答应/,6],[/选侍/,5],[/更衣/,4],[/采女/,3],[/官女子/,2],[/妃/,60]];
@@ -6098,6 +6090,13 @@ const SECRET_POOL=[
   {kind:'旧事',fit:['果决','爽直','坚忍'],text:'{w}的兄长在前朝站错过队，如今外放赎罪；她每月省下的份例银，一半都填了那个窟窿'},
   {kind:'旧事',fit:['温厚','淡泊','柔婉'],text:'{w}入宫前在闺中替人抄书养家，一手馆阁体是那时候练的——她从不提，一提就岔开话'}
 ];
+const EMPEROR_ID_RE=/^(皇帝|皇上|陛下|圣上|圣人|天子|万岁|今上|官家|大家)$/; // 帝的称谓键：身份闸与归一都用
+const SECRET_POOL_EMPEROR=[ // 帝专用：潜邸旧事、心病与忌讳——妃嫔池的「入宫/份例/请脉」口吻不配帝王身份
+  {kind:'旧事',text:'{w}登基前在东宫蛰伏了七年，最信不过的就是身边人递的好话——潜邸的旧仆如今只剩一个还在御前'},
+  {kind:'旧事',text:'{w}继位那年冬天病过一场，太医院的脉案锁在御前，连太后都只许看摘要'},
+  {kind:'隐私',text:'{w}每月朔望独自在奉先殿坐半日，不许人跟——不是先皇后忌辰，没人知道那是什么日子'},
+  {kind:'隐私',text:'{w}枕下压着一枚磨旧的铜钱，是潜邸时一位旧人留下的；那旧人的名字，如今宫里没人敢提'}
+];
 function secretAddS(s,who,text,kind){ // 新立一条秘密（s 可为任意存档对象；全局态走 secretAdd）
   if(!s||!who||!text)return null;
   s.secrets=Array.isArray(s.secrets)?s.secrets:[];
@@ -6107,13 +6106,15 @@ function secretAddS(s,who,text,kind){ // 新立一条秘密（s 可为任意存�
   return sec;
 }
 function secretAdd(who,text,kind){return secretAddS(state,who,text,kind)}
-function secretAssignS(s,who,traits){ // 给一个人物从牌库挑 1—2 条合性情的秘密（幂等：一人只发一次）
+function secretAssignS(s,who,traits,force){ // 给一个人物从牌库挑 1—2 条合性情的秘密（幂等：一人只发一次，force 跳检）；帝走专用池
   if(!s)return;
   s.secrets=Array.isArray(s.secrets)?s.secrets:[];
-  if(s.secrets.some(x=>x.who===who))return;
+  if(!force&&s.secrets.some(x=>x.who===who))return;
   const tr=Array.isArray(traits)?traits:[];
-  const fit=SECRET_POOL.filter(x=>!tr.length||x.fit.some(f=>tr.includes(f)));
-  const pool=(fit.length>=2?fit:SECRET_POOL).slice();
+  const isEmp=EMPEROR_ID_RE.test(String(who).trim())||(typeof UI!=='undefined'&&UI.isEmperorId(who));
+  const src=isEmp?SECRET_POOL_EMPEROR:SECRET_POOL;
+  const fit=src.filter(x=>!tr.length||!x.fit||x.fit.some(f=>tr.includes(f)));
+  const pool=(fit.length>=2?fit:src).slice();
   const n=1+(Math.random()<0.35?1:0),picks=[];
   while(picks.length<n&&pool.length)picks.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]);
   for(const p of picks)secretAddS(s,who,p.text.split('{w}').join(who),p.kind);
@@ -6315,6 +6316,17 @@ function normalizeState(s){
   if(!Array.isArray(s.secrets)){ // 旧档补隐秘账：在册人物各发一两条，只发一次
     s.secrets=[];s.secretSeq=0;
     for(const id in s.npcs){const n=s.npcs[id];if(n&&n.rank)secretAssignS(s,id,((n.profile||{}).traits)||[])}
+  }
+  { // 旧档把妃嫔池秘密错发给帝的，换发帝专用池：只换未掌握的（玩家已见过的留在账上，不改口）
+    const wEmp=String((((s||{}).world||{}).emperor)||{}).name||'';
+    const empKeys=[...new Set([...Object.keys(s.npcs||{}),...Object.keys(s.relationships||{})])]
+      .filter(k=>EMPEROR_ID_RE.test(String(k).trim())||(wEmp&&String(k)===wEmp));
+    for(const k of empKeys){
+      const foreign=(s.secrets||[]).filter(x=>x.who===k&&!x.learned&&!SECRET_POOL_EMPEROR.some(p=>p.text.split('{w}').join(k)===x.text));
+      if(!foreign.length)continue;
+      s.secrets=s.secrets.filter(x=>!foreign.includes(x));
+      secretAssignS(s,k,(((s.npcs||{})[k]||{}).profile||{}).traits||[],true);
+    }
   }
   s.time=s.time||{era:'元朔',year:1,month:3,xun:'上旬'};
   if(!s.plotLedgerV1){migratePlotLedger(s);s.plotLedgerV1=true} // 一次性迁移须先于 pending 归一：此时剧情类条目还是字符串，模式才匹配得上；归一后再迁永远命中不了
@@ -14267,9 +14279,11 @@ const Game={
     const hist=history.slice(-14)
       .filter(h=>((h.narrative||'')+' '+(h.focus||'')+' '+(h.choice||'')).indexOf(name)>-1)
       .map(h=>`第${h.turn}旬「${h.focus}」${h.choice?('，应对「'+h.choice+'」'):''}：${(h.narrative||'').slice(0,150)}`);
-    const sys='你是文字游戏《带着系统去宫斗》的主持人。这是一次【读心笺】系统道具查询，不是回合推进：不演绎剧情、不推进时间、不结算、不写 statePatch。依据所附该人物的完整真相（hidden）与她同主控的近期往来，写出此人此刻对主控的真实内心印象。只输出 JSON：{"impression":"…"}；impression 用第二人称称呼主控（行文中写“你”）、一两句、80字以内，可含她未曾表露的算计、戒备、轻蔑或柔情，但只写对你（主控）的印象，不写他人，不用 emoji。';
+    const isEmp=typeof UI!=='undefined'&&UI.isEmperorId(id);
+    const ta=isEmp?'他':'她';
+    const sys='你是文字游戏《带着系统去宫斗》的主持人。这是一次【读心笺】系统道具查询，不是回合推进：不演绎剧情、不推进时间、不结算、不写 statePatch。依据所附该人物的完整真相（hidden）与其同主控的近期往来，写出此人此刻对主控的真实内心印象。只输出 JSON：{"impression":"…"}；impression 用第二人称称呼主控（行文中写“你”）、一两句、80字以内，可含此人未曾表露的算计、戒备、轻蔑或柔情，但只写对你（主控）的印象，不写他人，不用 emoji。';
     const payload={who:name,hidden:npc.hidden||{},known:{traits:normalizePersona(prof.traits),recent:(prof.recent||[]).slice(-6),biography:(prof.biography||[]).slice(-8)},relationship:rel==null?null:rel,recentWithMe:hist,me:state.protagonist&&state.protagonist.name};
-    const msg='请写出「她此刻对主控（行文中称“你”）的印象」，人物资料如下：\n'+JSON.stringify(payload);
+    const msg=`请写出「${ta}此刻对主控（行文中称“你”）的印象」，人物资料如下：\n`+JSON.stringify(payload);
     callModel(msg,{messages:[{role:'system',content:sys},{role:'user',content:msg}],maxTokens:220,expect:'impression'})
       .then(raw=>{
         let text='';
@@ -14277,7 +14291,7 @@ const Game={
         if(!text)throw new Error('模型未返回有效印象');
         impView[id]={text:text.slice(0,200),turn:state.turn};
         const sec=state.secrets&&state.secrets.find(x=>x.who===id&&!x.learned); // 窥心顺带察觉一桩隐秘：读心笺的真正价值
-        if(sec){secretLearn(sec.id);impView[id].text+=`\n（窥心之际，你顺带察觉一桩她的隐秘——${sec.text}）`}
+        if(sec){secretLearn(sec.id);impView[id].text+=`\n（窥心之际，你顺带察觉一桩${ta}的隐秘——${sec.text}）`}
         persistCurrent();markSafe();UI.renderSheet('NPC详情',id);
       })
       .catch(e=>{
