@@ -4947,7 +4947,7 @@ function presenceNote(p){ // 面板「属性」里的一行说明
 /* ============================================================ 工具 */
 const $=s=>document.querySelector(s);
 const MONTHS=['','正月','二月','三月','四月','五月','六月','七月','八月','九月','十月','冬月','腊月'];
-const BUILD='2026-11-27·去案头（有书即修）＋书档进益分级＋求师门槛30＋撤前情'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
+const BUILD='2026-11-28·提示词按回合裁剪（无戏旬不带场景契约）＋无戏旬锁死自加剧情'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
 /* 月俸：按位份每月下旬末由前端自动入账（单位：两） */
 const SALARY_BY_GRADE={'正一品':220,'从一品':150,'正二品':110,'从二品':80,'正三品':60,'从三品':45,'正四品':36,'从四品':28,'正五品':20,'从五品':15,'正六品':12,'从六品':10,'正七品':8,'从七品':6,'正八品':5,'从八品':4,'正九品':3,'从九品':2};
 const SALARY_TITLES=[[/皇后/,220],[/皇贵妃/,150],[/贵妃/,110],[/贤妃|良妃|淑妃|德妃/,80],[/昭仪|昭容|昭媛|修仪|修容|修媛|充仪|充容|充媛/,45],[/贵嫔/,36],[/嫔/,28],[/贵人/,20],[/才人/,15],[/美人/,12],[/宝林/,10],[/常在/,8],[/答应/,6],[/选侍/,5],[/更衣/,4],[/采女/,3],[/官女子/,2],[/妃/,60]];
@@ -7034,16 +7034,34 @@ function compactState(s,focusMsg){ // 只压缩送入模型的那一份，localS
   if(Array.isArray(s.recentConfirmedFacts))out.recentConfirmedFacts=s.recentConfirmedFacts.slice(-12);
   return out;
 }
-let _staticSystem=null; // 静态提示词只拼一次：内容不变，前缀缓存也依赖它逐字节一致
-function buildStaticSystem(){
-  if(_staticSystem==null){
-    _staticSystem=PROMPT_TEMPLATE
+/* 提示词按回合类型裁剪：本旬不可能出戏的回合，不带场景契约、帝线、派系、暗流、手作那些用不上的规则。
+   full   —— 赠礼／献艺／收尾等固定用全量（这些调用方不传 kind，默认落在这里）
+   event  —— 旬首／自拟行动里可能演到场景的一轮
+   routine—— 前端已裁定无戏：只写养成与日常，连 scene 字段都不许写（减少自由度，也省掉最大的一块规则） */
+const PROMPT_MODULES={
+  full:['NPC_MODULE','SECRETS_MODULE','ENERGY_MODULE','PLOTS_MODULE','MAIN_LINE_MODULE','SCHEME_MODULE','FACTION_MODULE','FESTIVAL_MODULE','EMPEROR_MODULE','EMPEROR_PERSONA_MODULE','CHAMBER_MODULE','SCENE_MODULE','SKILL_MODULE','CRAFT_MODULE','COOKING_MODULE','STUDIO_MODULE','GIFT_MODULE','PERFORM_MODULE','PERSONA_MODULE','PERSONA_ACT_MODULE','LENGTH_MODULE','PRESENCE_MODULE','PLAY_UI_MODULE'],
+  event:['NPC_MODULE','SECRETS_MODULE','ENERGY_MODULE','PLOTS_MODULE','MAIN_LINE_MODULE','SCHEME_MODULE','FACTION_MODULE','FESTIVAL_MODULE','EMPEROR_MODULE','EMPEROR_PERSONA_MODULE','SCENE_MODULE','SKILL_MODULE','COOKING_MODULE','PERSONA_MODULE','PERSONA_ACT_MODULE','LENGTH_MODULE','PRESENCE_MODULE','PLAY_UI_MODULE'], // 侍寝、手作、书画、赠礼、互动各有自己的请求：这些模块只在那边出现
+  routine:['NPC_MODULE','SECRETS_MODULE','ENERGY_MODULE','PLOTS_MODULE','SKILL_MODULE','PERSONA_MODULE','PERSONA_ACT_MODULE','LENGTH_MODULE','PRESENCE_MODULE','PLAY_UI_MODULE']
+};
+const ROUTINE_LOCK='\n\n【本轮无戏】前端已裁定本旬没有剧情：只写养成与日常。hasEvent 恒为 false，options 为空数组，不写 scene 字段；不得引入任何要应对的冲突，也不得让谁忽然找上门——清静的旬就该是清静的。changes 照实写，statePatch 只放真变化。';
+let _staticCache={}; // 每套静态提示词各拼一次：同类回合逐字节一致，前缀缓存才命中
+let _modMap=null;
+function promptModules(){
+  if(!_modMap)_modMap={NPC_MODULE,SECRETS_MODULE,ENERGY_MODULE,PLOTS_MODULE,MAIN_LINE_MODULE,SCHEME_MODULE,FACTION_MODULE,FESTIVAL_MODULE,EMPEROR_MODULE,EMPEROR_PERSONA_MODULE,CHAMBER_MODULE,SCENE_MODULE,SKILL_MODULE,CRAFT_MODULE,COOKING_MODULE,STUDIO_MODULE,GIFT_MODULE,PERFORM_MODULE,PERSONA_MODULE,PERSONA_ACT_MODULE,LENGTH_MODULE,PRESENCE_MODULE,PLAY_UI_MODULE};
+  return _modMap;
+}
+function buildStaticSystem(kind){
+  kind=PROMPT_MODULES[kind]?kind:'full';
+  if(_staticCache[kind]==null){
+    const map=promptModules();
+    _staticCache[kind]=PROMPT_TEMPLATE
       .replace('{{世界书全文：02-世界书.md}}',WORLD_BOOK_RUNTIME)
       .replace('{{叙事文风全文：03-叙事文风.md}}',STYLE_GUIDE)
       .replace('{{当前存档 JSON：04-当前存档-v36.json 或玩家当前档}}','（见本提示词末尾「当前存档」段，动态存档在最后）')
-      +'\n\n'+NPC_MODULE+'\n\n'+SECRETS_MODULE+'\n\n'+ENERGY_MODULE+'\n\n'+PLOTS_MODULE+'\n\n'+MAIN_LINE_MODULE+'\n\n'+SCHEME_MODULE+'\n\n'+FACTION_MODULE+'\n\n'+FESTIVAL_MODULE+'\n\n'+EMPEROR_MODULE+'\n\n'+EMPEROR_PERSONA_MODULE+'\n\n'+CHAMBER_MODULE+'\n\n'+SCENE_MODULE+'\n\n'+SKILL_MODULE+'\n\n'+CRAFT_MODULE+'\n\n'+COOKING_MODULE+'\n\n'+STUDIO_MODULE+'\n\n'+GIFT_MODULE+'\n\n'+PERFORM_MODULE+'\n\n'+PERSONA_MODULE+'\n\n'+PERSONA_ACT_MODULE+'\n\n'+LENGTH_MODULE+'\n\n'+PRESENCE_MODULE+'\n\n'+PLAY_UI_MODULE; // 只放与存档无关的常量：本档人物性情表是动态的，见 buildSystem
+      +'\n\n'+PROMPT_MODULES[kind].map(n=>map[n]).join('\n\n') // 只放与存档无关的常量：本档人物性情表是动态的，见 buildSystem
+      +(kind==='routine'?ROUTINE_LOCK:'');
   }
-  return _staticSystem;
+  return _staticCache[kind];
 }
 function secretsBrief(){ // 主控掌握的把柄：随每旬请求附上，是对话里的硬通货
   const known=((state&&state.secrets)||[]).filter(s=>s.learned);
@@ -7054,10 +7072,10 @@ function secretsBrief(){ // 主控掌握的把柄：随每旬请求附上，是�
     +(rows.length?rows.map((r,i)=>`${i+1}. ${r}`).join('\n'):'（手头暂无未用的把柄）')
     +(used?`\n另有 ${used} 条已抖出成公开旧事。`:'');
 }
-function buildSystem(focusMsg){
+function buildSystem(focusMsg,kind){
   // 静态内容（世界书/文风/模块）全部在前、动态存档放最后：
   // 每次请求的前缀保持一致，接口侧前缀缓存才能命中，省 prefill 与费用。
-  const sys=buildStaticSystem()
+  const sys=buildStaticSystem(kind)
     +'\n\n## 十三、当前存档（动态进度的唯一依据，覆盖世界书默认值）\n\n'+JSON.stringify(compactState(state,focusMsg))
     +'\n\n'+presenceBrief(state) // 当前外貌/忌惮档位，每旬随存档变化
     +'\n\n'+disguiseBrief(state) // 本旬易容：旁人只认这张脸，后果记在被冒名者名下
@@ -7072,8 +7090,10 @@ function emperorPersonaBrief(){ // 帝设每旬点一次：不靠模型自己翻
   if(!ps)return '';
   return '\n\n【帝设·执行】本旬凡有帝出场（召见、偶遇、御前、haremNews 里的御前动静），至少写出一处只属于帝设的可见细节：口癖、惯用手势、固定赏赐或忌讳、对主控的固定称呼与破例边界；不得用“待你温柔/冷淡”代替。帝设与随机性情冲突时，以帝设为先。';
 }
-function buildMessages(userMsg,noHistory){
-  const msgs=[{role:'system',content:buildSystem(userMsg)}];
+function buildMessages(userMsg,opts){
+  const noHistory=typeof opts==='boolean'?opts:!!(opts&&opts.noHistory); // 兼容旧的布尔调用（noHistory）
+  const kind=(opts&&typeof opts==='object'&&opts.kind)||'full';
+  const msgs=[{role:'system',content:buildSystem(userMsg,kind)}];
   if(!noHistory){
     const recent=history.slice(-HISTORY_FULL_TURNS),old=history.slice(0,-HISTORY_FULL_TURNS);
     if(old.length){ // 更早的旬合并成一段摘要，避免几十条 messages 反复携带
@@ -7233,7 +7253,7 @@ async function callModel(userMsg,opts){
   const epoch=runEpoch;
   const s=loadSettings();
   if(!s.apiKey){const err=new Error('尚未填写 API Key');err.noKey=true;throw err}
-  const baseMsgs=(opts&&opts.messages)||buildMessages(userMsg,opts&&opts.noHistory);
+  const baseMsgs=(opts&&opts.messages)||buildMessages(userMsg,opts);
   const maxTokens=(opts&&opts.maxTokens)||MAX_OUTPUT_TOKENS;
   const timeoutMs=(opts&&opts.timeoutMs)||REQUEST_TIMEOUT;
   const allowStream=s.stream!==false&&!(opts&&opts.noStream); // 设置里可关闭，兼容不支持 SSE 的网关
@@ -12383,8 +12403,12 @@ const Game={
     }
     if(adj.text)msg+='\n'+adj.text;
     if(loadSettings().fastRoutine!==false&&!bigEvent&&!sceneLike&&!itl)msg+='\n【速览】本旬大概率是例行养成：narrative 只写≤40字的一句摘要（交代做了什么、有何进益即可），不铺陈过程、景物与心绪，把笔墨留给 changes 与 statePatch；若剧情骰命中或横生枝节，照常展开不必受这句限制。';
+    // 本旬有没有可能出戏：没有就不发场景契约（省掉最大一块规则），并锁死“不许自己加戏”
+    const noScene=!bigEvent&&!sceneLike&&!itl&&!(opts&&opts.forceScene);
+    const reqKind=noScene?'routine':'event';
     lastRequest={type:'r1',msg,focus,cost,opts};
     const settle=p=>{
+      if(reqKind==='routine'){p.hasEvent=false;p.options=[];delete p.scene;} // 无戏的旬：模型自己加的戏一律不认（前端已裁定本旬无剧情）
       $('#mapview').classList.remove('on'); // 目的地行动落定即收起宫城图（加载层 z-60 本就叠在图上）
       UI.hideBusy();
       soldNotes=[];lastUseIdx=null;
@@ -12476,7 +12500,7 @@ const Game={
         UI.actResult(focus+(itl?` · 插曲「${itl.card.title}」`:''),filterText(p.narrative),(opts&&opts.foodDeltas)||[]); // 结果弹窗只讲本旬做了什么：待续归局面页，不在弹窗末尾重复
       }
     };
-    callModel(msg).then(raw=>{
+    callModel(msg,{kind:reqKind}).then(raw=>{
       const p0=parsePayload(raw);
       const itlMiss=this._interludeMissed(p0); // 插曲被写成一句闲笔或干脆没演：先按插曲纠正，它同时要求 event 牌进对话
       if(itlMiss){
@@ -12487,7 +12511,7 @@ const Game={
         const fixMsg=msg+`\n【纠正】上一版没有演出本旬插曲「${card.title}」（${itlMiss.hook}）：本旬就这一段事，你却另写了别的，或只顺带提了一句。请重写完整 JSON：正文以这张插曲为主，${mode}；主控原定的「${focus}」一句交代即可，不得改掉，也不得另起别的剧情。`;
         lastRequest={type:'r1',msg:fixMsg,focus,cost,opts};
         UI.showBusy('铺排中','正在重写这段插曲……',true);
-        return callModel(fixMsg).then(raw2=>settle(parsePayload(raw2)));
+        return callModel(fixMsg,{kind:'event'}).then(raw2=>settle(parsePayload(raw2)));
       }
       const newMainIn=Array.isArray(p0.statePatch&&p0.statePatch.plots)&&p0.statePatch.plots.some(x=>x&&x.line==='主线'&&(!x.stage||x.stage==='进行中')); // 新主线已借正文或与发酵处置同场埋入并落账：hasEvent=false 也算兑现，不再纠正
       const noEvent=(((this._eventMandated(adj)||(this._lastInterlude&&this._lastInterlude.event))&&!(adj.mainPub&&newMainIn))||(opts&&(opts._xunPop||opts.forceScene)))&&!p0.hasEvent; // 裁决或插曲要求触发而模型没触发：仍纠正一次（旬首发酵弹出为硬强制）
@@ -12495,7 +12519,7 @@ const Game={
         const fixMsg=msg+`\n【纠正】前端剧情裁决已裁定本旬必须触发剧情（${this._mandateText(adj,opts)}），你却输出 hasEvent=false。请重新输出完整 JSON：hasEvent=true，用剧情对话 scene 结构呈现本轮剧情（scene.state="ongoing"、scene.parts 按语义分段：act 写对方动作神态，say 写对方台词，quote 写转述他人原话，narr 只写其他人物与客观场面，台词都不带引号、不按标点硬切；顶层 options 给 2—4 个接话选项），停下等待玩家应对、不结算后果；本旬养成过程简要并入 narrative。`;
         lastRequest={type:'r1',msg:fixMsg,focus,cost,opts};
         UI.showBusy('铺排中','正在重新生成剧情……',true);
-        return callModel(fixMsg).then(raw2=>settle(parsePayload(raw2)));
+        return callModel(fixMsg,{kind:'event'}).then(raw2=>settle(parsePayload(raw2)));
       }
       const stranger=this._strangerDemand(p0); // 生人一开口就派差事：与交情不符，纠正一次
       if(stranger){
@@ -12503,7 +12527,7 @@ const Game={
         const fixMsg=msg+`\n【纠正】上一版里 ${stranger} 与主控${t.first?'只是头一回照面':`只是${t.label}`}（好感 ${t.value==null?0:t.value}），却一开口就把差事交给她——问她会什么再派活、让她去抄去送去跑腿、或替她出力。交情不到时她只谈场面话、打量试探，难处只露在神色与动作里；托事须有上命、共同利益、把柄或人情作由头。请重写本轮：人物、地点与其余情节不变，删去任何请托与派差，改成她自己的处境、旁人的一句话、一句场面话或一个场面变化；仍用 scene 结构（scene.who 写「${stranger}」，hasEvent=true，步骤同前），不结算后果。`;
         lastRequest={type:'r1',msg:fixMsg,focus,cost,opts};
         UI.showBusy('铺排中','正在重新生成剧情……',true);
-        return callModel(fixMsg).then(raw2=>settle(parsePayload(raw2)));
+        return callModel(fixMsg,{kind:'event'}).then(raw2=>settle(parsePayload(raw2)));
       }
       settle(p0);
     }).catch(e=>{UI.hideBusy();this.handleCallErr(e)});
