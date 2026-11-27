@@ -4528,11 +4528,12 @@ const FESTIVAL_MODULE = [
 
 /* 剧情分段协议：narr 完全旁白 / act 当前说话人动作神态 / say 本人台词 / quote 转述他人原话。完整提示与 ongoing 精简提示共用同一段 */
 const SCENE_PARTS_RULES = [
-'【scene.parts 分段协议】按语义拆 2—5 段，每段只做一件事：',
-'narr＝完全旁白：只写其他人物的举止、客观场面、环境与事件环节，不写当前说话人（scene.who）的动作神态；',
+'【scene.parts 分段协议】按语义拆 2—5 段，每段只做一件事。动笔前先给这段定说话人：是某人的动作（act）、某人亲口说的话（say），还是与在场谁都无干的客观经过（narr）——先定类，再写内容，写完回头核对每段的 type 与 who 没有互相矛盾。',
+'narr＝完全旁白：只写其他人物的举止、客观场面、环境与事件环节，不写当前说话人（scene.who）的动作神态；事件经过、消息怎么传来的、纸条/信上写了什么、人群如何聚散，全是 narr——拿不准归属的整段经过一律 narr，绝不塞进 say/act 挂到当前说话人名下（旁白被挂到人物名下，界面会让她替场面背书）；',
 'act＝当前说话人的动作神态：只写她/他此刻做了什么、神色如何，只写这一个动作或神态（一两句），不写台词、不加引号，也不得写主控或其他人物的举动；前端会把它并入同一只对方对话气泡，以（）显示。主控的动作、多人往来、时间推移与场面变化一律写 narr（开场的这一整段写顶层 narrative）。',
 'say＝当前说话人此刻亲口说的原话：直接写说了什么，不带引号，也不带“他说”“她说”之类的提示语。',
 'quote＝转述/引用第三方的原话：某人复述别人（贵嫔、帝、太后、宫女等）说过的话，或信里、传闻里、圣旨里的原话；who 写原话者的称谓（确无出处可省），text 仍不带引号。',
+'引语只用「」或“”：复述、纸条、信函、传闻里的原话，要么放 quote 段，要么在 narr 里用「」引住；绝不能用圆括号（）包原话——圆括号在界面里专用于渲染动作神态，用圆括号包话，原话会被切成动作、说话人归属全乱。',
 '分辨：当前说话人的动作神态→act；当前说话人亲口说→say；他转述第三个人说的话→quote；其他人物与客观场面→narr。不要把当前说话人的动作神态写成 narr 旁白。',
 '例：{"parts":[{"type":"act","text":"她把茶盏搁下，声音放轻"},{"type":"say","text":"知道了"},{"type":"narr","text":"素心福身往正殿去，两刻才回"},{"type":"quote","who":"贵嫔","text":"回得干净"}]}',
 'act 与 say 相邻时合成一只气泡：动作在前就“（动作）台词”，动作在后就“台词（动作）”；不输出空段、纯标点段；同一句不要既写进 narr 又写进 act/say/quote。',
@@ -12282,24 +12283,31 @@ const Game={
       return '';
     };
     const out=[];
+    const fixParenQuote=t=>String(t||'').replace(/(低声道|回道|问道|答道|叹道|笑道|说道|传的话|说是|嘱咐|叮嘱|写着|写道|言道|说|问|答|言)）([^（）]{1,40}?)（/g,'$1「$2」'); // 模型拿圆括号当引号（说是）…（）：界面把圆括号当动作渲染，先洗回「」
     for(const p of arr){
       if(p==null)continue;
       let text=filterText(pick(p)).trim();
       if(!text||/^[\s。，、；：！？…—·'"“”‘’「」『』()（）]+$/.test(text))continue;
+      text=fixParenQuote(text);
       const raw=String(p.type||p.t||p.role||'').trim().toLowerCase();
       const isQuote=['quote','quoted','cite','citation','refer','references','引用','转述','引述'].includes(raw);
       const isSay=['say','dialog','dialogue','npc','speech','character','char','台词','对白'].includes(raw);
       const isAct=['act','action','gesture','manner','动作','神态','举止'].includes(raw);
       if(isSay||isQuote)text=fixEmperorMention(text); // 台词里提天子称“陛下”，不写“帝”
       let type=isQuote?'quote':isAct?'act':isSay?'say':'narr';
+      let who=p.who?String(p.who).trim():'';
       if(type==='act'){ // 模型常把主控/旁人的整段叙事塞进 act：以「你」起句、或长篇里反复提到你的，其实是旁白
         const bare=text.replace(/^[（(]\s*|\s*[）)]$/g,'').trim();
         const proto=String((state&&state.protagonist&&state.protagonist.name)||'');
         const fromHer=/^你/.test(bare)||(proto&&bare.indexOf(proto)===0);
         const muchYou=bare.length>=50&&(bare.match(/你/g)||[]).length>=2;
-        if(fromHer||muchYou){type='narr';text=bare}
+        if(fromHer||muchYou){type='narr';text=bare;who=''}
       }
-      out.push({type,text,who:p.who?String(p.who).trim():''});
+      if(type==='say'){ // 同上：整段事件经过（传话、塞纸条、人群聚散）被写成 say 挂在当前说话人名下，改判旁白，别让她替场面背书
+        const bare=text.replace(/^[（(]\s*|\s*[）)]$/g,'').trim();
+        if(bare.length>=50&&(bare.match(/你/g)||[]).length>=2){type='narr';text=bare;who=''}
+      }
+      out.push({type,text,who});
     }
     if(!out.length)return null;
     if(!out.some(x=>x.type==='say'||x.type==='quote')){ // parts 只给了动作/旁白、台词却落在 scene.line 上：补一句，别让这轮只剩个动作
