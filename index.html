@@ -3029,13 +3029,28 @@ function factionRelValue(who,s){
   const v=(r&&typeof r==='object')?Number(r.value):Number(r);
   return Number.isFinite(v)?v:null;
 }
-function factionRelLine(f){ // 派系对你的数值化交代：态度档背后的三个数——领袖好感、近期出手次数（另有实力表）
+function factionRelLine(f){ // 派系对你的数值化交代：综合关系（首领六成、相识成员均值四成）与近期出手次数（另有实力表）
   if(!f||f.defunct)return '';
-  const v=factionRelValue(f.leader);
+  const mix=factionRelMix(f);
+  const lv=factionRelValue(f.leader);
+  const mem=(f.members||[]).map(m=>factionRelValue(m)).filter(v=>v!=null);
+  const avg=mem.length?Math.round(mem.reduce((a,b)=>a+b,0)/mem.length):null;
   const ev=factionHostileEvidence(f);
-  const bits=[v==null?'领袖好感未明':`领袖好感 ${Math.round(v)}`];
+  const bits=[];
+  bits.push(mix==null?'关系未明':`关系 ${mix}`);
+  if(lv!=null||avg!=null)bits.push([lv!=null?`首领 ${Math.round(lv)}`:null,avg!=null?`相识成员均值 ${avg}`:null].filter(Boolean).join(' · '));
   bits.push(ev.mid>0?`近十二旬对你出手 ${ev.mid} 次`:'近期未对你出手');
   return bits.join(' · ');
+}
+function factionRelMix(f){ // 派系对主控的关系值：首领六成、相识成员均值四成；首领无账全看成员，成员无账全看首领
+  if(!f)return null;
+  const lv=factionRelValue(f.leader);
+  const mem=(f.members||[]).map(m=>factionRelValue(m)).filter(v=>v!=null);
+  const avg=mem.length?mem.reduce((a,b)=>a+b,0)/mem.length:null;
+  if(lv==null&&avg==null)return null;
+  if(lv==null)return Math.round(avg);
+  if(avg==null)return Math.round(lv);
+  return Math.round(lv*0.6+avg*0.4);
 }
 function factionPowerOf(f,s){
   const npcs=(s&&s.npcs)||{};
@@ -3730,12 +3745,12 @@ function openingWooActive(){
   const w=state&&state.openingWoo;
   return !!(w&&!w.done&&xunSerial(state.time)<=Number(w.until));
 }
-function pickWooVisitor(){ // 拉拢者：先挑仍立着的派系领袖，其次位份高的妃嫔；不挑结怨与中宫
-  const pool=consortVisitIds().filter(id=>relTier(id).key!=='feud');
+function pickWooVisitor(){ // 拉拢者：位份相近的派系领袖优先——高位者看不上低位新人是常理；不挑结怨与中宫
+  const pool=consortVisitIds().filter(id=>relTier(id).key!=='feud'&&Math.abs(rankGapToMe(id))<4);
   if(!pool.length)return null;
   const leads=new Set((state.factions||[]).filter(f=>f&&!f.defunct&&f.leader).map(f=>String(f.leader)));
-  const rankOf=id=>{const n=(state.npcs||{})[id]||{};return rankScoreOf(n.rank||rankTitleOf(id))};
-  pool.sort((a,b)=>(leads.has(String(b))-leads.has(String(a)))||(rankOf(b)-rankOf(a)));
+  const gapOf=id=>Math.abs(rankGapToMe(id));
+  pool.sort((a,b)=>(leads.has(String(b))-leads.has(String(a)))||gapOf(a)-gapOf(b)||rankScoreOf(((state.npcs||{})[b]||{}).rank||rankTitleOf(b))-rankScoreOf(((state.npcs||{})[a]||{}).rank||rankTitleOf(a)));
   return {id:pool[0],kind:'consort',reason:'你新入宫，她来看你，话里带着拉拢之意'};
 }
 /* 命途长赐：入梦定线后一直生效，按旬封顶 */
@@ -4868,7 +4883,13 @@ function isConsortWho(id,n){ // 此人是否妃嫔（太后与宫人除外；中
   if(/后|妃|嫔|昭仪|昭容|昭媛|修仪|修容|修媛|充仪|充容|充媛|贵人|才人|美人|宝林|常在|答应|选侍|更衣|采女/.test(rank))return true;
   return /皇后|贵妃|昭仪|昭容|昭媛|修仪|修容|修媛|充仪|充容|充媛|妃|嫔|贵人|才人|美人|宝林|常在|答应|选侍|更衣|采女/.test(w);
 }
+function rankGapToMe(id){ // 对方位份比主控高几级：正数=高于主控，负数=低于主控
+  const n=(state.npcs||{})[id]||{};
+  return rankScoreOf(n.rank||rankTitleOf(id))-rankScoreOf((state.protagonist||{}).rank);
+}
+
 function consortVisitIds(){ // 可主动登门或受邀的妃嫔：已认识、未结怨、未幽禁病重
+
   const ids=new Set();const npcs=(state&&state.npcs)||{};
   const dg=disguiseActive(state); // 易容中：被她本人登门/受邀会当场穿帮，先把这张脸从名单里摘掉
   for(const id in npcs){const n=npcs[id]||{};if(n.known&&isConsortWho(id,n))ids.add(id)}
@@ -4905,12 +4926,17 @@ function consortVisitReason(id){ // 来访由头：交情不到相熟的人，�
   if(tier.key==='new')return {kind:'errand',text:'新近照过面，提了些时令东西来认认门',weight:0.55}; // 初识只送东西、闲话，不托事
   return null;
 }
-function pickConsortVisitor(){ // 在可来的妃嫔里按交情与由头加权择一人
+function pickConsortVisitor(){ // 在可来的妃嫔里按交情、由头与位份差择一人：高位不登低位者的门，低位更爱来试探结交
   const pool=[];
   for(const id of consortVisitIds()){
     const r=consortVisitReason(id);if(!r)continue;
+    const gap=rankGapToMe(id);
+    if(gap>=5&&r.kind!=='enemy'&&r.kind!=='stake')continue; // 高五级以上不主动来：低位新人何劳她移驾（同仇敌忾/同在一件事上除外）
     const bond=Math.max(0,Number(relValueOf(id))||0);
-    pool.push({id,kind:'consort',reason:r.text,reasonKind:r.kind,w:r.weight*(0.4+bond/140)});
+    let w=r.weight*(0.4+bond/140);
+    if(gap>=3)w*=0.35; // 高三四级：来得少，多是居高施恩的姿态
+    else if(gap<=0)w*=1.3; // 平位与低位：更爱登门试探、结交、投靠
+    pool.push({id,kind:'consort',reason:r.text,reasonKind:r.kind,w});
   }
   if(!pool.length)return null;
   const total=pool.reduce((a,b)=>a+b.w,0);let x=Math.random()*total;
