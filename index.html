@@ -1891,8 +1891,9 @@ const GRACE_GUIDE=[ // 新入宫引导旬：缓冲期内每旬一项指引，借
 function describePlot(p){
   const head=`「${p.title}」(${p.line}，${p.dueText||(p.latest!=null?'有期限':'缓图')}${p.tie?`，所系：${p.tie}`:''})`;
   const next=p.next?`下一步：${p.next}`:'';
-  const note=p.note?`；前情：${String(p.note).slice(0,80)}`:'';
-  const recap=p.factionId?'（派系账：开场先用一两句把前情交到主控眼前——此前谁、在哪、做了什么，此刻来要什么；前情此前已演过则承接，不得再凭空加新桥段）':'';
+  const plan=!!p.factionId&&isFactionPlanNote(p.note);
+  const note=p.note?(plan?`；这一手（前端排的动议，本旬才落地，此前没有演过）：${String(p.note).slice(0,80)}`:`；前情：${String(p.note).slice(0,80)}`):'';
+  const recap=p.factionId?(plan?'（派系账：把这一手落到本旬具体的人、物、差事上，作为本场主戏开场；不得写成“上回已经……”或“前情如此”，也不得换成别的事。）':'（派系账：开场先用一两句把前情交到主控眼前——此前谁、在哪、做了什么，此刻来要什么；前情此前已演过则承接，不得再凭空加新桥段）'):'';
   return `${head}${next}${note}${recap}`;
 }
 function ensurePlotMeta(){return state.plotMeta=state.plotMeta||{lastEventTurn:-99,lastBigTurn:-99}}
@@ -1953,7 +1954,7 @@ function adjudicatePlots(skipDice,mode){ // 旬首裁决：到期强制兑现 + 
     const coolBig=(state.turn-(meta.lastBigTurn??-99))>=3;
     const grace=(meta.graceTurn||0)>(state.turn||0); // 新入宫缓冲期：头几旬只安顿，不掷剧情骰（到期剧情不受限）
     meta.rollHit=!fest&&!grace&&coolEvent&&coolBig&&Math.random()<PLOT_TRIGGER_BASE; // 节宴之旬不掷骰：宴席即当旬剧情
-    const pool0=eligible.filter(p=>!due.includes(p)&&!overdue.includes(p));
+    const pool0=eligible.filter(p=>!due.includes(p)&&!overdue.includes(p)&&!(p.factionId&&isFactionPlanNote(p.note))); // 派系账还停在底本上（这一步没演过）：没有"后续"可接
     const fresh=meta.rollHit&&(!pool0.length||Math.random()<PLOT_NEW_LEAD_CHANCE); // 新引子与在途后续混抽
     meta.rollTargetId=(meta.rollHit&&!fresh&&pool0.length)?pool0[Math.floor(Math.random()*pool0.length)].id:null;
     meta.rollFresh=!!(meta.rollHit&&fresh); // 命中且开新线：本旬从引子牌堆抽一张开头
@@ -3106,7 +3107,7 @@ const FACTION_MOVES={
   ],
   观望:[
     {kind:'probe',title:'探你口风',line:'支线',goal:'看清你站哪边',step:'她宫里的人来给你送时令果子，坐下不走，绕来绕去问你“前儿宴上那桩事，你觉得皇后处置得可公？”——问的是旧事，听的是你的立场',next:'给一句答话，答成什么样都是把柄'},
-    {kind:'seat',title:'席上试你',line:'支线',goal:'看你在人前怎么接话',step:'节宴上她当着半席的人把话头递到你面前：“崔才人诗才最好，何不即席一首给大家助兴？”满席都放下筷子看你',next:'应或不应，应了成不成'},
+    {kind:'seat',title:'席上试你',line:'支线',goal:'看你在人前怎么接话',step:'在人多的一处，她当着半席的人把一件要你露本事的差事递到你面前：“妹妹才学最好，何不即席一首给大家助兴？”满席都放下筷子看你',next:'应或不应，应了成不成'},
     {kind:'word',title:'借话探路',line:'支线',goal:'试你会不会顺着往下问',step:'她在御花园与你“偶遇”，叹一句“这园子里的花，开得太好的都先被折了”，说完看你一眼，看你接不接、怎么接',next:'接话探她底细，或装听不懂'},
     {kind:'watch',title:'袖手看你的热闹',line:'支线',goal:'看清你的斤两',step:'有人当面对你发难时，她就在旁边坐着，不帮也不踩，只看你怎么拆——散场时她的宫女来递了杯茶，说“我家主子请你润润口”',next:'事后探她的口风'},
     {kind:'ask',title:'请你评一件东西',line:'支线',goal:'借物试你的眼界与立场',step:'她拿出一件新得的器物请你掌眼，是一方前朝的砚——她真正想问的不是砚，是你懂不懂、识不识货、背后有没有高人',next:'评或不评，评到什么分寸'},
@@ -3146,10 +3147,27 @@ const FACTION_MOVES={
     {kind:'esc_banquet',title:'esc·宴上夺彩',line:'敌对',esc:true,goal:'在你露脸的场子踩死你的节目',step:'你备了半旬的献艺成了全宴的彩头——因为她在开宴前“无意”把你的节目透给了所有要献艺的人，人人都有了准备，你的成了最不出挑的那个',next:'临场拿出压箱底的东西翻回来'}
   ]
 };
+/* 派系账的 note 初值是前端从 FACTION_MOVES 排的底本（她打算这么做），这一旬才开始落地。
+   底本不能当成「前情」讲给玩家，也不能当成「上回已经演过」喂给模型——否则戏还没开演，前情先编完了。 */
+const FACTION_PLAN_STEPS=(()=>{const out=[];Object.keys(FACTION_MOVES).forEach(k=>(FACTION_MOVES[k]||[]).forEach(m=>{if(m&&m.step)out.push(String(m.step))}));return out})();
+function isFactionPlanNote(t){
+  const x=String(t||'').trim();
+  if(!x)return false;
+  return FACTION_PLAN_STEPS.some(s=>s===x||s.startsWith(x));
+}
 function factionNpc(name){
   if(!state||!name)return null;
   const npcs=state.npcs||{};
   return npcs[name]||Object.values(npcs).find(n=>n&&(n.name===name||n.realName===name))||null;
+}
+function factionInScene(fid,text){ // 本场是否真有这一系的人：派系账的底本还没落地时，正文对不上就不拿它当本场标题
+  const f=((state&&state.factions)||[]).find(x=>x&&x.name===fid);
+  if(!f)return true;
+  const toks=[f.name,String(f.name||'').replace(/一系$/,'').replace(/·.*$/,''),f.leader,...(f.members||[])];
+  const ln=factionNpc(f.leader);
+  if(ln&&ln.realName)toks.push(ln.realName);
+  const blob=String(text||'');
+  return toks.filter(t=>t&&String(t).length>1).some(t=>blob.includes(String(t)));
 }
 function factionMemberRank(name,s){ // 一个人物的位份排序：认称谓也认本名；0＝未定位份
   const npcs=((s||state||{}).npcs)||{};
@@ -4910,7 +4928,7 @@ function presenceNote(p){ // 面板「属性」里的一行说明
 /* ============================================================ 工具 */
 const $=s=>document.querySelector(s);
 const MONTHS=['','正月','二月','三月','四月','五月','六月','七月','八月','九月','十月','冬月','腊月'];
-const BUILD='2026-11-27·迷魂香择人+承恩香+长台词修复'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
+const BUILD='2026-11-27·派系底本不再当前情+请求统计'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
 /* 月俸：按位份每月下旬末由前端自动入账（单位：两） */
 const SALARY_BY_GRADE={'正一品':220,'从一品':150,'正二品':110,'从二品':80,'正三品':60,'从三品':45,'正四品':36,'从四品':28,'正五品':20,'从五品':15,'正六品':12,'从六品':10,'正七品':8,'从七品':6,'正八品':5,'从八品':4,'正九品':3,'从九品':2};
 const SALARY_TITLES=[[/皇后/,220],[/皇贵妃/,150],[/贵妃/,110],[/贤妃|良妃|淑妃|德妃/,80],[/昭仪|昭容|昭媛|修仪|修容|修媛|充仪|充容|充媛/,45],[/贵嫔/,36],[/嫔/,28],[/贵人/,20],[/才人/,15],[/美人/,12],[/宝林/,10],[/常在/,8],[/答应/,6],[/选侍/,5],[/更衣/,4],[/采女/,3],[/官女子/,2],[/妃/,60]];
@@ -7241,7 +7259,7 @@ async function callModel(userMsg,opts){
         if(Array.isArray(obj)){for(const x of obj)takeObj(x);return}
         if(obj.error){const em=obj.error.message||obj.error.code||JSON.stringify(obj.error);throw new Error('接口返回错误：'+em)}
         if(obj.usage)usage=obj.usage;
-        else if(obj.usageMetadata&&!usage)usage={prompt_tokens:obj.usageMetadata.promptTokenCount,completion_tokens:obj.usageMetadata.candidatesTokenCount};
+        else if(obj.usageMetadata&&!usage)usage={prompt_tokens:obj.usageMetadata.promptTokenCount,completion_tokens:obj.usageMetadata.candidatesTokenCount,cached_tokens:obj.usageMetadata.cachedContentTokenCount,thought_tokens:obj.usageMetadata.thoughtsTokenCount};
         if(obj.model)respModel=obj.model;
         const ch=obj.choices&&obj.choices[0];
         if(ch){
@@ -7295,9 +7313,12 @@ async function callModel(userMsg,opts){
       if(usage){ // 耗时与 token 用量：用于判断慢在输入还是输出
         const u=usage;
         const sec=(Date.now()-started)/1000;
-        lastApiStat={sec,in:u.prompt_tokens??null,out:u.completion_tokens??null,cache:u.prompt_cache_hit_tokens??null,model:respModel||s.model||'',at:Date.now()};
+        // 缓存命中与思考 token 一并记下：Gemini 的思考量不计入 completion_tokens，不单看它会把慢误判成输入过大
+        const cacheTok=u.prompt_cache_hit_tokens??u.cached_tokens??null;
+        const thinkTok=u.thought_tokens??((u.completion_tokens_details&&u.completion_tokens_details.reasoning_tokens)??null);
+        lastApiStat={sec,in:u.prompt_tokens??null,out:u.completion_tokens??null,cache:cacheTok,think:thinkTok,model:respModel||s.model||'',at:Date.now()};
         console.info(`[API] ${sec.toFixed(1)}s  prompt ${u.prompt_tokens??'?'} / completion ${u.completion_tokens??'?'} tokens`
-          +(u.prompt_cache_hit_tokens!=null?` / cache hit ${u.prompt_cache_hit_tokens}`:''));
+          +(cacheTok!=null?` / cache hit ${cacheTok}`:'')+(thinkTok!=null?` / thinking ${thinkTok}`:''));
       }
       if(finish==='length'||finish==='max_tokens'||finish==='MAX_TOKENS'){ // 截断的 JSON 必然解析失败，标记后由外层精简重试
         const err=new Error('输出达到长度上限被截断，JSON 未闭合');err.raw=content;err.truncated=true;throw err;
@@ -9691,7 +9712,7 @@ const UI={
       <div class="setrow"><span class="sk">流式输出</span><select id="setStream"><option value="1" ${s.stream!==false?'selected':''}>开启（边写边看，推荐）</option><option value="0" ${s.stream===false?'selected':''}>关闭（接口不支持流式时）</option></select></div>
       <div class="setrow"><span class="sk">外观</span><select id="setTheme"><option value="auto" ${s.theme==='auto'?'selected':''}>跟随系统</option><option value="light" ${s.theme==='light'?'selected':''}>宣纸（浅色）</option><option value="dark" ${s.theme==='dark'?'selected':''}>墨底（深色）</option></select></div>
       <div class="setrow"><span class="sk">例行速览</span><select onchange="Game.setFastRoutine(this.value==='1')"><option value="1" ${s.fastRoutine!==false?'selected':''}>开启（无事旬正文压成一句）</option><option value="0" ${s.fastRoutine===false?'selected':''}>关闭（无事旬也全文演绎）</option></select></div>
-      <div class="sheet-note" style="margin-top:6px">${lastApiStat?`上次请求：${lastApiStat.sec.toFixed(1)} 秒 · 输入 ${lastApiStat.in??'?'}${lastApiStat.cache!=null?`（缓存命中 ${lastApiStat.cache}）`:''} / 输出 ${lastApiStat.out??'?'} tokens`:'尚无请求记录'}</div>
+      <div class="sheet-note" style="margin-top:6px">${lastApiStat?`上次请求：${lastApiStat.sec.toFixed(1)} 秒 · 输入 ${lastApiStat.in??'?'}${lastApiStat.cache!=null?`（缓存命中 ${lastApiStat.cache}）`:''}${lastApiStat.think!=null?` · 思考 ${lastApiStat.think}`:''} / 输出 ${lastApiStat.out??'?'} tokens`:'尚无请求记录'}</div>
       <div class="setbtns"><button class="btn btn-primary" onclick="Game.saveSettingsFromUI()">保存设置</button><button class="btn btn-line" id="btnTestApi" onclick="Game.testApi()">测试连通</button></div>
       <div id="apiTestRes" style="display:none;margin-top:10px;font-size:13px;line-height:1.7;border-radius:2px;padding:8px 10px"></div></div>
       <div class="sec"><div class="sec-cap">数据</div>
@@ -12500,13 +12521,17 @@ const Game={
     const plot=adj.target||[...(adj.overdue||[]),...(adj.due||[])][0]||(adj.stale||[])[0];
     const who=sceneSpeaker(p,sc);
     if(isPlaceholderWho(sc.who))sc.who=who; // 回写兜底说话人，进入对话时不再丢
-    const title=scheme?scheme.who:((adj.fest&&!adj.festSoft)?adj.fest.name:(plot?plot.title:(adj.seed?adj.seed.title:(who==='宫中来人'?'事发':who))));
     const meta=[sc.when,sc.where].filter(Boolean).join('｜');
     const parts=this.sceneParts(sc);
     const lead=sc.line?filterText(sc.line):(parts?parts.map(x=>x.type==='say'?`“${x.text}”`:x.type==='quote'?`${x.who?x.who+'说：':''}「${x.text}」`:x.text).join(''):this.chatLead(p));
     const setup=filterText(p.narrative||'');
     const setupTail=setup?setup.split(/(?<=[。！？])/).filter(Boolean).slice(-2).join('').slice(-180):''; // 先交代在何处遇上谁，避免剧情凭空开始
-    const fore=(plot&&plot.note&&!scheme)?`<div style="line-height:1.8;margin-bottom:8px;font-size:13px;color:var(--ink-soft)">前情 · ${esc(String(plot.note).slice(0,90))}</div>`:''; // 派系账的前情先说给玩家听，免得戏开场了她却摸不着头脑
+    // 派系账的 note 还是前端排的底本时，它只是「这一手」，不是前情；本场若根本不见这一系的人，就不拿它当标题
+    const planPlot=(plot&&plot.factionId&&isFactionPlanNote(plot.note))?plot:null;
+    const blob=[sc.who,sc.where,sc.line,parts?parts.map(x=>x.text).join(''):'',p.narrative].filter(Boolean).join(' ');
+    const shownPlot=(plot&&(!planPlot||factionInScene(planPlot.factionId,blob)))?plot:null;
+    const title=scheme?scheme.who:((adj.fest&&!adj.festSoft)?adj.fest.name:(shownPlot?shownPlot.title:(adj.seed?adj.seed.title:(who==='宫中来人'?'事发':who))));
+    const fore=(shownPlot&&shownPlot.note&&!scheme)?`<div style="line-height:1.8;margin-bottom:8px;font-size:13px;color:var(--ink-soft)">${planPlot?'这一手':'前情'} · ${esc(String(shownPlot.note).slice(0,90))}</div>`:'';
     $('#incTitle').textContent=scheme?('暗流 · '+title):(title==='事发'?'事发':'事发 · '+title);
     const itl=Game._lastInterlude;
     $('#incBody').innerHTML=(meta?`<div style="font-size:12px;color:var(--ink-soft);letter-spacing:.08em;margin-bottom:8px">${esc(meta)}</div>`:'')
