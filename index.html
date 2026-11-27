@@ -49,7 +49,6 @@
   --serif:"Zhuque Fangsong","STFangsong","FangSong","仿宋","Songti SC","STSong","宋体","SimSun",serif;
   --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
   --gbar-h:calc(54px + var(--sat)); /* 常驻顶栏实际高度：同步脚本会按实测值覆盖 */
-  --sail:env(safe-area-inset-left,0px); --sair:env(safe-area-inset-right,0px);
 }
 @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
   --paper:#1c1915; --paper-deep:#262119; --card:#2a241c;
@@ -305,7 +304,6 @@ button.itemrow .cnt{flex:none;max-width:48%;overflow:hidden;text-overflow:ellips
 .destinycard.sel{border-color:var(--cinnabar);box-shadow:inset 0 0 0 1px rgba(166,58,46,.45)}
 .destinycard .dc-name{display:block;letter-spacing:.14em;font-size:15px}
 .destinycard .dc-note{display:block;font-size:12px;color:var(--ink-soft);margin-top:4px;letter-spacing:0}
-.destinycard .dc-tag{font-size:11px;color:var(--cinnabar);letter-spacing:.08em;margin-left:6px}
 .rowline{display:flex;align-items:center;gap:10px;min-height:42px;font-size:14px}
 .rowline .rk{flex:none;width:64px;color:var(--ink-soft);font-size:14px}
 .rowline .rv{flex:1}
@@ -441,7 +439,6 @@ button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:cente
 .hs:active>span:not(.hs-badge){transform:translateY(1px);background:var(--grain),linear-gradient(165deg,rgba(232,219,187,.96),rgba(221,206,172,.95));box-shadow:inset 0 1px 5px rgba(56,44,30,.32),0 1px 2px rgba(46,36,24,.18)}
 .hs:active>span:not(.hs-badge)::before{border-color:rgba(166,58,46,.6)}
 /* 朱边小徽标（角标提示）：纸底朱边，如一方小印 */
-.hs-badge{margin-top:1px;display:inline-flex;align-items:center;justify-content:center;min-height:22px;padding:0 9px;background:#fdfbf5;border:1.5px solid #b0442f;border-radius:999px;color:#b0442f;font-size:11px;font-weight:700;letter-spacing:.06em;white-space:nowrap;box-shadow:0 1px 3px rgba(46,36,24,.3)}
 /* 份例红点：朱砂小点，坐在绢签右上角 */
 .hs>span .hs-dot{position:absolute;top:-4px;right:-4px;width:9px;height:9px;border-radius:50%;background:var(--cinnabar);box-shadow:0 0 0 2px rgba(247,240,221,.92)}
 @media (prefers-reduced-motion:no-preference){.hs>span .hs-dot{animation:hsDotPulse 1.7s ease-in-out infinite}@keyframes hsDotPulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(.74);opacity:.62}}}
@@ -564,8 +561,6 @@ button.tstat{border:0;background:transparent;padding:0;margin:0;text-align:cente
 .chat-opt{text-align:left;background:var(--paper);border:1px solid var(--line-strong);border-radius:2px;min-height:44px;padding:8px 14px;font-size:15px;line-height:1.5;transition:border-color .15s,box-shadow .15s}
 .chat-opt:hover{border-color:var(--gold);box-shadow:inset 3px 0 0 var(--line-gold)}
 .chat-opt:active{border-color:var(--cinnabar);color:var(--cinnabar)}
-.chat-opt .chk{font-family:var(--sans);font-size:11px;letter-spacing:.04em;color:var(--ink-soft);opacity:.85}
-.chat-opt .chk::before{content:"· "}
 .chat-warn{font-family:var(--sans);font-size:11px;line-height:1.5;color:var(--cinnabar);background:rgba(166,58,46,.06);border:1px solid rgba(166,58,46,.25);border-radius:2px;padding:5px 10px}
 .chat-act{display:flex;gap:8px}
 .chat-act input{flex:1;min-height:44px;border:1px solid var(--line-strong);border-radius:2px;background:var(--paper);padding:0 16px;font-size:15px;outline:none}
@@ -3606,14 +3601,12 @@ function emperorRelKeyIn(s){ // 帝的关系键可能是「皇帝」，也可能
 }
 function mlFavor(s){const r=((s||{}).relationships||{})[emperorRelKeyIn(s)];return Number(r&&typeof r==='object'?r.value:r)||0}
 function mlIntimacy(s){return Number((((s||{}).emperor)||{}).intimacy)||0}
-function mlKnown(s){const n=(s||{}).npcs||{};return Object.keys(n).filter(k=>n[k]&&n[k].known).length}
 function mlRankNow(s){return rankScoreOf(((s||{}).protagonist||{}).rank)}
 function mlAllyCount(s,minRank){const rels=(s||{}).relationships||{},npcs=(s||{}).npcs||{};return Object.keys(rels).filter(w=>{const r=rels[w];const v=Number(r&&typeof r==='object'?r.value:r);const rk=rankScoreOf((npcs[w]&&npcs[w].rank)||rankTitleOf(w));return Number.isFinite(v)&&v>=60&&rk>=minRank}).length}
 function mlSkillCount(s,min){const sk=((s||{}).protagonist||{}).skills||{};return Object.values(sk).filter(v=>Number(v)>=min).length}
 function mlSpread(s){const vs=ATTR5.map(k=>mlAttr(s,k));return Math.max.apply(null,vs)-Math.min.apply(null,vs)}
 function mlHateCount(s,min){const rels=(s||{}).relationships||{};return Object.keys(rels).filter(w=>{const r=rels[w];return r&&typeof r==='object'&&r.type==='仇恨'&&Number(r.value)>=min}).length}
 function mlFavCount(s,min){const rels=(s||{}).relationships||{},npcs=(s||{}).npcs||{};return Object.keys(rels).filter(w=>{if(w==='皇帝')return false;const r=rels[w];const v=Number(r&&typeof r==='object'?r.value:r);if(!(v>=min))return false;const rk=rankScoreOf((npcs[w]&&npcs[w].rank)||rankTitleOf(w));return rk>0&&rk<27}).length}
-function mlSkillLowest(s){const sk=((s||{}).protagonist||{}).skills||{};const vs=Object.values(sk).map(Number).filter(Number.isFinite);return vs.length?Math.min.apply(null,vs):0}
 /* 翻手为云专用的“清册”：只认前端能查的痕迹——死、废、幽、逐、出家、禁足都算不再走动；
    “自己这一系”＝仍立着、且态度为「拉拢」的派系（或领袖正是主控本人）。 */
 const FAN_OUT_MARK=/薨|殁|病逝|已故|亡故|遇害|暴毙|幽禁|圈禁|冷宫|禁足|待罪|废为庶人|废黜|逐出|出宫|出家|失势/;
@@ -3819,7 +3812,6 @@ const MAIN_LINES={
 const MAIN_LINE_IDS=['tong','an','fan'];
 
 function mainLineDef(){const ml=state&&state.mainLine;return ml?MAIN_LINES[ml.id]||null:null}
-function mainLineStageDef(){const ml=state&&state.mainLine,def=mainLineDef();if(!ml||!def)return null;return def.stages[ml.stage-1]||null}
 function mlStageCheck(s,ml){
   if(!s||!ml)return null;
   const d=MAIN_LINES[ml.id];if(!d)return null;
@@ -4955,7 +4947,7 @@ function presenceNote(p){ // 面板「属性」里的一行说明
 /* ============================================================ 工具 */
 const $=s=>document.querySelector(s);
 const MONTHS=['','正月','二月','三月','四月','五月','六月','七月','八月','九月','十月','冬月','腊月'];
-const BUILD='2026-11-27·界面描金润色＋帝离场后交人、等待气泡不挂头像'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
+const BUILD='2026-11-27·清理死代码＋结算轮精简提示词、可单设结算模型'; // 版本标识：设置→API 页可见，用于确认浏览器加载的是新版
 /* 月俸：按位份每月下旬末由前端自动入账（单位：两） */
 const SALARY_BY_GRADE={'正一品':220,'从一品':150,'正二品':110,'从二品':80,'正三品':60,'从三品':45,'正四品':36,'从四品':28,'正五品':20,'从五品':15,'正六品':12,'从六品':10,'正七品':8,'从七品':6,'正八品':5,'从八品':4,'正九品':3,'从九品':2};
 const SALARY_TITLES=[[/皇后/,220],[/皇贵妃/,150],[/贵妃/,110],[/贤妃|良妃|淑妃|德妃/,80],[/昭仪|昭容|昭媛|修仪|修容|修媛|充仪|充容|充媛/,45],[/贵嫔/,36],[/嫔/,28],[/贵人/,20],[/才人/,15],[/美人/,12],[/宝林/,10],[/常在/,8],[/答应/,6],[/选侍/,5],[/更衣/,4],[/采女/,3],[/官女子/,2],[/妃/,60]];
@@ -6344,7 +6336,7 @@ function toast(msg,ms=2200){const el=$('#toast');el.textContent=msg;el.classList
 
 /* ============================================================ 设置 */
 const SET_KEY='sgd_settings';
-const DEFAULT_SETTINGS={apiKey:'',baseUrl:'https://api.deepseek.com/v1',model:'deepseek-chat',theme:'auto',stream:true,bgm:true,bgmTrack:1,apiProfiles:[],fastRoutine:true};
+const DEFAULT_SETTINGS={apiKey:'',baseUrl:'https://api.deepseek.com/v1',model:'deepseek-chat',settleModel:'',slimSettle:true,theme:'auto',stream:true,bgm:true,bgmTrack:1,apiProfiles:[],fastRoutine:true};
 function loadSettings(){
   try{return Object.assign({},DEFAULT_SETTINGS,JSON.parse(localStorage.getItem(SET_KEY)||'{}'))}
   catch(e){return Object.assign({},DEFAULT_SETTINGS)}
@@ -7095,6 +7087,26 @@ function buildMessages(userMsg,noHistory){
   msgs.push({role:'user',content:String(userMsg)+'\n【格式】只输出一个完整 JSON 对象，不要输出任何 JSON 以外的文字。'});
   return msgs;
 }
+/* 结算轮（玩家点「结束对话」）专用精简提示词：只留收尾要用的规则，砍掉世界书全文与只在面板里生效的模块。
+   静态部分照旧只拼一次；与完整版分两套前缀，缓存各算各的。 */
+let _settleSystem=null;
+function buildSettleSystem(){
+  if(_settleSystem==null){
+    _settleSystem=PROMPT_TEMPLATE
+      .replace('{{世界书全文：02-世界书.md}}','（本场只做收尾结算，世界书从略：位份、月俸、关系与数值口径以「当前存档」与下文规则为准，不得另立新规）')
+      .replace('{{叙事文风全文：03-叙事文风.md}}',STYLE_GUIDE)
+      .replace('{{当前存档 JSON：04-当前存档-v36.json 或玩家当前档}}','（见本提示词末尾「当前存档」段）')
+      +'\n\n'+NPC_MODULE+'\n\n'+ENERGY_MODULE+'\n\n'+PLOTS_MODULE+'\n\n'+EMPEROR_MODULE+'\n\n'+FACTION_MODULE
+      +'\n\n'+SCENE_MODULE+'\n\n'+SCENE_PARTS_RULES+'\n\n'+SKILL_MODULE+'\n\n'+PRESENCE_MODULE+'\n\n'+LENGTH_MODULE+'\n\n'+SECRETS_MODULE;
+  }
+  return _settleSystem+(sceneCtx&&sceneCtx.chamber?'\n\n'+CHAMBER_MODULE:''); // 侍寝夜话只收场：补一条夜话口径
+}
+function buildSettleMessages(userMsg){
+  return [{role:'system',content:buildSettleSystem()
+      +'\n\n## 当前存档（动态进度的唯一依据）\n\n'+JSON.stringify(compactState(state))
+      +'\n\n'+presenceBrief(state)+'\n\n'+personaActTable()},
+    {role:'user',content:String(userMsg)+'\n【格式】只输出一个完整 JSON 对象，不要输出任何 JSON 以外的文字。'}];
+}
 /* 剧情对话 ongoing 轮次专用精简提示词：只带本场对方、主控与相关引线，不带整本世界书与全部存档。
    这些轮次不结算、不推进时间，模型只需要写好对方这一句话与接话选项。 */
 const SCENE_RULES=[
@@ -7265,7 +7277,7 @@ async function callModel(userMsg,opts){
     const timer=setTimeout(()=>{timedOut=true;ctrl.abort()},timeoutMs);
     const started=Date.now();
     try{
-      const body={model:s.model||'deepseek-chat',messages,temperature:0.75,max_tokens:maxTokens};
+      const body={model:(opts&&opts.model)||s.model||'deepseek-chat',messages,temperature:0.75,max_tokens:maxTokens};
       if(!sansFormat)body.response_format={type:'json_object'};
       if(useStream)body.stream=true;
       const res=await fetch(s.baseUrl.replace(/\/+$/,'')+'/chat/completions',{
@@ -9736,6 +9748,8 @@ const UI={
       <div class="setrow"><span class="sk">API Key</span><input id="setKey" type="password" placeholder="sk-…" value="${esc(s.apiKey)}"></div>
       <div class="setrow"><span class="sk">接口地址</span><input id="setBase" placeholder="https://api.deepseek.com/v1" value="${esc(s.baseUrl)}"></div>
       <div class="setrow"><span class="sk">模型</span><input id="setModel" placeholder="deepseek-chat" value="${esc(s.model)}"></div>
+      <div class="setrow"><span class="sk">结算模型</span><input id="setSettleModel" placeholder="留空＝同上" value="${esc(s.settleModel||'')}"></div>
+      <div class="setrow"><span class="sk">精简结算</span><select id="setSlimSettle"><option value="1" ${s.slimSettle!==false?'selected':''}>开启</option><option value="0" ${s.slimSettle===false?'selected':''}>关闭</option></select></div>
       <div class="setrow"><span class="sk">流式输出</span><select id="setStream"><option value="1" ${s.stream!==false?'selected':''}>开启（边写边看，推荐）</option><option value="0" ${s.stream===false?'selected':''}>关闭（接口不支持流式时）</option></select></div>
       <div class="setrow"><span class="sk">外观</span><select id="setTheme"><option value="auto" ${s.theme==='auto'?'selected':''}>跟随系统</option><option value="light" ${s.theme==='light'?'selected':''}>宣纸（浅色）</option><option value="dark" ${s.theme==='dark'?'selected':''}>墨底（深色）</option></select></div>
       <div class="setrow"><span class="sk">例行速览</span><select onchange="Game.setFastRoutine(this.value==='1')"><option value="1" ${s.fastRoutine!==false?'selected':''}>开启（无事旬正文压成一句）</option><option value="0" ${s.fastRoutine===false?'selected':''}>关闭（无事旬也全文演绎）</option></select></div>
@@ -13151,6 +13165,12 @@ const Game={
     lastRequest={type:'sc',msg,choice,maxTokens,noHistory,compact,endReq,gift:gift||null,perf:perf||null};
     const req={};if(maxTokens)req.maxTokens=maxTokens;
     if(compact)req.messages=[{role:'system',content:buildSceneSystem(sceneCtx?sceneCtx.who:'')},{role:'user',content:msg}]; // ongoing：精简提示词，不结算
+    else if(endReq){ // 收尾轮：精简提示词＋可选的结算模型，输入少一半，慢模型上省的是整段 prefill
+      const st=loadSettings();
+      if(st.slimSettle!==false)req.messages=buildSettleMessages(msg);
+      else req.noHistory=true;
+      if(st.settleModel)req.model=st.settleModel;
+    }
     else if(noHistory)req.noHistory=true; // 收尾轮保留完整提示词，只省历史正文
     callModel(msg,req).then(raw=>{
       const p=parsePayload(raw);
@@ -14824,7 +14844,8 @@ const Game={
   },
   saveSettingsFromUI(){
     const cur=loadSettings(); // 合并保存：别把背景音乐曲目、速率等本次没改的设置冲掉
-    saveSettings(Object.assign({},cur,{apiKey:$('#setKey').value.trim(),baseUrl:$('#setBase').value.trim()||'https://api.deepseek.com/v1',model:$('#setModel').value.trim()||'deepseek-chat',theme:$('#setTheme').value,stream:$('#setStream').value!=='0'}));
+    const sm=$('#setSettleModel'),ss=$('#setSlimSettle');
+    saveSettings(Object.assign({},cur,{apiKey:$('#setKey').value.trim(),baseUrl:$('#setBase').value.trim()||'https://api.deepseek.com/v1',model:$('#setModel').value.trim()||'deepseek-chat',settleModel:sm?sm.value.trim():cur.settleModel,slimSettle:ss?ss.value!=='0':cur.slimSettle,theme:$('#setTheme').value,stream:$('#setStream').value!=='0'}));
     toast('设置已保存');
   },
   applyApiProfile(i){
